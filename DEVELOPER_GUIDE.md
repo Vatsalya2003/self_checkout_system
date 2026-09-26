@@ -1,7 +1,11 @@
-# Developer Guide — Self-Checkout Monolith
+# Developer Guide — Self-Checkout, Layered
 
 A walkthrough of the whole project: what it does, how it is built, why each
 decision was made, and how to run and explain it.
+
+The code is organized into **four layers** — `api`, `transactions`,
+`analytics`, `persistence` — with the dependency rules between them enforced by
+an automated test. §3 and the new §4.5 cover how they talk to each other.
 
 For **measured results and architectural trade-offs**, see
 [ARCHITECTURE.md](ARCHITECTURE.md). This guide deliberately does not repeat the
@@ -14,7 +18,7 @@ numbers — it explains the *machinery* that produced them.
 1. [What the system does](#1-what-the-system-does)
 2. [Tech stack, and why each piece](#2-tech-stack-and-why-each-piece)
 3. [Architecture](#3-architecture)
-4. [How a request flows](#4-how-a-request-flows)
+4. [How a request flows](#4-how-a-request-flows) · [how the layers talk](#45-how-the-layers-talk-to-each-other)
 5. [The database](#5-the-database)
 6. [API reference](#6-api-reference)
 7. [File-by-file walkthrough](#7-file-by-file-walkthrough)
@@ -71,79 +75,95 @@ Two rules drive almost every design decision in the codebase:
 | **PostgreSQL** | 16 | A real relational database with real transactions and real row-level locking. The correctness guarantee in this project is *enforced by the database*, not by Java code, so the database choice matters. Also easy to reinitialize from a `.sql` file. |
 | **HikariCP** | (bundled) | The connection pool. Opening a database connection is slow, so the app keeps a set of them open and lends them out. Worth knowing about: under heavy load this pool becomes the bottleneck — see §8.7. |
 | **Maven** | wrapper (`./mvnw`) | Builds the project and downloads dependencies. The *wrapper* means nobody has to install Maven — `./mvnw` fetches the right version itself. |
+| **ArchUnit** | 1.3.0 (test) | Reads the compiled classes and fails the build if a layer depends on something it shouldn't. Turns "controllers must not call repositories" from a convention nobody checks into a test. |
 | **Jackson** | 3.x | Turns objects into JSON and back. Note: Jackson 3 moved to the `tools.jackson` package — the old `com.fasterxml` imports do not work on Spring Boot 4. |
 
-**Why a monolith at all?** This is week one of a semester that rebuilds the
-same API in a different architecture each week. One process and one database
-is the simplest thing that can possibly work, which makes it the honest
-baseline everything else gets compared against.
+**Why layers?** This is week two of a semester that rebuilds the same API in a
+different architecture each week. Week 1 grouped classes by technical type,
+which *looked* layered but enforced nothing — HTTP types had already leaked into
+the business code. This week the layers are real packages with rules a test
+checks. It is still one process and one database: layering is a source-code
+structure, not a deployment one.
 
 ---
 
 ## 3. Architecture
 
-Three layers, each allowed to talk only to the one below it.
+Four layers. Each may only depend downwards, and a test enforces it.
 
 ```mermaid
 graph TD
-    subgraph client["Client"]
-        LC["Load client / curl"]
+    subgraph api["api — HTTP only (CLOSED)"]
+        A1["ItemController · TransactionController<br/>InventoryController · AnalyticsController"]
+        A2["dto/ — 12 records, the spec's wire shapes"]
+        A3["error/ — ApiError · GlobalExceptionHandler<br/>domain exception → status + error code"]
     end
 
-    subgraph controller["CONTROLLER layer — HTTP only, no logic"]
-        IC["ItemController<br/>GET /items"]
-        TC["TransactionController<br/>POST /transactions<br/>POST /{id}/items<br/>POST /{id}/complete<br/>GET /{id}"]
-        INC["InventoryController<br/>GET /inventory/low-stock"]
-        AC["AnalyticsController<br/>GET /analytics/popular-items"]
-        GEH["GlobalExceptionHandler<br/>turns exceptions into JSON"]
+    subgraph tx["transactions — business rules (CLOSED)"]
+        T1["CatalogService · TransactionService · InventoryService"]
+        T2["result/ — 7 domain records"]
+        T3["exception/ — DomainException + 5 subtypes"]
     end
 
-    subgraph service["SERVICE layer — business rules + transaction boundaries"]
-        CS["CatalogService"]
-        TS["TransactionService<br/>start / scan / complete"]
-        IS["InventoryService"]
-        PS["PopularItemsService"]
+    subgraph an["analytics — business rules (OPEN)"]
+        N1["AnalyticsService implements ScanRecorder"]
+        N2["ScanRecorder — the one-method door in"]
+        N3["result/ — 2 domain records"]
+        N4["RecomputeExecutorConfig — the background thread"]
     end
 
-    subgraph repo["REPOSITORY layer — all SQL lives here"]
-        IR["ItemRepository<br/>findBySkuForUpdate = row lock"]
-        TR["TransactionRepository<br/>findByIdForUpdate = row lock"]
-        TIR["TransactionItemRepository<br/>...OrderBySkuAsc = lock order"]
-        SLR["ScanLogRepository"]
-        LSR["LowStockAlertRepository"]
-        PSR["PopularSnapshotRepository"]
+    subgraph per["persistence — JPA only (CLOSED)"]
+        P1["entity/ — 8 entities"]
+        P2["repository/ — 6 repositories + 2 projections"]
     end
 
-    DB[("PostgreSQL<br/>items, transactions,<br/>transaction_items, scan_log,<br/>low_stock_alerts, popular_snapshots")]
-    BG["popular-recompute<br/>background thread"]
+    CFG["config — shared kernel<br/>SelfCheckoutProperties"]
+    DB[("PostgreSQL")]
 
-    LC --> IC & TC & INC & AC
-    IC --> CS
-    TC --> TS
-    INC --> IS
-    AC --> PS
-    TS -.->|"notifies on each scan"| PS
-    PS -.->|"after commit"| BG
-    BG --> SLR
-    CS --> IR
-    TS --> IR & TR & TIR & SLR & LSR
-    IS --> LSR
-    PS --> SLR & PSR
-    IR & TR & TIR & SLR & LSR & PSR --> DB
-    TC -.->|"throws ApiException"| GEH
+    api -->|"start · scan · complete · catalog · low-stock"| tx
+    api -.->|"popular-items only"| an
+    tx -->|"recordScan(sku)"| an
+    tx --> per
+    an --> per
+    per --> DB
+    api -.-> CFG
+    tx -.-> CFG
+    an -.-> CFG
+
+    classDef openLayer stroke-dasharray:5 5
+    class an openLayer
 ```
 
-**The rules this diagram encodes:**
+**Closed vs open.** A *closed* layer must be passed through — you cannot reach
+what is under it without going via it. An *open* layer may be bypassed.
+`api`, `transactions` and `persistence` are closed. **`analytics` is open**:
+the API calls it directly for `GET /analytics/popular-items`, because routing a
+read-only query through a transactions method that only forwards the call would
+be a **sinkhole** — a layer that adds a hop and nothing else.
 
-- Controllers contain **no** business logic and **no** `try/catch`. They map a
-  URL to a service call and return the result.
-- Services own the **transaction boundaries** — `@Transactional` appears only
-  here. They are also the only place that throws `ApiException`.
-- Repositories own **all** SQL. Nothing above them writes a query.
-- DTOs cross the boundary outward; entities never leave the service layer.
-  That's why `GET /items` cannot accidentally leak the stock count.
+**The rules, as enforced by `LayeredArchitectureTest`:**
 
----
+| Layer | May be accessed by | May depend on |
+|---|---|---|
+| `api` | *nothing* | transactions, analytics, config |
+| `transactions` | api | analytics *(via `ScanRecorder` only)*, persistence, config |
+| `analytics` | api, transactions | persistence, config |
+| `persistence` | transactions, analytics | JPA / Spring Data only |
+| `config` | all | nothing |
+
+Plus: **no class outside `api` may touch `org.springframework.http..` or
+`org.springframework.web..`**, and **no class in `api` may touch
+`..persistence..`**.
+
+**What this buys, in one example.** `TransactionService` does not contain the
+word `HttpStatus`. It throws `TransactionNotOpenException`; the API layer
+decides that means 409 with code `TRANSACTION_NOT_OPEN`. Serve the same rules
+over gRPC tomorrow and the business layer does not change.
+
+**What it costs.** Seven of the domain result records are field-for-field
+identical to the DTOs they map to, and that mapping code is pure overhead until
+the day the API shape and the domain shape need to differ. See ARCHITECTURE.md
+§2 for the honest accounting.
 
 ## 4. How a request flows
 
@@ -300,6 +320,76 @@ sequenceDiagram
   database connection, however heavy the checkout load gets.
 
 ---
+
+### 4.5 How the layers talk to each other
+
+One scan, followed all the way down and back. Watch where each layer stops
+knowing things: the controller knows HTTP but not SQL; the service knows stock
+rules but not HTTP; analytics knows windows but not baskets; persistence knows
+rows but nothing above it.
+
+```mermaid
+sequenceDiagram
+    participant C as Station
+    box api — HTTP only
+    participant CTL as TransactionController
+    participant EH as GlobalExceptionHandler
+    end
+    box transactions — business rules
+    participant TS as TransactionService
+    end
+    box analytics — business rules
+    participant AS as AnalyticsService<br/>(as ScanRecorder)
+    end
+    box persistence — JPA only
+    participant REPO as Repositories
+    end
+    participant DB as PostgreSQL
+
+    C->>CTL: POST /transactions/{id}/items {"sku":"SKU-000001"}
+    Note over CTL: parses JSON into ScanItemRequest.<br/>Knows nothing about stock.
+    CTL->>TS: scan(id, sku)
+    Note over TS: @Transactional starts here —<br/>a business decision, not a DB one
+
+    TS->>REPO: findById(transaction) / findById(item)
+    REPO->>DB: SELECT
+    alt transaction missing
+        TS-->>CTL: throw TransactionNotFoundException
+        Note over TS: a DOMAIN exception —<br/>no HttpStatus anywhere in this layer
+        CTL-->>EH: propagates
+        EH-->>C: 404 {"error":"TRANSACTION_NOT_FOUND"}
+    end
+
+    TS->>REPO: upsert basket line, tx.addScan(price)
+    Note over TS,DB: items.stock is never read or locked on a scan
+
+    TS->>AS: recordScan("SKU-000001")
+    Note over TS: one method on ScanRecorder.<br/>Transactions does not know scan_log exists.
+    AS->>REPO: INSERT scan_log → seq
+    REPO->>DB: INSERT
+    Note over AS: no @Transactional — joins the scan's<br/>transaction, so a rollback takes the log row too
+    AS->>AS: boundary = (seq / 500) * 500<br/>compareAndSet — did we cross?
+    opt boundary crossed
+        AS->>AS: register afterCommit hook
+    end
+
+    TS-->>CTL: ScanOutcome (a domain record)
+    Note over CTL: maps ScanOutcome → ScanResult.<br/>Domain shape and wire shape are separate.
+    CTL-->>C: 200 {"transactionId":...,"runningTotal":...}
+
+    Note over AS,DB: after COMMIT, on the background thread:<br/>aggregate the window, INSERT popular_snapshots
+```
+
+**The three boundary crossings worth noticing:**
+
+1. **api → transactions** passes a `String`, gets back a domain record. No DTO
+   goes down; no entity comes up.
+2. **transactions → analytics** is one method, `recordScan(sku)`. Everything
+   about sequence numbers, boundaries and background threads is hidden behind
+   it.
+3. **The exception path** never mentions HTTP until it reaches
+   `GlobalExceptionHandler`, which is the only class allowed to turn
+   "the basket wasn't open" into "409".
 
 ## 5. The database
 
@@ -523,78 +613,68 @@ response with an empty `items` list, never a 404.
 
 ## 7. File-by-file walkthrough
 
-### Entry point and configuration
+Organized by layer, top to bottom.
+
+### Entry point and shared config
 
 | File | What it does |
 |---|---|
-| `SelfCheckoutApplication.java` | `main()`. `@SpringBootApplication` turns on component scanning (which is why every class must live under `com.selfcheckout.self_checkout`). Starting it also rebuilds the database. |
-| `config/SelfCheckoutProperties.java` | A record bound to the `selfcheckout.*` keys, so services get one typed, immutable settings object instead of scattered `@Value` strings. |
-| `config/RecomputeExecutorConfig.java` | Defines the single daemon thread used for analytics recomputes. Single-threaded on purpose — windows must be written in order, and analytics must never grab more than one extra DB connection. |
+| `SelfCheckoutApplication.java` | `main()`. Sits above every layer so component scanning reaches them all. Starting it also rebuilds the database. |
+| `config/SelfCheckoutProperties.java` | A record bound to the `selfcheckout.*` keys. The **shared kernel**: any layer may read it, it may depend on none of them. |
 
-### Controllers — HTTP only
+### `api/` — HTTP only
 
-| File | Endpoints | Notes |
-|---|---|---|
-| `ItemController` | `GET /items` | Two lines of logic. |
-| `TransactionController` | `POST /transactions`, `POST /{id}/items`, `POST /{id}/complete`, `GET /{id}` | Returns `ResponseEntity` only for the 201; everything else returns the record directly. No `try/catch` anywhere. |
-| `InventoryController` | `GET /inventory/low-stock` | `Integer threshold` not `int`, so "absent" is distinguishable from "zero". |
-| `AnalyticsController` | `GET /analytics/popular-items` | Only reads the newest stored window; never computes. |
+| File | Endpoints / role |
+|---|---|
+| `ItemController` | `GET /items`. Maps `CatalogItem` → `ItemDto`. Honestly a pass-through today. |
+| `TransactionController` | `POST /transactions`, `POST /{id}/items`, `POST /{id}/complete`, `GET /{id}`. Maps domain results → spec DTOs. No `try/catch`. |
+| `InventoryController` | `GET /inventory/low-stock`. `Integer threshold` so "absent" ≠ "zero". |
+| `AnalyticsController` | `GET /analytics/popular-items`. Calls **analytics directly** — this is what makes analytics an open layer. |
+| `api/dto/*` (12 records) | The spec's wire shapes. Renaming a field here changes the API; renaming a domain record does not. |
+| `api/error/ApiError` | The `{error, message}` body. |
+| `api/error/GlobalExceptionHandler` | **The only class that maps a business failure to an HTTP status.** One `@ExceptionHandler` per domain exception, plus one for malformed JSON. |
 
-### Services — the business rules
+### `transactions/` — checkout business rules
 
 | File | Key methods | Notes |
 |---|---|---|
-| `CatalogService` | `listItems()` | Maps entities → DTOs so stock never leaks. Its **sort order matters**: the load client treats catalog position as popularity rank, making `SKU-000001` the hottest item. |
-| `TransactionService` | `start`, `scan`, `complete`, `get` | **The core of the project.** `scan` deliberately touches no locks; `complete` holds all of them. Read this file first. |
-| `InventoryService` | `lowStock(Integer)` | Resolves the effective threshold, then stamps it onto each row. Only *reads* alerts — they're *written* by `complete()`. |
-| `PopularItemsService` | `onScanRecorded`, `recomputeWindow`, `latest` | Boundary detection on the hot path, the aggregate on a background thread, and the read-back for the endpoint. |
+| `TransactionService` | `start`, `scan`, `complete`, `get` | **Read this first.** `scan` takes no locks; `complete` holds all of them. Contains no HTTP type. |
+| `CatalogService` | `listItems()` | Entity → `CatalogItem`. Its sort order makes `SKU-000001` the hottest item under the load client's Zipf sampler. |
+| `InventoryService` | `lowStock(Integer)` | Only *reads* alerts; they are *written* by `complete()`. |
+| `transactions/result/*` (7 records) | — | `CatalogItem`, `TransactionView`, `ScanOutcome`, `ReceiptView`, `ReceiptLineView`, `LowStockView`, `LowStockEntry`. `TransactionView.status` is a `String`, not the persistence enum. |
+| `transactions/exception/*` (6 types) | — | `DomainException` + `TransactionNotFound`, `ItemNotFound`, `TransactionNotOpen`, `EmptyTransaction`, `InvalidRequest`. All unchecked, so `@Transactional` rolls back. |
 
-### Repositories — all the SQL
+### `analytics/` — popularity windows
+
+| File | Role |
+|---|---|
+| `ScanRecorder` | The one-method interface the transactions layer calls. Keeps the dependency narrow and one-directional. |
+| `AnalyticsService` | Implements `ScanRecorder`. `recordScan` writes `scan_log` and checks the boundary; `recomputeWindow` runs the aggregate on the background thread; `latest` serves the endpoint. |
+| `analytics/result/*` | `PopularWindowView`, `PopularEntry`. `PopularEntry` is also the on-disk JSON format inside `popular_snapshots`. |
+| `RecomputeExecutorConfig` | The single daemon thread. Analytics-specific, so it lives here rather than in `config/`. |
+
+### `persistence/` — all the SQL
 
 | File | Notable method | Why it matters |
 |---|---|---|
-| `ItemRepository` | `findBySkuForUpdate` | `@Lock(PESSIMISTIC_WRITE)` → `SELECT ... FOR UPDATE`. **This is the lock that prevents lost updates.** |
-| `TransactionRepository` | `findByIdForUpdate` | Serializes two completes of the same basket. |
-| `TransactionItemRepository` | `findByTransactionIdOrderBySkuAsc` | The `OrderBySkuAsc` **is** the deadlock prevention. Don't "tidy" the name. |
-| `ScanLogRepository` | `topInWindow(start, end, limit)` | The windowed aggregate. Half-open `(start, end]`. |
-| `LowStockAlertRepository` | `findBelowThreshold` | `LEFT JOIN` + `coalesce` so SKUs without a recorded crossing fall back to "now". |
-| `PopularSnapshotRepository` | `findFirstByOrderByIdDesc` | Newest window. Append-only table, so highest id wins. |
-| `ScanCount`, `LowStockRow` | — | Query *projections*: small records to receive results, instead of loading whole entities. |
+| `repository/ItemRepository` | `findBySkuForUpdate` | `@Lock(PESSIMISTIC_WRITE)` → `SELECT ... FOR UPDATE`. **The lock that prevents lost updates.** |
+| `repository/TransactionRepository` | `findByIdForUpdate` | Serializes two completes of the same basket. |
+| `repository/TransactionItemRepository` | `findByTransactionIdOrderBySkuAsc` | The `OrderBySkuAsc` **is** the deadlock prevention. |
+| `repository/ScanLogRepository` | `topInWindow(start, end, limit)` | The windowed aggregate, half-open `(start, end]`. |
+| `repository/LowStockAlertRepository` | `findBelowThreshold` | `LEFT JOIN` + `coalesce` for the ad-hoc threshold fallback. |
+| `repository/PopularSnapshotRepository` | `findFirstByOrderByIdDesc` | Newest window; the table is append-only. |
+| `repository/ScanCount`, `LowStockRow` | — | Query projections. |
+| `entity/*` (8) | — | `Item`, `Transaction`, `TransactionItem` (+`TransactionItemId`), `ScanLog`, `LowStockAlert`, `PopularSnapshot`, `TransactionStatus`. Foreign keys are plain `String`s, not `@ManyToOne`, to avoid N+1 fetches and unlocked copies. |
 
-### Entities — one class per table
-
-`Item`, `Transaction`, `TransactionItem` (+ `TransactionItemId` for its
-two-column key), `ScanLog`, `LowStockAlert`, `PopularSnapshot`, and the
-`TransactionStatus` enum. All use explicit `@Column(name = ...)` so a change in
-naming defaults can't silently break the mapping.
-
-`TransactionItem` stores its foreign keys as plain `String`s rather than
-`@ManyToOne` objects. Two reasons: `@ManyToOne` defaults to EAGER fetching, so
-reading a 7-line basket would fire 7 extra SELECTs; and it would load
-*unlocked* copies of `Item` right before we deliberately re-read those rows
-*with* a lock.
-
-### DTOs — the API's vocabulary
-
-Thirteen records in `dto/`, one per schema in the OpenAPI spec. They exist so
-the JSON contract is independent of the database shape — the entity field is
-`id`, the JSON field is `transactionId`, and the mapping is explicit.
-
-### Everything else
+### Tests, scripts, reports
 
 | File | What it does |
 |---|---|
-| `exception/ApiException.java` | Carries HTTP status + error code + message. Unchecked, so `@Transactional` rolls back automatically. |
-| `exception/GlobalExceptionHandler.java` | `@RestControllerAdvice` that converts exceptions to the spec's error JSON. This is why controllers have no `try/catch`. |
-| `resources/schema.sql` | Drops and recreates all six tables. Runs on **every** boot. |
-| `resources/data.sql` | Seeds 2000 items × 10,000 units using `generate_series`. |
-| `resources/application.properties` | Datasource, domain tunables, performance settings — each with its reasoning inline. |
-| `scripts/check-invariant.sql` | The three correctness checks. Run after a load test, **before** restarting. |
-| `scripts/_client.py` | Shared stdlib-only HTTP + `psql` helper. |
-| `scripts/test-*.py` | Four behavioural tests; each file's header says what it proves. |
+| `src/test/.../architecture/LayeredArchitectureTest.java` | Six ArchUnit rules encoding the dependency table. Does not start Spring. |
+| `src/test/.../SelfCheckoutApplicationTests.java` | `contextLoads` smoke test. **Boots the app, so it re-runs `schema.sql` and wipes the database.** |
+| `scripts/check-invariant.sql` | The three correctness checks. Run after a load test, before restarting. |
+| `scripts/_client.py`, `scripts/test-*.py` | Shared helper + four behavioural tests. |
 | `reports/*.json` | The two committed load-test reports. |
-
----
 
 ## 8. Deep dives
 
@@ -861,6 +941,19 @@ psql self_checkout -f scripts/check-invariant.sql
 Plus a summary line: violations, completed transactions, total scans, windows
 written, alerts recorded.
 
+### Run the architecture test
+
+```bash
+./mvnw test -Dtest=LayeredArchitectureTest
+```
+
+Six rules, no Spring, no database — about a second. It fails the build if any
+layer starts depending on something it shouldn't.
+
+> `./mvnw test` on its own also runs `contextLoads`, which boots the app and
+> therefore **re-runs `schema.sql` and wipes the database**. Never run it
+> between a load test and its invariant check.
+
 ### Run the behavioural tests
 
 Restart the server first (they assume full stock), then:
@@ -967,6 +1060,13 @@ itself was starved — that's a host problem, not a code problem.
 |---|---|
 | **Entity** | A Java class mapped to a database table; one object = one row. `Item`, `Transaction`. |
 | **DTO** | Data Transfer Object. A simple record shaped for the *API*, not the database. Keeps the JSON contract independent of the tables. |
+| **Layer** | A group of classes with one responsibility, allowed to depend only on the layers below it. |
+| **Closed layer** | Must be passed through; you cannot reach past it. Buys isolation. |
+| **Open layer** | May be bypassed. Ours: `analytics`. Avoids a pointless hop. |
+| **Sinkhole** | A layer that receives a call and just forwards it, adding nothing. |
+| **Domain exception** | An error thrown by the business layer that describes *what* went wrong, with no HTTP in it. |
+| **Shared kernel** | Something every layer may use (here: `config`) that depends on none of them. |
+| **ArchUnit** | A library that reads compiled classes and fails a test when a dependency rule is broken. |
 | **Repository** | The interface that holds the queries. Spring generates the implementation; we just declare the methods. |
 | **Derived query** | A repository method whose **name** defines the SQL — `findByTransactionIdOrderBySkuAsc` becomes a `WHERE` + `ORDER BY`. Rename it carelessly and you change the query. |
 | **Projection** | A small record used to receive query results, instead of loading whole entities you don't need. |

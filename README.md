@@ -1,4 +1,4 @@
-# Self-Checkout System — Monolith
+# Self-Checkout System — Layered Architecture
 
 A monolithic backend for a supermarket self-checkout system: customers start a
 transaction at a station, scan items one unit at a time, then pay. Stock is decremented
@@ -7,6 +7,10 @@ over a hopping window.
 
 Spring Boot 4.1.1 (Java 21) over PostgreSQL 16, implementing the shared course contract
 in `CS6510-2026/spec/self-checkout-openapi.yaml`.
+
+The code is split into four layers — **api**, **transactions**, **analytics**,
+**persistence** — and the dependency rules between them are enforced by an ArchUnit test,
+not by convention.
 
 **New to this codebase? Start with [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)** — a full
 walkthrough with diagrams: how a request flows, what every table and column is for,
@@ -180,12 +184,13 @@ of each file explains what it proves and why it matters.
 
 ```
 src/main/java/com/selfcheckout/self_checkout/
-  controller/   HTTP endpoints, one per resource area
-  service/      business logic and transaction boundaries
-  repository/   Spring Data JPA repositories and query projections
-  entity/       JPA entities mapped to the tables in schema.sql
-  dto/          request/response records matching the OpenAPI schemas
-  config/       configuration properties and the analytics executor
+  api/            HTTP only — controllers, dto/ (wire shapes), error/ (exception → status)
+  transactions/   checkout business rules — services, result/ (domain records), exception/
+  analytics/      popularity windows — AnalyticsService, ScanRecorder, result/
+  persistence/    database access only — entity/, repository/
+  config/         shared kernel — SelfCheckoutProperties
+src/test/java/com/selfcheckout/self_checkout/
+  architecture/   LayeredArchitectureTest — the dependency rules, as a test
 src/main/resources/
   schema.sql            dropped and recreated on every boot
   data.sql              seeds 2000 items x 10,000 stock
@@ -193,3 +198,18 @@ src/main/resources/
 scripts/        invariant check + behavioural tests
 reports/        the two committed load-test reports
 ```
+
+Dependencies only ever point downwards: `api → transactions → persistence`, with
+`analytics` sitting below transactions and reachable directly from `api` for its one
+read-only endpoint. See [ARCHITECTURE.md](ARCHITECTURE.md) §4 for why, and
+[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) §4.5 for a request crossing all four.
+
+## Run the architecture test
+
+```bash
+./mvnw test -Dtest=LayeredArchitectureTest     # six rules, ~1s, no database
+./mvnw test                                     # also runs contextLoads
+```
+
+> **`./mvnw test` boots the application, which re-runs `schema.sql` and wipes the
+> database.** Never run it between a load test and its invariant check.

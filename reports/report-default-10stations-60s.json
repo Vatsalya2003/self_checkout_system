@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-24T22:18:40.644471Z",
+  "generatedAt": "2026-09-26T02:13:01.987234Z",
   "config": {
     "baseUrl": "http://localhost:8080",
     "stations": 10,
@@ -7,47 +7,47 @@
     "minItems": 1,
     "maxItems": 20
   },
-  "wallClockSeconds": 60.020975042,
-  "totalTransactions": 20619,
-  "totalItemsScanned": 216324,
-  "transactionsPerSecond": 343.52990742939016,
-  "itemsPerSecond": 3604.1400501845583,
+  "wallClockSeconds": 60.0519845,
+  "totalTransactions": 19663,
+  "totalItemsScanned": 205130,
+  "transactionsPerSecond": 327.4329760076455,
+  "itemsPerSecond": 3415.8737918144902,
   "operations": [
     {
       "operation": "START_TRANSACTION",
-      "successCount": 20619,
+      "successCount": 19663,
       "errorCount": 0,
       "errorRate": 0.0,
-      "meanMs": 0.7224734890634852,
-      "p50Ms": 0.625167,
-      "p95Ms": 1.120083,
-      "p99Ms": 1.931,
-      "minMs": 0.325666,
-      "maxMs": 56.7435
+      "meanMs": 0.7806696917052331,
+      "p50Ms": 0.650667,
+      "p95Ms": 1.226125,
+      "p99Ms": 2.201083,
+      "minMs": 0.322333,
+      "maxMs": 63.69275
     },
     {
       "operation": "SCAN_ITEM",
-      "successCount": 216324,
+      "successCount": 205130,
       "errorCount": 0,
       "errorRate": 0.0,
-      "meanMs": 1.2991222350733158,
-      "p50Ms": 1.191333,
-      "p95Ms": 1.98975,
-      "p99Ms": 3.133333,
-      "minMs": 0.523458,
-      "maxMs": 80.41
+      "meanMs": 1.385824239979525,
+      "p50Ms": 1.239625,
+      "p95Ms": 2.187166,
+      "p99Ms": 3.551583,
+      "minMs": 0.514458,
+      "maxMs": 240.699708
     },
     {
       "operation": "COMPLETE_TRANSACTION",
-      "successCount": 20619,
+      "successCount": 19663,
       "errorCount": 0,
       "errorRate": 0.0,
-      "meanMs": 14.743950649983026,
-      "p50Ms": 14.993,
-      "p95Ms": 30.982125,
-      "p99Ms": 43.923417,
-      "minMs": 0.620875,
-      "maxMs": 265.583708
+      "meanMs": 15.285124948024208,
+      "p50Ms": 15.160917,
+      "p95Ms": 32.676333,
+      "p99Ms": 47.441125,
+      "minMs": 0.627583,
+      "maxMs": 339.502584
     }
   ],
   "lowStockAlerts": [
@@ -55,15 +55,15 @@
     {"sku": "SKU-000002", "name": "Item 2", "currentStock": 0, "threshold": 50}
   ],
   "popularItems": [
-    {"rank": 1, "sku": "SKU-000001", "name": "Item 1", "scanCount": 106},
-    {"rank": 2, "sku": "SKU-000002", "name": "Item 2", "scanCount": 64},
-    {"rank": 3, "sku": "SKU-000003", "name": "Item 3", "scanCount": 47},
-    {"rank": 4, "sku": "SKU-000004", "name": "Item 4", "scanCount": 31},
-    {"rank": 5, "sku": "SKU-000005", "name": "Item 5", "scanCount": 29},
-    {"rank": 6, "sku": "SKU-000006", "name": "Item 6", "scanCount": 27},
-    {"rank": 7, "sku": "SKU-000007", "name": "Item 7", "scanCount": 19},
-    {"rank": 8, "sku": "SKU-000008", "name": "Item 8", "scanCount": 14},
-    {"rank": 9, "sku": "SKU-000012", "name": "Item 12", "scanCount": 12},
-    {"rank": 10, "sku": "SKU-000009", "name": "Item 9", "scanCount": 11}
+    {"rank": 1, "sku": "SKU-000001", "name": "Item 1", "scanCount": 118},
+    {"rank": 2, "sku": "SKU-000002", "name": "Item 2", "scanCount": 58},
+    {"rank": 3, "sku": "SKU-000003", "name": "Item 3", "scanCount": 38},
+    {"rank": 4, "sku": "SKU-000006", "name": "Item 6", "scanCount": 27},
+    {"rank": 5, "sku": "SKU-000004", "name": "Item 4", "scanCount": 26},
+    {"rank": 6, "sku": "SKU-000009", "name": "Item 9", "scanCount": 20},
+    {"rank": 7, "sku": "SKU-000010", "name": "Item 10", "scanCount": 20},
+    {"rank": 8, "sku": "SKU-000005", "name": "Item 5", "scanCount": 17},
+    {"rank": 9, "sku": "SKU-000011", "name": "Item 11", "scanCount": 16},
+    {"rank": 10, "sku": "SKU-000007", "name": "Item 7", "scanCount": 14}
   ]
 }
