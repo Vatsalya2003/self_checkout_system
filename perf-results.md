@@ -50,6 +50,9 @@ understated the baseline and mis-ranked which costs matter.
 | 4 stress | 100 stations, 120 s | 993.3 | 999.8 | 0.10 / 0.33 | 80.56 / 286.58 | 0 | PASS | — | **kept** |
 | 6 | Write the transaction header before taking the item lock | 1051.7 | 1007.9 | 0.09 / 0.38 | 4.35 / 41.54 | 0 | PASS | — | **kept** |
 | 6 stress | 100 stations, 120 s | 1012.2 | 998.1 | 0.10 / 0.33 | 77.49 / 290.08 | 0 | PASS | — | **kept** |
+| 7 | Connection pool 16 vs 32 vs 64, interleaved | see Phase 7 below | | | | 0 | PASS | — | **kept 32** (unchanged) |
+| **FINAL** | 10 stations, 60 s | **1031.8** | **1028.5** | 0.09 / 0.40 | 4.44 / 43.51 | 0 | PASS | no (~310 % of 800 %) | — |
+| **FINAL stress** | 100 stations, 120 s | **1007.8** | **1040.2** | 0.10 / 0.32 | 76.51 / 305.22 | 0 | PASS | no (~350 % of 800 %) | — |
 
 ### Reading the phases
 
@@ -436,3 +439,120 @@ labelled, not deleted.
 | pool=64, 100 st | 303.5 | contaminated, background CPU peaked at 232 % |
 | pool=16, 100 st | 347.2 | contaminated |
 | pool=32, 100 st (A/A re-test) | 805.4 | partial recovery; critical section 1,318 µs vs 1,013 µs |
+
+---
+
+## Phase 7 — connection pool size: 16 vs 32 vs 64
+
+Run **interleaved** (16, 32, 64 × 3) after a 12-minute cooldown, 100 stations,
+60 s each. Rep 3 matches rep 1 to within 0.4 %, so there is no drift left in
+these numbers.
+
+| pool | tx/s (rep 1 / 2 / 3) | mean tx/s | COMPLETE p50 | p95 | p99 | critical section |
+|---|---|---|---|---|---|---|
+| 16 | 945.5 / 1008.1 / 949.2 | 967.6 | 90.8 ms | **167.6 ms** | **228.9 ms** | 1,124 µs |
+| **32** | 992.9 / 981.4 / 995.6 | **990.0** | 78.2 ms | 205.4 ms | 307.1 ms | **1,065 µs** |
+| 64 | 892.3 / 883.8 / 879.3 | 885.1 | **66.6 ms** | 324.6 ms | 511.3 ms | 1,159 µs |
+
+Zero errors at every size.
+
+**Decision: keep 32.** This phase confirms the existing setting with data
+rather than changing it.
+
+**Reading the numbers.** There is a clean trade running across the three rows,
+and it is not "bigger pool, more throughput":
+
+- **p50 falls as the pool grows** (90.8 → 78.2 → 66.6 ms). A bigger pool admits
+  more requests sooner, so the median request starts earlier.
+- **p95 and p99 rise sharply** (229 → 307 → 511 ms at p99). Admitting more
+  requests does not make the hot row any less serial — it just moves the queue
+  from the connection pool into Postgres, where it is longer and less fair.
+- **Throughput peaks in the middle.** 64 is 10.6 % *worse* than 32, with no
+  overlap between the two sets of runs.
+
+The mechanism shows up in the critical section, which is the server's own work
+and should not depend on the pool at all: at 64 it grows from 1,065 µs to
+1,159 µs. With 8 cores, 64 Postgres backends contending means each one's work
+takes measurably longer — so a bigger pool makes the serialized section
+*slower*, which is exactly the wrong direction.
+
+16 vs 32 is a genuine choice rather than a clear win: 32 is ~2.3 % faster on
+the mean but their ranges overlap (16 peaked at 1008.1, above 32's best run),
+while 16 gives a visibly tighter tail (p99 229 ms vs 307 ms). 32 is kept
+because throughput is the goal this week and it also has the lowest critical
+section. **If tail latency were the priority, 16 would be the better choice** —
+that is a real, measured option, not a hypothetical.
+
+---
+
+## Final result
+
+Four runs, fresh restart before each, packaged jar, machine cooled first.
+Raw reports in `reports/perf/final/`.
+
+| | baseline (`pipeline-v1`) | final | change |
+|---|---|---|---|
+| tx/s, 10 stations | 404.6 / 407.2 | **1031.8 / 1028.5** | **×2.54** |
+| tx/s, 100 stations | 420.3 / 431.9 | **1007.8 / 1040.2** | **×2.40** |
+| scans/s, 100 stations | ~4,400 | **10,591 / 10,950** | ×2.45 |
+| `START` p50 | 0.61 ms | **0.10 ms** | −84 % |
+| `SCAN` p50 / p99 | 0.85 / 2.86 ms | **0.09 / 0.40 ms** | −89 % / −86 % |
+| `COMPLETE` p50 / p99 (10 st) | 13.82 / 50.43 ms | **4.44 / 43.51 ms** | −68 % / −14 % |
+| `COMPLETE` p50 / p99 (100 st) | 90.84 / 328.56 ms | **76.51 / 305.22 ms** | −16 % / −7 % |
+| errors | 0 | **0** (of ~2.9 M requests across the four runs) | — |
+| invariant | PASS | **PASS** | — |
+
+### Statements per operation, start to finish
+
+| Operation | `pipeline-v1` | final |
+|---|---|---|
+| `POST /transactions` | 4 | **0** |
+| `POST /{id}/items` (scan) | 7–8 + 3 background | **0** |
+| `POST /{id}/complete` (L SKUs) | 3L + 5 ≈ 33 | **6** |
+| `GET /items` | 1 | **0** |
+| **statements held under the item lock** | **3L + 2 ≈ 30** | **3** |
+| whole checkout cycle | ~120 | **6** |
+
+### Phase 8 — is it CPU-bound? No, and that is the point
+
+CPU sampled every 3 s during each final run, as a percentage of the 800 %
+available on 8 cores:
+
+| Run | server | Postgres | load client | total |
+|---|---|---|---|---|
+| default 1 | 100 % | 96 % | 114 % | 310 % |
+| default 2 | 103 % | 94 % | 111 % | 308 % |
+| stress 1 | 104 % | 132 % | 122 % | 358 % |
+| stress 2 | 87 % | 134 % | 126 % | 347 % |
+
+**The server uses about one core.** It is not short of CPU, memory or
+connections — at 100 stations it is blocked, and the measurement in Phase 6
+says exactly where: `lockWait` 93–96 ms against a `criticalSection` of
+1.01–1.04 ms. Roughly 99 % of a completion's database time is spent queueing
+for the hottest SKU's row, and about 1 % doing the work.
+
+Note also that the baseline burned **~505 %** of CPU to do 405 tx/s, while the
+final build does 1030 tx/s on ~310 %. Most of the removed work was never
+useful: it was round trips, Hibernate dirty-checking and merge-before-insert
+SELECTs.
+
+### What would have to change to go faster
+
+Not a to-do list, just the honest reading of the numbers. Everything below is
+a **hypothesis**, not a measurement.
+
+1. **Shard the hot row.** The ceiling is one row's serialization. Splitting
+   `SKU-000001`'s stock across N counter rows and decrementing a random one
+   would cut contention by roughly N, at the cost of making "what is the
+   stock?" a `SUM` and the invariant check more complicated.
+2. **Shorten the critical section further.** The remaining 1.0 ms is one
+   `UPDATE`, one `INSERT` and a commit. Folding the first two into a single
+   CTE statement would remove one round trip; see the rejection above for why
+   it was not done.
+3. **Don't take the lock at all.** `UPDATE items SET stock = stock - LEAST(stock, ?)`
+   is atomic without a prior `SELECT`. It was rejected because the row-locking
+   order inside a multi-row `UPDATE` is not guaranteed, which reopens the
+   deadlock the sorted lock exists to prevent.
+
+The two levers that are *not* worth pulling: more CPU (there is spare), and a
+bigger connection pool (Phase 7 measured it as actively harmful).
