@@ -113,7 +113,7 @@ graph TD
         N1["AnalyticsService implements ScanRecorder"]
         N2["ScanRecorder — the one-method door in"]
         N3["result/ — 2 domain records"]
-        N4["pipeline/ — 5 filters over bounded queues"]
+        N4["pipeline/ — 4-5 filters over bounded queues"]
     end
 
     subgraph per["persistence — JPA only (CLOSED)"]

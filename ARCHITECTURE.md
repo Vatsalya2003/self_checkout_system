@@ -220,7 +220,7 @@ differences smaller than that carry no signal.
 graph TD
     API["<b>api</b> — HTTP only · CLOSED<br/>4 controllers · dto/ (12 records) · error/"]
     TX["<b>transactions</b> — CLOSED<br/>CatalogService · TransactionService · InventoryService<br/>result/ (7 records) · exception/ (6 types)"]
-    AN["<b>analytics</b> — OPEN<br/>AnalyticsService · ScanRecorder<br/>result/ (2 records) · pipeline/ (5 filters)"]
+    AN["<b>analytics</b> — OPEN<br/>AnalyticsService · ScanRecorder<br/>result/ (2 records) · pipeline/ (4-5 filters)"]
     PER["<b>persistence</b> — JPA only · CLOSED<br/>entity/ (8) · repository/ (6 + 2 projections)"]
     CFG["config — shared kernel<br/>SelfCheckoutProperties"]
     DB[("PostgreSQL")]

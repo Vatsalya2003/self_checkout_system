@@ -1,5 +1,26 @@
 # Self-Checkout System — Layered Architecture with a Pipelined Analytics Stage
 
+> ## Week 3 submission
+>
+> **The two load-client JSON reports:**
+> - [`reports/report-default-10stations-60s.json`](reports/report-default-10stations-60s.json) — default, 10 stations, 60 s: **1031.8 tx/s, 0 errors**
+> - [`reports/report-stress-100stations-120s.json`](reports/report-stress-100stations-120s.json) — stress, `--stations=100 --duration=120`: **1007.8 tx/s, 0 errors**
+>
+> **The filter description: [PIPELINE.md](PIPELINE.md).**
+>
+> The system has a **4-stage pipeline**: **ingest** (numbers each scan with a gapless
+> global sequence) → **window** (last 1000 scans in a ring buffer, emits a counts snapshot
+> every 500) → **rank** (top 10, ties by SKU ascending, names attached) → **sink** (batches
+> windows and writes them to `popular_snapshots`). **Ingest** optionally also tees to a
+> fifth filter, the **scan-log writer** (batched multi-row INSERT into `scan_log`), which is
+> off by default. The pipes are implemented with bounded Java `ArrayBlockingQueue`s, one
+> thread per filter.
+>
+> The throughput is well above the `pipeline-v1` tag because a separate round of checkout
+> performance work followed the pipeline — see
+> [PIPELINE.md § Beyond the pipeline](PIPELINE.md#beyond-the-pipeline) and
+> [perf-results.md](perf-results.md).
+
 A monolithic backend for a supermarket self-checkout system: customers start a
 transaction at a station, scan items one unit at a time, then pay. Stock is decremented
 at payment, low-stock alerts are recorded as they happen, and item popularity is tracked
@@ -12,7 +33,7 @@ The code is split into four layers — **api**, **transactions**, **analytics**,
 **persistence** — and the dependency rules between them are enforced by an ArchUnit test,
 not by convention.
 
-The windowed analytics run as a **5-stage pipeline of filters connected by pipes**:
+The windowed analytics run as a **pipeline of filters connected by pipes** (4 stages, 5 with raw scan persistence on):
 **ingest** (numbers each committed scan and tees it) → **window** (last 1000 scans, emits
 every 500) → **rank** (top 10, ties by SKU) → **sink** (writes `popular_snapshots`), with
 ingest also teeing to an optional **scan-log writer** (batched multi-row INSERT into
