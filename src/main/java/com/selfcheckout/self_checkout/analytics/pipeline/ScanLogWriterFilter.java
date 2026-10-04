@@ -15,23 +15,20 @@ import java.util.List;
  * checkout. Here the rows are batched and written on a background thread, so
  * a scan request does no database work for analytics at all.
  *
- * The batching is ADAPTIVE: it writes whatever has accumulated, up to
- * maxBatch. When traffic is light that is one or two rows; if the writer ever
- * falls behind -- say it waited for a pooled connection under stress -- the
- * backlog is simply written in bigger batches, so it catches up instead of
- * drifting further behind.
+ * The batching itself lives in BatchingLoop, which this filter shares with
+ * the sink: it writes whatever has accumulated, up to a cap. When traffic is
+ * light that is one or two rows; if the writer ever falls behind -- say it
+ * waited for a pooled connection under stress -- the backlog is simply
+ * written in bigger batches, so it catches up instead of drifting further
+ * behind.
  */
 public class ScanLogWriterFilter {
 
     private final ScanLogBatchWriter writer;
-    private final int maxBatch;
 
-    public ScanLogWriterFilter(ScanLogBatchWriter writer, int maxBatch) {
+    public ScanLogWriterFilter(ScanLogBatchWriter writer) {
         this.writer = writer;
-        this.maxBatch = maxBatch;
     }
-
-    public int maxBatch() { return maxBatch; }
 
     /** Write one batch. Returns how many rows were written. */
     public int flush(List<SequencedScanEvent> batch) {

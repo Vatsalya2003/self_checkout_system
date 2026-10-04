@@ -20,6 +20,14 @@ public class PipelineMetrics {
     /** Events refused at the request boundary because the ingest pipe was full. */
     private final AtomicLong droppedAtIngress = new AtomicLong();
 
+    /**
+     * Events the ingest filter could not hand to the scan-log branch because
+     * that pipe was full. Counted separately from droppedAtIngress because it
+     * means something different: the audit trail has a hole, but the live
+     * window -- which is what the API actually serves -- is unaffected.
+     */
+    private final AtomicLong droppedRawScans = new AtomicLong();
+
     public void registerStage(String stage) {
         in.computeIfAbsent(stage, k -> new AtomicLong());
         out.computeIfAbsent(stage, k -> new AtomicLong());
@@ -27,15 +35,18 @@ public class PipelineMetrics {
     }
 
     public void recordIn(String stage)    { in.get(stage).incrementAndGet(); }
+    public void recordIn(String stage, long n)  { in.get(stage).addAndGet(n); }
     public void recordOut(String stage)   { out.get(stage).incrementAndGet(); }
     public void recordOut(String stage, long n) { out.get(stage).addAndGet(n); }
     public void recordError(String stage) { errors.get(stage).incrementAndGet(); }
     public void recordDrop()              { droppedAtIngress.incrementAndGet(); }
+    public void recordRawScanDrop()       { droppedRawScans.incrementAndGet(); }
 
     public long in(String stage)     { return in.get(stage).get(); }
     public long out(String stage)    { return out.get(stage).get(); }
     public long errors(String stage) { return errors.get(stage).get(); }
     public long dropped()            { return droppedAtIngress.get(); }
+    public long droppedRawScans()    { return droppedRawScans.get(); }
 
     public Iterable<String> stages() { return in.keySet(); }
 
@@ -60,6 +71,7 @@ public class PipelineMetrics {
             sb.append(" |");
         }
         sb.append(" droppedAtIngress=").append(droppedAtIngress.get());
+        sb.append(" droppedRawScans=").append(droppedRawScans.get());
         return sb.toString();
     }
 }

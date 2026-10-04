@@ -20,11 +20,18 @@ import java.util.List;
  *
  * Shape (see PIPELINE.md):
  *
- *   request thread --offer--> [ingest] --+--> [window] --> [rank] --> [sink]
+ *   request thread --offer--> [ingest] --put--> [window] --> [rank] --> [sink]
  *                                        |
- *                                        +--> [scan-log writer]
+ *                                        +--offer--> [scan-log writer]   (optional)
  *
  * One thread per filter, bounded queue between each pair.
+ *
+ * Two things about the tee are deliberate:
+ *  - the window branch uses a blocking put, the scan-log branch a
+ *    non-blocking offer, so the optional audit trail can never slow down or
+ *    starve the branch the API serves from
+ *  - the scan-log branch is only built when selfcheckout.analytics
+ *    .persist-raw-scans is true; with it off the stage does not exist at all
  */
 @Component
 public class AnalyticsPipeline {
@@ -35,17 +42,27 @@ public class AnalyticsPipeline {
     private static final int TOP_N = 10;
 
     // ---- sizing -------------------------------------------------------
-    // The three event pipes carry one message per scan. At the ~3600 scans/sec
-    // measured in Week 2, 65536 slots is roughly 18 seconds of buffer, and
-    // three of them cost about 20 MB at worst. The two window pipes carry one
-    // message per 500 scans -- about 7 per second -- so 256 is already absurd
-    // headroom.
+    // The event pipes carry one message per scan. At the ~8900 scans/sec this
+    // server now reaches under stress, 65536 slots is about 7 seconds of
+    // buffer, and they cost about 20 MB at worst.
     private static final int EVENT_PIPE_CAPACITY = 65_536;
-    private static final int WINDOW_PIPE_CAPACITY = 256;
+
+    // The two window pipes carry one message per slideInterval scans -- about
+    // 18 per second at stress rates. They were 256, which filled, because the
+    // sink wrote one row per commit and could not keep up; the backlog pushed
+    // all the way up to the window filter. The real fix for that is the
+    // batched sink below, NOT a bigger queue. This headroom is only so a
+    // transient stall (a long pool wait, a GC pause) is absorbed instead of
+    // propagated: 4096 slots is over three minutes of windows.
+    private static final int WINDOW_PIPE_CAPACITY = 4_096;
 
     // Biggest single INSERT. 1000 rows x 3 columns = 3000 bind parameters,
     // well under Postgres' 65535 limit.
     private static final int MAX_BATCH = 1_000;
+
+    // Snapshot rows are much fatter (each carries the top-10 JSON), so the
+    // window batch is smaller: 512 rows x 4 columns = 2048 bind parameters.
+    private static final int MAX_SNAPSHOT_BATCH = 512;
 
     /**
      * How long the REQUEST thread will wait to hand over an event.
@@ -74,6 +91,7 @@ public class AnalyticsPipeline {
     private Pipe<WindowCounts> rankPipe;
     private Pipe<RankedWindow> sinkPipe;
     private List<Pipe<?>> allPipes = List.of();
+    private boolean persistRawScans;
 
     private final List<Thread> threads = new ArrayList<>();
     private volatile Thread metricsThread;
@@ -92,14 +110,26 @@ public class AnalyticsPipeline {
 
     @PostConstruct
     public void start() {
+        persistRawScans = properties.analytics().persistRawScans();
+
         ingestPipe  = new BlockingQueuePipe<>("ingestPipe",  EVENT_PIPE_CAPACITY);
         windowPipe  = new BlockingQueuePipe<>("windowPipe",  EVENT_PIPE_CAPACITY);
-        scanLogPipe = new BlockingQueuePipe<>("scanLogPipe", EVENT_PIPE_CAPACITY);
         rankPipe    = new BlockingQueuePipe<>("rankPipe",    WINDOW_PIPE_CAPACITY);
         sinkPipe    = new BlockingQueuePipe<>("sinkPipe",    WINDOW_PIPE_CAPACITY);
-        allPipes = List.of(ingestPipe, windowPipe, scanLogPipe, rankPipe, sinkPipe);
 
-        for (String s : List.of("ingest", "window", "rank", "sink", "scanlog")) {
+        List<String> stages = new ArrayList<>(List.of("ingest", "window", "rank", "sink"));
+        List<Pipe<?>> pipes = new ArrayList<>(List.of(ingestPipe, windowPipe, rankPipe, sinkPipe));
+
+        // The scan-log branch only exists when raw scans are being persisted.
+        // With the flag off there is no pipe, no thread and no writer -- the
+        // pipeline is ingest -> window -> rank -> sink.
+        if (persistRawScans) {
+            scanLogPipe = new BlockingQueuePipe<>("scanLogPipe", EVENT_PIPE_CAPACITY);
+            stages.add("scanlog");
+            pipes.add(scanLogPipe);
+        }
+        allPipes = List.copyOf(pipes);
+        for (String s : stages) {
             metrics.registerStage(s);
         }
 
@@ -108,25 +138,10 @@ public class AnalyticsPipeline {
                                                properties.popularSlideInterval());
         RankFilter rank = new RankFilter(TOP_N, catalogNames);
         SinkFilter sink = new SinkFilter(snapshotWriter, objectMapper);
-        ScanLogWriterFilter writer = new ScanLogWriterFilter(scanLogBatchWriter, MAX_BATCH);
 
-        // Between filters we use blocking put: if a downstream stage is slow,
-        // the stage above it should wait rather than throw work away. That
-        // backpressure stays strictly inside the pipeline.
-        startThread("pipeline-ingest", new FilterLoop<>("ingest", ingestPipe,
-                event -> {
-                    SequencedScanEvent sequenced = ingest.assign(event);
-                    try {
-                        windowPipe.put(sequenced);     // tee, arm 1
-                        scanLogPipe.put(sequenced);    // tee, arm 2
-                        metrics.recordOut("ingest");
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        throw new IllegalStateException("ingest interrupted", e);
-                    }
-                },
-                () -> { windowPipe.poison(); scanLogPipe.poison(); },
-                metrics));
+        IngestTee tee = new IngestTee(ingest, windowPipe, scanLogPipe, metrics);
+        startThread("pipeline-ingest",
+                new FilterLoop<>("ingest", ingestPipe, tee, tee::poisonDownstream, metrics));
 
         startThread("pipeline-window", new FilterLoop<>("window", windowPipe,
                 event -> window.accept(event).ifPresent(counts -> {
@@ -152,14 +167,18 @@ public class AnalyticsPipeline {
                 },
                 () -> sinkPipe.poison(), metrics));
 
-        startThread("pipeline-sink", new FilterLoop<>("sink", sinkPipe,
-                ranked -> { sink.accept(ranked); metrics.recordOut("sink"); },
-                () -> { }, metrics));
+        startThread("pipeline-sink",
+                new BatchingLoop<>("sink", sinkPipe, MAX_SNAPSHOT_BATCH, sink::flush, metrics));
 
-        startThread("pipeline-scanlog", new ScanLogWriterLoop("scanlog", scanLogPipe, writer, metrics));
+        if (persistRawScans) {
+            ScanLogWriterFilter writer = new ScanLogWriterFilter(scanLogBatchWriter);
+            startThread("pipeline-scanlog",
+                    new BatchingLoop<>("scanlog", scanLogPipe, MAX_BATCH, writer::flush, metrics));
+        }
 
         startMetricsReporter();
-        log.info("analytics pipeline started: 5 filters, 5 bounded queue pipes");
+        log.info("analytics pipeline started: {} filters, {} bounded queue pipes (raw scan persistence {})",
+                stages.size(), allPipes.size(), persistRawScans ? "ON" : "OFF");
     }
 
     private void startThread(String name, Runnable body) {
@@ -175,6 +194,7 @@ public class AnalyticsPipeline {
                 while (!Thread.currentThread().isInterrupted()) {
                     Thread.sleep(METRICS_INTERVAL_MILLIS);
                     log.info(metrics.summary(allPipes));
+                    logSinkCostSplit();
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -218,6 +238,7 @@ public class AnalyticsPipeline {
     @PreDestroy
     public void stop() {
         log.info("analytics pipeline shutting down: {}", metrics.summary(allPipes));
+        logSinkCostSplit();
         ingestPipe.poison();
         for (Thread t : threads) {
             try {
@@ -231,6 +252,25 @@ public class AnalyticsPipeline {
             metricsThread.interrupt();
         }
         log.info("analytics pipeline stopped: {}", metrics.summary(allPipes));
+    }
+
+    /**
+     * Where the sink's time actually goes. Three very different problems hide
+     * behind "the sink is slow": queueing for a pooled connection, executing
+     * the statement, and committing.
+     */
+    private void logSinkCostSplit() {
+        long n = snapshotWriter.batches();
+        if (n == 0) {
+            return;
+        }
+        long rows = metrics.out("sink");
+        log.info("sink cost | batches={} rows={} rowsPerBatch={} | avg per batch: "
+                 + "poolWait={}us execute={}us commit={}us",
+                n, rows, rows / n,
+                snapshotWriter.connectionWaitNanos() / 1000 / n,
+                snapshotWriter.executeNanos() / 1000 / n,
+                snapshotWriter.commitNanos() / 1000 / n);
     }
 
     /** Visible for tests and for the shutdown/report logging. */

@@ -27,7 +27,7 @@ class ScanLogWriterFilterTest {
     @DisplayName("writes the whole batch in one call and maps every field")
     void writesOneBatch() {
         RecordingWriter w = new RecordingWriter();
-        ScanLogWriterFilter f = new ScanLogWriterFilter(w, 1000);
+        ScanLogWriterFilter f = new ScanLogWriterFilter(w);
 
         int written = f.flush(List.of(ev(1), ev(2), ev(3)));
 
@@ -42,7 +42,7 @@ class ScanLogWriterFilterTest {
     @DisplayName("an empty batch writes nothing at all")
     void emptyBatchIsNoOp() {
         RecordingWriter w = new RecordingWriter();
-        assertEquals(0, new ScanLogWriterFilter(w, 1000).flush(List.of()));
+        assertEquals(0, new ScanLogWriterFilter(w).flush(List.of()));
         assertTrue(w.batches.isEmpty());
     }
 
@@ -58,8 +58,8 @@ class ScanLogWriterFilterTest {
         // sweep should pick up far more than one.
         for (int i = 1; i <= 250; i++) pipe.put(ev(i));
 
-        Thread t = new Thread(new ScanLogWriterLoop("scanlog", pipe,
-                new ScanLogWriterFilter(w, 1000), metrics));
+        Thread t = new Thread(new BatchingLoop<>("scanlog", pipe, 1000,
+                new ScanLogWriterFilter(w)::flush, metrics));
         t.start();
         Thread.sleep(400);          // let it drain
         pipe.poison();
@@ -69,6 +69,7 @@ class ScanLogWriterFilterTest {
         assertEquals(250, rows, "every queued row must be written exactly once");
         assertTrue(w.batches.get(0).size() > 1, "the first sweep should batch, not write one row");
         assertEquals(250, metrics.out("scanlog"), "metrics count ROWS written");
+        assertEquals(250, metrics.in("scanlog"), "in and out are both in rows, so they must match");
     }
 
     @Test
@@ -80,8 +81,8 @@ class ScanLogWriterFilterTest {
         Pipe<SequencedScanEvent> pipe = new BlockingQueuePipe<>("scanLogPipe", 1000);
         for (int i = 1; i <= 500; i++) pipe.put(ev(i));
 
-        Thread t = new Thread(new ScanLogWriterLoop("scanlog", pipe,
-                new ScanLogWriterFilter(w, 100), metrics));
+        Thread t = new Thread(new BatchingLoop<>("scanlog", pipe, 100,
+                new ScanLogWriterFilter(w)::flush, metrics));
         t.start();
         Thread.sleep(500);
         pipe.poison();
@@ -99,8 +100,8 @@ class ScanLogWriterFilterTest {
         metrics.registerStage("scanlog");
         Pipe<SequencedScanEvent> pipe = new BlockingQueuePipe<>("scanLogPipe", 1000);
 
-        Thread t = new Thread(new ScanLogWriterLoop("scanlog", pipe,
-                new ScanLogWriterFilter(w, 1000), metrics));
+        Thread t = new Thread(new BatchingLoop<>("scanlog", pipe, 1000,
+                new ScanLogWriterFilter(w)::flush, metrics));
         t.start();
         Thread.sleep(150);                       // loop is idle, polling
         for (int i = 1; i <= 7; i++) pipe.put(ev(i));

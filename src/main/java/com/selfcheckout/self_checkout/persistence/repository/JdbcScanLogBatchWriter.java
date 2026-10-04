@@ -1,8 +1,8 @@
 package com.selfcheckout.self_checkout.persistence.repository;
 
+import com.selfcheckout.self_checkout.persistence.AnalyticsWriterPool;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
 import java.util.ArrayList;
@@ -19,12 +19,16 @@ public class JdbcScanLogBatchWriter implements ScanLogBatchWriter {
 
     private final JdbcTemplate jdbcTemplate;
 
-    public JdbcScanLogBatchWriter(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    // On the dedicated analytics pool, like the sink, so a saturated checkout
+    // pool cannot stall the audit trail (and vice versa).
+    public JdbcScanLogBatchWriter(AnalyticsWriterPool pool) {
+        this.jdbcTemplate = new JdbcTemplate(pool.dataSource());
     }
 
+    // No @Transactional: this is a single statement, so it is already atomic,
+    // and the annotation would bind it to the MAIN DataSource's transaction
+    // manager -- which is exactly the pool we are trying to stay out of.
     @Override
-    @Transactional
     public void insertBatch(List<ScanLogRow> rows) {
         if (rows.isEmpty()) {
             return;

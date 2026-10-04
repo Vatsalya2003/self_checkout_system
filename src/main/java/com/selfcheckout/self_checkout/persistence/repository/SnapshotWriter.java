@@ -1,20 +1,33 @@
 package com.selfcheckout.self_checkout.persistence.repository;
 
-import java.time.Instant;
+import java.util.List;
 
 // PERSISTENCE layer (database access).
-// Writes one computed popular-items window.
-//
-// Takes plain values rather than an analytics record, so persistence stays
-// free of any dependency on the layer above it.
+// Writes computed popular-items windows.
 public interface SnapshotWriter {
 
     /**
-     * Insert one popular_snapshots row.
+     * Insert every window in one statement and one commit.
      *
-     * There is a UNIQUE constraint on window_end, and this does NOT swallow a
-     * violation. Exactly one thread owns window boundaries, so a duplicate can
-     * only mean a bug -- it should be loud, not quietly ignored.
+     * Batched for the same reason the scan-log writer is: when the pipeline
+     * falls behind, the backlog should make the next write cheaper per row,
+     * not more expensive.
+     *
+     * There is a UNIQUE constraint on window_end and this does NOT swallow a
+     * violation. Exactly one thread produces window boundaries, so a duplicate
+     * could only mean a bug.
      */
-    void insert(long windowStart, long windowEnd, Instant computedAt, String itemsJson);
+    void insertBatch(List<SnapshotRow> rows);
+
+    /** Nanoseconds spent waiting for a pooled connection, accumulated. */
+    long connectionWaitNanos();
+
+    /** Nanoseconds spent executing the insert, accumulated. */
+    long executeNanos();
+
+    /** Nanoseconds spent in commit, accumulated. */
+    long commitNanos();
+
+    /** How many batches have been written. */
+    long batches();
 }

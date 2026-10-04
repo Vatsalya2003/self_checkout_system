@@ -57,14 +57,14 @@ class PipelineEndToEndTest {
         WindowFilter window = new WindowFilter(WINDOW, SLIDE);
         RankFilter rank = new RankFilter(10, new StubCatalog("Name "));
         ScanLogBatchWriter batchWriter = written::addAll;
-        ScanLogWriterFilter writer = new ScanLogWriterFilter(batchWriter, 1000);
+        ScanLogWriterFilter writer = new ScanLogWriterFilter(batchWriter);
 
         List<Thread> threads = new ArrayList<>();
-        threads.add(new Thread(new FilterLoop<>("ingest", ingestPipe, e -> {
-            SequencedScanEvent s = ingest.assign(e);
-            try { windowPipe.put(s); scanLogPipe.put(s); metrics.recordOut("ingest"); }
-            catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
-        }, () -> { windowPipe.poison(); scanLogPipe.poison(); }, metrics), "t-ingest"));
+        // The REAL tee, not a copy of it, so this test covers the wiring
+        // AnalyticsPipeline actually builds.
+        IngestTee tee = new IngestTee(ingest, windowPipe, scanLogPipe, metrics);
+        threads.add(new Thread(new FilterLoop<>("ingest", ingestPipe, tee,
+                tee::poisonDownstream, metrics), "t-ingest"));
 
         threads.add(new Thread(new FilterLoop<>("window", windowPipe,
                 e -> window.accept(e).ifPresent(c -> {
@@ -81,7 +81,8 @@ class PipelineEndToEndTest {
                 w -> { emitted.add(w); metrics.recordOut("sink"); },
                 () -> { }, metrics), "t-sink"));
 
-        threads.add(new Thread(new ScanLogWriterLoop("scanlog", scanLogPipe, writer, metrics), "t-scanlog"));
+        threads.add(new Thread(new BatchingLoop<>("scanlog", scanLogPipe, 1000,
+                writer::flush, metrics), "t-scanlog"));
         threads.forEach(Thread::start);
 
         List<String> all = new ArrayList<>(TOTAL);
