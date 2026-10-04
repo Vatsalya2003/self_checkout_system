@@ -64,3 +64,63 @@ sequentially, so two requests never contend for the same transaction row.
 Measured effect is **within noise** (422.4 / 413.3 against a 404.6 / 407.2
 baseline — if anything slightly faster, which is just run-to-run variation).
 This is a correctness fix that happens to be free.
+
+---
+
+## Phase 1 — measured statement profile
+
+Counted with Postgres' own statement log, enabled **only for this server's
+sessions** by passing `options=-c log_statement=all` in the JDBC URL on the
+command line. No config file was edited and the global setting is still
+`log_statement = none`.
+
+Basket shape, measured over a real 25 s run (8,791 baskets), not estimated:
+**L = 9.32 distinct SKUs**, 10.47 units, and **66.4 % of baskets contain
+`SKU-000001`**.
+
+| Operation | Statements | Breakdown |
+|---|---|---|
+| `POST /transactions` (start) | **4** | BEGIN · SELECT transactions · INSERT transactions · COMMIT |
+| `POST /{id}/items` (scan, new line) | **8** request-path + 3 background | BEGIN · SELECT tx `FOR UPDATE` · SELECT item · SELECT line · SELECT line *again* · INSERT line · UPDATE tx (all 7 columns) · COMMIT |
+| `POST /{id}/items` (scan, SKU already in basket) | **7** request-path + 3 background | same, minus one line SELECT, UPDATE line instead of INSERT |
+| `POST /{id}/complete` (L distinct SKUs) | **3L + 5** → **≈ 33** at L = 9.32 | BEGIN · SELECT tx `FOR UPDATE` · SELECT lines · L × SELECT item `FOR UPDATE` · UPDATE tx · L × UPDATE line · L × UPDATE item · COMMIT |
+| `GET /transactions/{id}` | 4 | |
+| `GET /items` | 1 | |
+| `GET /analytics/popular-items` | 3 | |
+| `GET /inventory/low-stock` | 3 | |
+
+**Statements held inside the item locks — the number that sets the stress
+ceiling.** For L = 3 the first item lock is taken at statement 4 and COMMIT is
+statement 14, so **11 statements run while the first-locked row is held**, 8 of
+them after every lock is already taken. In general that is **3L + 2 ≈ 30
+statements** for an average basket. Because locks are taken in ascending SKU
+order and `SKU-000001` sorts first, the hottest row in the system — in two
+thirds of all baskets — is the one held across that entire window.
+
+**Cycle arithmetic (checks out against the measured baseline).** 10 stations at
+404.6 tx/s is a 24.7 ms cycle. The measured means add up to it exactly:
+
+| Step | Mean | Share of cycle |
+|---|---|---|
+| start | 0.61 ms | 2.5 % |
+| 10.47 scans × 0.96 ms | 10.05 ms | 40.7 % |
+| complete | 14.02 ms | 56.8 % |
+| **total** | **24.68 ms** | — |
+
+About **120 request-path statements per checkout cycle**.
+
+**Not CPU-bound.** Across every baseline run CPU sat at ~505 % of the 800 %
+available (server ~200 %, Postgres ~230 %, load client ~75 %). The server is
+waiting on round trips, not computing — which is exactly why cutting the
+*number* of statements is the right lever.
+
+### Two things the profile shows that the plan did not predict
+
+1. **`start` wastes a SELECT.** Spring Data's `save()` sees a non-null assigned
+   id (our UUID), concludes the entity is not new, and issues a `merge` —
+   SELECT then INSERT. The same thing causes the *two* `transaction_items`
+   SELECTs on a new-line scan. Phase 3 removes both paths entirely.
+2. **Hibernate rewrites whole rows.** `update items set name=$1,price=$2,stock=$3`
+   rewrites the name and price of an item on every single stock change, and the
+   transaction row is rewritten across all 7 columns on every scan. That is
+   also the mechanism behind the Phase 0.5 race bug.
