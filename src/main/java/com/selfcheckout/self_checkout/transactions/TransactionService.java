@@ -57,6 +57,7 @@ public class TransactionService {
     // silently ignored -- every statement would autocommit and the item row
     // locks would be released the instant they were taken.
     private final TransactionTemplate transactionTemplate;
+    private final CheckoutTimings timings;
 
     public TransactionService(OpenTransactionStore openTransactions,
                               CatalogCache catalog,
@@ -66,7 +67,8 @@ public class TransactionService {
                               LowStockAlertWriter lowStockAlertWriter,
                               SelfCheckoutProperties properties,
                               ScanRecorder scanRecorder,
-                              PlatformTransactionManager transactionManager) {
+                              PlatformTransactionManager transactionManager,
+                              CheckoutTimings timings) {
         this.openTransactions = openTransactions;
         this.catalog = catalog;
         this.transactionRepository = transactionRepository;
@@ -76,6 +78,7 @@ public class TransactionService {
         this.properties = properties;
         this.scanRecorder = scanRecorder;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.timings = timings;
     }
 
     /**
@@ -177,9 +180,18 @@ public class TransactionService {
                     "Transaction " + transactionId + " has no scanned items");
         }
 
+        // lockGrantedAt is written inside the transaction and read after it
+        // commits, which is why it is a holder rather than a local.
+        long[] lockGrantedAt = new long[1];
+        long startedAt = System.nanoTime();
         try {
             ReceiptView receipt = transactionTemplate.execute(
-                    status -> writePaidTransaction(basket, claimed));
+                    status -> writePaidTransaction(basket, claimed, lockGrantedAt));
+            // Measured AFTER execute() returns, so the commit itself is inside
+            // the critical section -- which it is: the item rows stay locked
+            // until the commit completes.
+            long committedAt = System.nanoTime();
+            timings.record(lockGrantedAt[0] - startedAt, committedAt - lockGrantedAt[0]);
             openTransactions.remove(transactionId);
             return receipt;
         } catch (RuntimeException e) {
@@ -193,7 +205,8 @@ public class TransactionService {
      * the TransactionTemplate above. Every item lock taken here is held until
      * that transaction commits.
      */
-    private ReceiptView writePaidTransaction(OpenBasket basket, OpenBasket.Snapshot claimed) {
+    private ReceiptView writePaidTransaction(OpenBasket basket, OpenBasket.Snapshot claimed,
+                                             long[] lockGrantedAt) {
         // Ascending SKU order. Every checkout takes its item locks in this one
         // global order, which is what makes a deadlock impossible: a cycle
         // would need some transaction to hold a higher SKU while waiting for a
@@ -204,8 +217,19 @@ public class TransactionService {
         Instant completedAt = Instant.now();
         int threshold = properties.lowStockThreshold();
 
+        // ---- written BEFORE the lock, on purpose.
+        // Nothing in the header depends on stock, and every statement issued
+        // after the lock is granted is a statement the hottest row in the
+        // system spends queued behind us. Measured: the critical section was
+        // 1127us for four statements; this moves one of them out of it.
+        // Same database transaction either way, so a failure still rolls the
+        // header back.
+        completedWriter.insertHeader(basket.id(), basket.stationId(), claimed.itemCount(),
+                claimed.runningTotal(), basket.startedAt(), completedAt);
+
         // ---- the only statement that takes locks: one, for the whole basket
         Map<String, Integer> stockBefore = stockUpdater.lockAndReadStock(skus);
+        lockGrantedAt[0] = System.nanoTime();        // every item row is now held
         if (stockBefore.size() != skus.size()) {
             for (String sku : skus) {
                 if (!stockBefore.containsKey(sku)) {
@@ -238,10 +262,9 @@ public class TransactionService {
             lines.add(new CompletedTransactionWriter.Line(sku, quantity, applied));
         }
 
-        // ---- three bulk writes, then commit
+        // ---- the writes that genuinely need the lock, then commit
         stockUpdater.applyStock(newStock);
-        completedWriter.insertCompleted(basket.id(), basket.stationId(), claimed.itemCount(),
-                claimed.runningTotal(), basket.startedAt(), completedAt, lines);
+        completedWriter.insertLines(basket.id(), lines);
         lowStockAlertWriter.insertCrossings(crossings, completedAt);
 
         // The receipt lists lines in the order they were first scanned, and

@@ -17,10 +17,17 @@ public interface CompletedTransactionWriter {
     record Line(String sku, int quantity, int appliedQuantity) {}
 
     /**
-     * Insert the COMPLETED transaction header and every line, in the caller's
-     * transaction. Both are new rows -- nothing about this basket was written
-     * while it was open.
+     * Insert the COMPLETED transaction header, in the caller's transaction.
+     *
+     * Split from the lines on purpose. The header depends on nothing that the
+     * item lock protects, so the caller writes it BEFORE taking that lock and
+     * keeps one statement out of the critical section. The lines cannot move:
+     * their applied_quantity is only known once the stock has been read under
+     * the lock.
      */
-    void insertCompleted(String id, String stationId, int itemCount, BigDecimal runningTotal,
-                         Instant startedAt, Instant completedAt, List<Line> lines);
+    void insertHeader(String id, String stationId, int itemCount, BigDecimal runningTotal,
+                      Instant startedAt, Instant completedAt);
+
+    /** Insert every line of the basket as one multi-row INSERT. */
+    void insertLines(String id, List<Line> lines);
 }

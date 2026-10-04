@@ -27,14 +27,17 @@ public class JdbcCompletedTransactionWriter implements CompletedTransactionWrite
     }
 
     @Override
-    public void insertCompleted(String id, String stationId, int itemCount, BigDecimal runningTotal,
-                                Instant startedAt, Instant completedAt, List<Line> lines) {
+    public void insertHeader(String id, String stationId, int itemCount, BigDecimal runningTotal,
+                             Instant startedAt, Instant completedAt) {
         jdbc.update("INSERT INTO transactions "
                         + "(id, station_id, status, item_count, running_total, started_at, completed_at) "
                         + "VALUES (?,?,?,?,?,?,?)",
                 id, stationId, "COMPLETED", itemCount, runningTotal,
                 Timestamp.from(startedAt), Timestamp.from(completedAt));
+    }
 
+    @Override
+    public void insertLines(String id, List<Line> lines) {
         if (lines.isEmpty()) {
             return;
         }
