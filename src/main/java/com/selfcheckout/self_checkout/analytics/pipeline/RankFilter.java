@@ -1,7 +1,7 @@
 package com.selfcheckout.self_checkout.analytics.pipeline;
 
 import com.selfcheckout.self_checkout.analytics.result.PopularEntry;
-import com.selfcheckout.self_checkout.persistence.repository.CatalogNameLookup;
+import com.selfcheckout.self_checkout.persistence.repository.CatalogCache;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -19,9 +19,9 @@ import java.util.Map;
 public class RankFilter {
 
     private final int topN;
-    private final CatalogNameLookup names;
+    private final CatalogCache names;
 
-    public RankFilter(int topN, CatalogNameLookup names) {
+    public RankFilter(int topN, CatalogCache names) {
         this.topN = topN;
         this.names = names;
     }

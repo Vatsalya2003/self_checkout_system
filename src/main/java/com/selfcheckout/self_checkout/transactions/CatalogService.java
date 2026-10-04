@@ -1,7 +1,7 @@
 package com.selfcheckout.self_checkout.transactions;
 
 import com.selfcheckout.self_checkout.transactions.result.CatalogItem;
-import com.selfcheckout.self_checkout.persistence.repository.ItemRepository;
+import com.selfcheckout.self_checkout.persistence.repository.CatalogCache;
 import org.springframework.stereotype.Service;
 import java.util.List;
 
@@ -15,18 +15,20 @@ import java.util.List;
 @Service
 public class CatalogService {
 
-    private final ItemRepository itemRepository;
+    private final CatalogCache catalog;
 
-    // Constructor injection: Spring sees this needs an ItemRepository and passes one in
-    public CatalogService(ItemRepository itemRepository) {
-        this.itemRepository = itemRepository;
+    // Constructor injection: Spring sees this needs the cache and passes it in
+    public CatalogService(CatalogCache catalog) {
+        this.catalog = catalog;
     }
 
     public List<CatalogItem> listItems() {
-        return itemRepository.findAllByOrderBySkuAsc().stream()
-                // map entity -> domain result so no persistence type, and no
-                // stock count, ever leaves this layer
-                .map(i -> new CatalogItem(i.getSku(), i.getName(), i.getPrice()))
+        // Served from memory. The catalog is seeded once at boot and never
+        // changes during a run, so re-reading 2000 rows per request bought
+        // nothing. Still maps to the domain record, so no persistence type
+        // and no stock count leaves this layer.
+        return catalog.all().stream()
+                .map(e -> new CatalogItem(e.sku(), e.name(), e.price()))
                 .toList();
     }
 }

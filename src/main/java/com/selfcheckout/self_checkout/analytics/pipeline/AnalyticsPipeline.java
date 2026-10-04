@@ -1,7 +1,7 @@
 package com.selfcheckout.self_checkout.analytics.pipeline;
 
 import com.selfcheckout.self_checkout.config.SelfCheckoutProperties;
-import com.selfcheckout.self_checkout.persistence.repository.CatalogNameLookup;
+import com.selfcheckout.self_checkout.persistence.repository.CatalogCache;
 import com.selfcheckout.self_checkout.persistence.repository.ScanLogBatchWriter;
 import com.selfcheckout.self_checkout.persistence.repository.SnapshotWriter;
 import jakarta.annotation.PostConstruct;
@@ -63,7 +63,7 @@ public class AnalyticsPipeline {
     private final SelfCheckoutProperties properties;
     private final ScanLogBatchWriter scanLogBatchWriter;
     private final SnapshotWriter snapshotWriter;
-    private final CatalogNameLookup catalogNames;
+    private final CatalogCache catalogNames;
     private final ObjectMapper objectMapper;
 
     private final PipelineMetrics metrics = new PipelineMetrics();
@@ -81,7 +81,7 @@ public class AnalyticsPipeline {
     public AnalyticsPipeline(SelfCheckoutProperties properties,
                              ScanLogBatchWriter scanLogBatchWriter,
                              SnapshotWriter snapshotWriter,
-                             CatalogNameLookup catalogNames,
+                             CatalogCache catalogNames,
                              ObjectMapper objectMapper) {
         this.properties = properties;
         this.scanLogBatchWriter = scanLogBatchWriter;

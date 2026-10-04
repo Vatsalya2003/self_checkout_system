@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class RankFilterTest {
 
     // the name lookup is an interface, so the stub is one lambda
-    private final RankFilter rank = new RankFilter(10, sku -> "Name of " + sku);
+    private final RankFilter rank = new RankFilter(10, new StubCatalog("Name of "));
 
     private static WindowCounts counts(Map<String, Long> m) {
         return new WindowCounts(0, 1000, Map.copyOf(m));

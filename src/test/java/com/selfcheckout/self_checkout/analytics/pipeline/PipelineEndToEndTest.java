@@ -55,7 +55,7 @@ class PipelineEndToEndTest {
 
         IngestFilter ingest = new IngestFilter();
         WindowFilter window = new WindowFilter(WINDOW, SLIDE);
-        RankFilter rank = new RankFilter(10, sku -> "Name " + sku);
+        RankFilter rank = new RankFilter(10, new StubCatalog("Name "));
         ScanLogBatchWriter batchWriter = written::addAll;
         ScanLogWriterFilter writer = new ScanLogWriterFilter(batchWriter, 1000);
 
