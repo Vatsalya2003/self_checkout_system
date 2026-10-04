@@ -2,6 +2,7 @@ package com.selfcheckout.self_checkout.transactions;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -50,7 +51,7 @@ final class OpenBasket {
 
     /** Immutable view of the current state, taken under the lock. */
     synchronized Snapshot snapshot() {
-        return new Snapshot(state, itemCount, runningTotal, Map.copyOf(lines));
+        return new Snapshot(state, itemCount, runningTotal, frozenCopyOf(lines));
     }
 
     /**
@@ -64,7 +65,7 @@ final class OpenBasket {
         lines.merge(sku, 1, Integer::sum);
         itemCount += 1;
         runningTotal = runningTotal.add(unitPrice);
-        return new Snapshot(state, itemCount, runningTotal, Map.copyOf(lines));
+        return new Snapshot(state, itemCount, runningTotal, frozenCopyOf(lines));
     }
 
     /**
@@ -84,7 +85,7 @@ final class OpenBasket {
             return new Snapshot(state, 0, runningTotal, Map.of());   // caller -> 409 EMPTY, still OPEN
         }
         state = State.COMPLETING;
-        return new Snapshot(state, itemCount, runningTotal, Map.copyOf(lines));
+        return new Snapshot(state, itemCount, runningTotal, frozenCopyOf(lines));
     }
 
     /** Put the basket back if the database work failed, so it can be retried. */
@@ -95,5 +96,18 @@ final class OpenBasket {
     }
 
     /** What callers see; a plain immutable carrier. */
+    /**
+     * An unmodifiable copy that KEEPS insertion order.
+     *
+     * Not Map.copyOf: that returns an immutable map with unspecified
+     * iteration order, which quietly threw away the LinkedHashMap ordering
+     * above and made receipt lines come out in hash order. The golden-response
+     * diff caught it -- the same basket produced its two lines in the opposite
+     * order from every previous version of this server.
+     */
+    private static Map<String, Integer> frozenCopyOf(Map<String, Integer> source) {
+        return Collections.unmodifiableMap(new LinkedHashMap<>(source));
+    }
+
     record Snapshot(State state, int itemCount, BigDecimal runningTotal, Map<String, Integer> lines) {}
 }
