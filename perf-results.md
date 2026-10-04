@@ -46,6 +46,8 @@ understated the baseline and mis-ranked which costs matter.
 | 5 (first attempt) | Bulk lock with plain `FOR UPDATE` | 2.9 | 5.0 | 0.64 / 5.41 | 1148 / 9146 | **9,239** | PASS | no (~20 %) | **reverted** |
 | 5 | Lock late + batch: 1 bulk `FOR NO KEY UPDATE` + 3 bulk writes | 742.1 | 677.1 (3rd: 744.9) | 0.09 / 0.45 | 6.11 / 56.61 | 0 | PASS | no (~344 % of 800 %) | **kept** |
 | 5 stress | 100 stations, 120 s | 849.3 | 650.7 | 0.09 / 0.34 | 93.45 / 354.11 | 0 | PASS | no (~320 %) | see warning below |
+| 4 | Raw scans optional (off), non-blocking tee, batched sink on its own pool | 997.5 | 989.5 | 0.09 / 0.36 | 4.94 / 39.38 | 0 | PASS | — | **kept** |
+| 4 stress | 100 stations, 120 s | 993.3 | 999.8 | 0.10 / 0.33 | 80.56 / 286.58 | 0 | PASS | — | **kept** |
 
 ### Reading the phases
 
@@ -164,3 +166,129 @@ to a fixed **6**, and from `3L + 2 ≈ 30` statements inside the item locks to
 because the first two spanned 9.6 %); taking the median, roughly **+8 %** at 10
 stations. The far bigger effect is at 100 stations: **420 → 849.3 tx/s**, and
 complete p50 fell 90.84 → 93.45 ms while serving twice the transactions.
+
+---
+
+## Phase 4 — the analytics pipeline could not keep up with the faster checkout
+
+Phases 2–5 roughly doubled checkout, which pushed the scan rate to ~10,400
+items/s. The pipeline had been sized for Week 2's ~3,600/s, and two different
+stages buckled. They were diagnosed separately because they are separate bugs.
+
+### The sink was the real bottleneck, and it was waiting, not working
+
+The earlier stop-report blamed the scan-log writer. That was wrong for stress
+run 1, where `scanLogPipe` peaked at 22,335 / 65,536 — not full — while
+`rankPipe` and `sinkPipe` were both full with 1,299 sink full-waits. The sink
+was writing ~18 windows/s at ~55 ms each and backing up the whole
+window → rank branch behind it.
+
+So the sink was instrumented to split its cost three ways instead of guessing.
+Measured on a 100-station run with the writers still sharing the main pool:
+
+| Where the sink's time went | per window |
+|---|---|
+| waiting for a pooled connection | **66,480 µs** |
+| executing the INSERT | 230 µs |
+| commit | 156 µs |
+
+**99.4 % of it was queueing.** The write itself takes under half a millisecond.
+At 100 stations, checkout keeps the 32-connection pool saturated while it waits
+on item row locks, and the sink was simply at the back of that queue.
+
+Two fixes, measured in that order:
+
+1. **Batch the sink** (`BatchingLoop`, now shared with the scan-log writer):
+   drain everything waiting on `sinkPipe` and write it in one multi-row INSERT
+   and one commit. This is what removed the backpressure — `sinkPipe` max depth
+   went from **256 / 256 (full, 1,299 full-waits)** to **1 / 4096**.
+2. **Give the pipeline writers their own 2-connection pool**
+   (`AnalyticsWriterPool`). This is what removed the wait:
+
+| | shared pool | dedicated pool |
+|---|---|---|
+| pool wait | 66,480 µs | **11 µs** |
+| execute | 230 µs | 204 µs |
+| commit | 156 µs | 216 µs |
+| **total per window** | **66,866 µs** | **431 µs** |
+
+That is **155× faster per window**. It did **not** raise checkout throughput
+(1001.5 tx/s before vs 979.4 immediately after, both inside the run-to-run
+spread seen below) — the sink only took a connection ~20 times a second, so
+checkout was never really waiting on it. It is kept because it makes the
+analytics branch independent of checkout pressure, which is the whole point of
+the pipeline, and because it matters enormously with raw scans switched on,
+where the writer does ~1.2 M inserts instead of 2,500.
+
+### The run-to-run spread closed on its own
+
+Phase 5's stress runs were 849.3 and 650.7 — a 23 % gap, which made it
+impossible to say whether a change had helped. After Phase 4 the two stress
+runs were **993.3 and 999.8, a 0.65 % gap**. The earlier spread was the
+pipeline backing up to different depths on different runs and dragging the
+checkout path with it; with the pipeline no longer saturating, the measurement
+is stable. The 979.4 reading above is best read as the low end of that old
+spread, not as a regression.
+
+### Raw scan persistence is now optional, and off
+
+`selfcheckout.analytics.persist-raw-scans=false` by default. The assignment
+requires the **top-N windows** in the database; those are computed in memory
+from the event stream, so the raw `scan_log` rows are an audit trail and not an
+input to anything. At ~10,400 scans/s that was ~1.25 M inserts per stress run.
+With the flag off the stage does not exist — no pipe, no thread, no writer.
+`scripts/test-popular-window.py` turns it on and still passes, including its
+cross-check of the stored window against a raw SQL aggregate.
+
+### The tee no longer lets the audit branch starve the window branch
+
+`IngestTee` deliberately treats its two branches differently: the window branch
+uses a blocking `put` (losing a window loses an answer the API serves), the
+scan-log branch a non-blocking `offer` with a counted, logged drop. Previously
+both blocked, so a saturated raw-scan writer stalled the shared ingest thread
+and the window branch went idle behind an audit trail nobody reads live.
+
+### Acceptance check on both stress runs
+
+| | stress run 1 | stress run 2 | limit |
+|---|---|---|---|
+| `ingestPipe` max depth | 31 / 65,536 (0.05 %) | 25 / 65,536 (0.04 %) | < 10 % |
+| `windowPipe` max depth | 31 / 65,536 (0.05 %) | 26 / 65,536 (0.04 %) | < 10 % |
+| `rankPipe` max depth | 1 / 4,096 (0.02 %) | 1 / 4,096 (0.02 %) | < 10 % |
+| `sinkPipe` max depth | 1 / 4,096 (0.02 %) | 1 / 4,096 (0.02 %) | < 10 % |
+| drops | 0 | 0 | 0 |
+| stage errors | 0 | 0 | 0 |
+| ingest in == out | 1,249,436 == 1,249,436 | 1,258,349 == 1,258,349 | equal |
+| rank in == out | 2,498 == 2,498 | 2,516 == 2,516 | equal |
+| sink rows in == out | 2,498 == 2,498 | 2,516 == 2,516 | equal |
+
+`window` is the one stage where in ≠ out by design: it aggregates, emitting one
+window per 500 scans (1,258,349 / 500 = 2,516). All 2,516 windows reached
+`popular_snapshots`, and `scan_log` was empty, as the flag intends.
+
+### A regression the golden diff caught
+
+Not a performance change, but found by this phase's verification. Receipt
+`lines[]` came back in a different order than in every previous version of the
+server. `OpenBasket` kept its lines in a `LinkedHashMap` — correctly, so the
+receipt lists them in the order first scanned — but handed out snapshots via
+`Map.copyOf`, **whose iteration order is unspecified**. The same five-SKU basket
+reorders:
+
+```
+LinkedHashMap : [SKU-000009, SKU-000004, SKU-000007, SKU-000001, SKU-000002]
+Map.copyOf    : [SKU-000004, SKU-000007, SKU-000009, SKU-000001, SKU-000002]
+```
+
+Fixed, and locked down by `OpenBasketTest.linesKeepFirstScanOrder`, which was
+confirmed to fail against the old code. The golden diff is now byte-for-byte
+identical across all 28 captured responses.
+
+### Where throughput now stands
+
+Default (10 stations) and stress (100 stations) now return **the same ~995
+tx/s**. That is the signature of a server already at its ceiling with only 10
+stations: the extra 90 stations add queueing, not work. It shows up entirely in
+`COMPLETE` latency — p50 4.94 ms at 10 stations against 80.56 ms at 100, for
+the same throughput — while `SCAN` and `START` stay flat at ~0.1 ms because
+they touch no database at all.
