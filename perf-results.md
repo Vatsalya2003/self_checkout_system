@@ -499,7 +499,7 @@ Raw reports in `reports/perf/final/`.
 | `SCAN` p50 / p99 | 0.85 / 2.86 ms | **0.09 / 0.40 ms** | −89 % / −86 % |
 | `COMPLETE` p50 / p99 (10 st) | 13.82 / 50.43 ms | **4.44 / 43.51 ms** | −68 % / −14 % |
 | `COMPLETE` p50 / p99 (100 st) | 90.84 / 328.56 ms | **76.51 / 305.22 ms** | −16 % / −7 % |
-| errors | 0 | **0** (of ~2.9 M requests across the four runs) | — |
+| errors | 0 | **0** of 4,624,769 requests across the four runs | — |
 | invariant | PASS | **PASS** | — |
 
 ### Statements per operation, start to finish

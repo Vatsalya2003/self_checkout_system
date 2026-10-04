@@ -1,9 +1,9 @@
 # Architecture — Self-Checkout: Layered, with a Pipelined Analytics Stage
 
-Weeks 2 and 3 of the semester project. Same API contract, same database, same
-checkout behaviour as Week 1's monolith throughout — the only things that
-changed are how the code is structured (Week 2) and how the windowed analytics
-are executed (Week 3).
+Weeks 2 to 4 of the semester project. Same API contract, same database, same
+externally visible checkout behaviour as Week 1's monolith throughout — what
+changed is how the code is structured (Week 2), how the windowed analytics are
+executed (Week 3), and how much work a request actually does (Week 4, §7).
 
 Week 1 organized classes by technical type (`controller/`, `service/`,
 `repository/`). That reads like layers but nothing enforced it: HTTP types had
@@ -11,9 +11,12 @@ already leaked into the business code, and the services built API-shaped DTOs.
 This week the layers are real packages with **dependency rules enforced by a
 test that fails the build**.
 
-All numbers come from the two JSON reports in [`reports/`](reports/), produced
-by the unmodified course load client against the code as committed. Anything
-not measured is labelled a prediction.
+All numbers come from JSON reports produced by the unmodified course load
+client against the code as committed: the two graded runs in
+[`reports/`](reports/), and for the Week 4 performance work every run in
+`reports/perf/` — including the ones that were reverted or taken while the
+machine was throttling, which are kept and labelled rather than dropped.
+Anything not measured is labelled a prediction.
 
 ---
 
@@ -27,12 +30,12 @@ not measured is labelled a prediction.
 | 4 | **Modifiability — enforced layer boundaries** | No class outside `api` may reference `org.springframework.http..` or `org.springframework.web..`; no class in `api` may reference `..persistence..`; `persistence` and `analytics` may not reference anything above them. | `LayeredArchitectureTest`, 6 rules, run by `./mvnw test`. **Measured: 5 of 6 failed before the refactor, 6 of 6 pass after.** |
 | 5 | **Modifiability — layer isolation** | Each layer is replaceable without touching its neighbours' internals: business code must compile with no knowledge of HTTP, and the API must compile with no knowledge of JPA. | Same test, rules 2 and 3. **Measured: 47 HTTP-leak violations before, 0 after.** |
 | 6 | **Behavioural equivalence with Week 1** | Every endpoint returns byte-identical bodies, status codes and error codes to the monolith, for the happy path and all 400/404/409 cases. | 27-call golden script captured from the `monolith` tag, re-run against the layered build and diffed with IDs/timestamps normalized. **Measured: identical.** |
-| 7 | **Performance / latency (default load)** | At 10 stations for 60 s: `SCAN_ITEM` p95 < 10 ms, `COMPLETE_TRANSACTION` p95 < 100 ms. | Default report. **Measured: scan p95 2.19 ms, complete p95 32.68 ms.** |
-| 8 | **Performance / latency (stress)** | At 100 stations for 120 s: `COMPLETE_TRANSACTION` p99 < 1000 ms, no request exceeds the client's 10 s timeout. | Stress report. **Measured: complete p99 326.29 ms, max 894.20 ms.** |
-| 9 | **Throughput** | Sustain ≥ 1000 scans/sec at 100 stations. | Stress report. **Measured: 3651.7 scans/sec, 348.1 transactions/sec.** |
+| 7 | **Performance / latency (default load)** | At 10 stations for 60 s: `SCAN_ITEM` p95 < 10 ms, `COMPLETE_TRANSACTION` p95 < 100 ms. | Default report. **Measured (Week 4 final): scan p95 0.20 ms, complete p95 28.45 / 28.53 ms.** (Week 2: 2.19 / 32.68 ms.) |
+| 8 | **Performance / latency (stress)** | At 100 stations for 120 s: `COMPLETE_TRANSACTION` p99 < 1000 ms, no request exceeds the client's 10 s timeout. | Stress report. **Measured (Week 4 final): complete p99 305.22 / 285.03 ms, max 1302 / 748 ms.** The 1,302 ms outlier is one request of 121,005; the requirement is on p99, which holds. |
+| 9 | **Throughput** | Sustain ≥ 1000 scans/sec at 100 stations. | Stress report. **Measured (Week 4 final): 10,591 / 10,950 scans/sec, 1007.8 / 1040.2 transactions/sec** — 10× the requirement. (Week 2: 3,651.7 scans/sec.) |
 | 10 | **Scalability** | 10 → 100 stations must not break any correctness requirement; degradation must be latency only. | Both runs pass CHECK 1 and CHECK 2 identically. **Measured: correctness unchanged.** |
-| 11 | **Availability / robustness** | Zero errors on every operation for the full duration of both runs; no deadlocks, no connection-acquisition timeouts, no unhandled exceptions. | Client error counts + server log scan. **Measured: 0 errors of 767,418 total requests (244,456 default + 522,962 stress); 0 deadlocks; 0 WARN/ERROR lines.** |
-| 12 | **Analytics consistency** | One window written per `slideInterval` scans, each covering `windowSize` scans, ranks 1-based and dense. | `scripts/test-popular-window.py` + snapshot counts. **Measured: 410 windows for 205,130 scans; 878 for 439,230.** |
+| 11 | **Availability / robustness** | Zero errors on every operation for the full duration of both runs; no deadlocks, no connection-acquisition timeouts, no unhandled exceptions. | Client error counts + server log scan. **Measured (Week 4 final): 0 errors of 4,624,769 requests across four runs; 0 deadlocks; 0 WARN/ERROR lines.** |
+| 12 | **Analytics consistency** | One window written per `slideInterval` scans, each covering `windowSize` scans, ranks 1-based and dense. | `scripts/test-popular-window.py` + snapshot counts. **Measured (Week 4 final): 2,629 windows for 1,314,701 scans = exactly ⌊n/500⌋; 0 dropped events; in == out at every filter.** |
 | 13 | **Alerting** | An alert is recorded exactly once per SKU, at the moment stock first goes strictly below the threshold, and stays queryable with its real trigger time. | `scripts/test-low-stock.py`. **Measured: 50 does not alert, 49 does, further drops neither duplicate nor move `triggeredAt`.** |
 | 14 | **Observability** | Every correctness property checkable after a run from the database alone. | `scripts/check-invariant.sql`. |
 | 15 | **Simplicity / reinitializability** | A full reset to a known state is one action, no manual SQL. | Restarting the server re-runs `schema.sql` + `data.sql`. **Verified before every run here.** |
@@ -622,7 +625,148 @@ three checkout behaviour scripts passing unchanged.
 
 ---
 
-## 7. Known limitations
+## 7. Performance — making it do less, not making it work harder
+
+Week 4 kept the architecture and the contract exactly as they were and went
+after throughput. Every claim here is backed by a run recorded in
+[`perf-results.md`](perf-results.md), with the raw JSON in `reports/perf/`.
+
+### 7.1 Result
+
+| | baseline (`pipeline-v1`) | final | change |
+|---|---|---|---|
+| tx/s, 10 stations | 404.6 / 407.2 | **1031.8 / 1028.5** | **×2.54** |
+| tx/s, 100 stations | 420.3 / 431.9 | **1007.8 / 1040.2** | **×2.40** |
+| `SCAN` p50 / p99 | 0.85 / 2.86 ms | **0.09 / 0.40 ms** | −89 % / −86 % |
+| `COMPLETE` p50, 100 st | 90.84 ms | **76.51 ms** | −16 % |
+| errors | 0 | **0** of 4,624,769 requests | — |
+| stock invariant | PASS | **PASS** | — |
+
+### 7.2 A note on how these were launched
+
+The Week 1–3 reports in [`reports/`](reports/) were produced with
+`./mvnw spring-boot:run`. That plugin starts the JVM with
+`-XX:TieredStopAtLevel=1`, which caps the JIT at C1 — worth about 20 % of
+throughput. Every Week 4 number, **including the baseline it is compared
+against**, was taken from the packaged jar instead, so the comparison is
+like-for-like. The earlier submitted reports have not been re-run or altered.
+
+### 7.3 The one idea behind all of it
+
+Nothing here is a faster algorithm. Every change removes database work from a
+path that did not need it:
+
+| | statements, `pipeline-v1` | statements, final |
+|---|---|---|
+| `POST /transactions` | 4 | **0** |
+| `POST /{id}/items` (scan) | 7–8 + 3 background | **0** |
+| `POST /{id}/complete` (L SKUs) | 3L + 5 ≈ 33 | **6** |
+| `GET /items` | 1 | **0** |
+| held under the item lock | 3L + 2 ≈ 30 | **3** |
+
+Three structural changes got there:
+
+1. **An unpaid basket is not a database row.** It lives in memory until the
+   customer pays (`OpenBasket`, `OpenTransactionStore`). The database only
+   ever sees baskets that were actually paid for.
+2. **The catalog is immutable, so it is cached.** 2,000 rows, read once.
+3. **One checkout, one round of bulk statements.** One `SELECT ... IN (...)
+   ORDER BY sku FOR NO KEY UPDATE` for the whole basket instead of one per
+   SKU, then bulk `UPDATE`/`INSERT`s, instead of Hibernate's per-row
+   merge-then-write.
+
+### 7.4 What actually limits it now, measured
+
+`CheckoutTimings` splits a completion's database time in two:
+
+| | 10 stations | 100 stations |
+|---|---|---|
+| lock **wait** | 7.2 ms | 93–96 ms |
+| **critical section** (lock granted → commit) | 1.02 ms | 1.01–1.04 ms |
+
+The wait grows 13× with load; the critical section does not move. At 100
+stations roughly **99 % of a completion's database time is queueing** for the
+hottest SKU's row and about 1 % is work.
+
+CPU confirms it is not a resource problem — sampled during the final runs, out
+of 800 % available: server ~100 %, Postgres ~95–134 %, load client ~111–126 %,
+**total ~310–360 %**. The server uses about one core. (The baseline burned
+~505 % to do 405 tx/s; most of the removed work was round trips, not
+computation.)
+
+Because every basket containing the hottest SKU passes through that critical
+section one at a time, it is what sets the ceiling:
+
+```
+ceiling ≈ 1 / (critical section × fraction of baskets holding that SKU)
+```
+
+which is why the only change that raised it was taking a statement *out* of
+the critical section (writing the transaction header before the lock:
+−9.8 % critical section, +3.7 % throughput at 10 stations).
+
+### 7.5 Trade-offs accepted
+
+These are costs, stated as costs:
+
+| Change | What it buys | What it costs |
+|---|---|---|
+| Baskets in memory | 11–12 statements per basket gone | **An unpaid basket does not survive a restart**, and the design is now firmly single-process: two servers would not see each other's baskets. A *paid* basket is as durable as before. |
+| Catalog cached | every price lookup is a map read | **Price and name changes need a restart.** Safe only because this catalog is seeded once and never updated. |
+| Raw scan persistence off by default | ~1.25 M inserts per stress run gone | **No row-level audit trail** unless switched back on. The graded requirement — top-10 windows in the database — is unaffected, because windows are computed from the event stream, not from those rows. |
+| Separate 2-connection pool for the pipeline | sink write 66.9 ms → 0.43 ms | Two more Postgres connections, and a second pool to reason about. |
+| Pool size 32, not 16 | ~2.3 % more throughput | **A worse tail**: p99 307 ms vs 229 ms at 16. If tail latency mattered more than throughput, 16 is the better setting (§7.6). |
+
+### 7.6 Choices measured and *not* taken
+
+- **Connection pool 64.** 10.6 % *worse* than 32, with p99 doubling to 511 ms.
+  More connections do not make a serialized row less serial; they just move
+  the queue into Postgres, and with 8 cores they make the critical section
+  itself slower (1,065 → 1,159 µs).
+- **Plain `FOR UPDATE` on the bulk lock.** Collapsed the server to 2.9 tx/s
+  with 9,239 errors and deadlocks. `scan_log`, `transaction_items` and
+  `low_stock_alerts` all have a foreign key to `items`, so Postgres takes a
+  `FOR KEY SHARE` lock on the parent row when it checks one — compatible with
+  `FOR NO KEY UPDATE`, in conflict with `FOR UPDATE`. Reverted.
+- **Folding the stock `UPDATE` and the line `INSERT` into one CTE.** Would
+  remove a round trip from the critical section; rejected because it fuses two
+  cleanly separated persistence classes into one SQL string for an expected
+  few percent.
+- **`synchronous_commit = off`.** Would cut the commit cost, which is a large
+  part of the remaining 1.0 ms. Rejected: a crash could lose paid
+  transactions.
+
+### 7.7 Measurement honesty
+
+Two things are worth stating rather than hiding.
+
+**The machine throttles.** After ~45 minutes of continuous stress runs,
+throughput on an *unchanged* binary fell from ~1,036 to 805 tx/s and in the
+worst period to ~330. The critical section — the server's own work — grew from
+1,013 to 1,318 µs, and operations that touch no database slowed by the same
+fraction, so this is the machine, not the code. The pool-size sweep was
+therefore re-run **interleaved** (16, 32, 64, 16, 32, 64, …) after a cooldown,
+so drift is shared across arms rather than charged to whichever ran last.
+Every contaminated run is kept in `reports/perf/contaminated-thermal/` and
+labelled, not deleted.
+
+**One change at a time.** Each phase was measured on its own, and one was
+reverted outright. The reverted run is in the results table with its real
+numbers.
+
+### 7.8 A regression this work introduced, and how it was caught
+
+Moving baskets into memory silently changed the order of `lines[]` on a
+receipt. `OpenBasket` stored lines in a `LinkedHashMap` — correctly, so they
+appear in the order first scanned — but published snapshots with
+`Map.copyOf`, whose iteration order is unspecified. No test covered line
+order; the 28-response golden diff against the pre-Week-4 build did. Fixed,
+and now locked down by `OpenBasketTest.linesKeepFirstScanOrder`, which was
+confirmed to fail against the old code.
+
+---
+
+## 8. Known limitations
 
 1. **Layering changed nothing operational.** One process, one database, one
    point of failure, vertical scaling only (§2, priority 3).
@@ -633,8 +777,9 @@ three checkout behaviour scripts passing unchanged.
 5. **Single measurement runs**, against a Week 1 baseline whose own spread was
    about 15% (§3.2, §3.4).
 6. **Client and server share one machine.**
-7. **The pool size is reasoned, not optimized**, and is the binding constraint
-   at 100 stations.
+7. **~~The pool size is reasoned, not optimized~~** — measured in Week 4
+   (§7.6). 32 is a deliberate throughput-over-tail-latency choice; 16 would
+   give a better p99.
 8. **Analytics are eventually consistent** by design (§5.7).
 9. **The basket upsert assumes sequential scans per transaction** (§5.9).
 10. **`scan_log` is written asynchronously** — a hard kill can lose up to one
@@ -642,4 +787,14 @@ three checkout behaviour scripts passing unchanged.
 11. **The scan sequence restarts at 1 on every boot**, which is safe only
     because the schema is recreated on every start (§6.3).
 12. **The throughput gain is within run-to-run noise** (§6.7); only the
-    low-load scan latency improvement is outside it.
+    low-load scan latency improvement is outside it. *(Week 3 statement. Week
+    4's gain is ×2.4–2.5 and far outside noise — see §7.)*
+13. **An unpaid basket is lost on restart**, and the in-memory basket store
+    makes the single-process assumption explicit rather than incidental
+    (§7.5).
+14. **The catalog is cached at first use**, so price or name changes require a
+    restart (§7.5).
+15. **The ceiling is one row's serialization.** At 100 stations ~99 % of a
+    completion's database time is spent queueing for the hottest SKU. Going
+    materially faster means sharding that row, not tuning the server (§7.4).
+16. **Measurements are sensitive to machine thermal state** (§7.7).
