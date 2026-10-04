@@ -12,10 +12,12 @@ the second half by another. A window that really slides must report the second
 SKU as rank 1 at the end, with the first SKU's count reduced to only the part
 that still falls inside the window.
 
-Boundaries are detected by "which multiple of the slide interval has this seq
-passed", not by seq %% interval == 0: scan_log.seq is a BIGSERIAL, and a
-rolled-back insert consumes a number, so an exact multiple can simply never
-appear and a window would be skipped forever.
+Since Week 3 the window is computed by a pipeline of filters on background
+threads, and scan_log is written in batches rather than one row per scan. The
+window counts therefore reach memory before the matching rows reach the
+database, so this script WAITS for the writer to catch up before comparing a
+stored snapshot against a raw SQL aggregate. Without that wait the comparison
+would be racy and fail for the wrong reason.
 
 Usage:  python3 scripts/test-popular-window.py
 Requires a freshly restarted server (empty scan_log).
@@ -59,13 +61,28 @@ def main():
     conn.close()
     print(f"{TOTAL} scans in {time.time() - started:.1f}s")
 
-    # The recompute is handed to a background thread after the scan commits,
-    # so the last window may not be written the instant the loop ends.
-    time.sleep(2)   # the recompute runs on a background thread after commit
+    # Everything downstream of the scan is asynchronous now, so rather than
+    # sleeping a fixed amount we wait for two concrete conditions:
+    #   1. the scan-log writer has flushed every event we sent
+    #   2. the expected number of snapshots has been written
+    # Both are bounded so a genuine failure still fails rather than hanging.
+    expected_windows = TOTAL // slide
+    deadline = time.time() + 30
+    while time.time() < deadline:
+        flushed = int(sql("SELECT count(*) FROM scan_log") or 0)
+        windows = int(sql("SELECT count(*) FROM popular_snapshots") or 0)
+        if flushed >= TOTAL and windows >= expected_windows:
+            break
+        time.sleep(0.2)
+    print(f"pipeline drained: scan_log={flushed} snapshots={windows}")
 
     rows = sql("SELECT window_start || ',' || window_end FROM popular_snapshots ORDER BY id;").splitlines()
     print(f"snapshots written: {rows}")
-    ok &= check("one snapshot per slide interval", len(rows), TOTAL // slide)
+    ok &= check("one snapshot per slide interval", len(rows), expected_windows)
+    ok &= check("scan_log received every scan exactly once", 
+                sql("SELECT count(*) FROM scan_log"), str(TOTAL))
+    ok &= check("the scan sequence has no gaps", 
+                sql("SELECT max(seq) FROM scan_log"), str(TOTAL))
 
     body = req("GET", "/analytics/popular-items")[1]
     ws, we = body["windowStart"], body["windowEnd"]

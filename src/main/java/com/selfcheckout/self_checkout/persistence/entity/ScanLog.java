@@ -7,21 +7,22 @@ import java.time.Instant;
 /**
  * One row per physical scan, across every station.
  *
- * seq is a BIGSERIAL, so Postgres hands out a global, monotonically increasing
- * scan number. Phase 4 uses that number as the "global scan sequence" for the
- * popular-items hopping window.
+ * seq is the global scan sequence. As of Week 3 it is assigned by the
+ * pipeline's ingest filter and written by the scan-log writer, NOT by a
+ * BIGSERIAL. Only committed scans are numbered, one at a time by one thread,
+ * so unlike the old BIGSERIAL the sequence has no gaps.
+ *
+ * Nothing writes this entity any more -- rows go in through a batched JDBC
+ * INSERT. It stays mapped because the windowed aggregate in
+ * ScanLogRepository.topInWindow is the brute-force oracle the tests check the
+ * in-memory window against.
  */
-// Watch out: "monotonically increasing" is NOT the same as "no gaps".
-// A rolled-back INSERT still burns its sequence number, so numbers can be
-// skipped. That's exactly why the window boundary check can't just test
-// seq % 500 == 0 -- see PopularItemsService.onScanRecorded().
 @Entity
 @Table(name = "scan_log")
 public class ScanLog {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)  // Postgres BIGSERIAL assigns it
-    @Column(name = "seq")
+    @Column(name = "seq")        // assigned by the pipeline, not generated
     private Long seq;
 
     @Column(name = "sku")
@@ -32,11 +33,10 @@ public class ScanLog {
 
     protected ScanLog() {}
 
-    // seq is deliberately not set here -- the database fills it in on INSERT,
-    // and Hibernate reads it back so the caller can see which number it got.
-    public ScanLog(String sku) {
+    public ScanLog(long seq, String sku, Instant scannedAt) {
+        this.seq = seq;
         this.sku = sku;
-        this.scannedAt = Instant.now();
+        this.scannedAt = scannedAt;
     }
 
     public Long getSeq() { return seq; }

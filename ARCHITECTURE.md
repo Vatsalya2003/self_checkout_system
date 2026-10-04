@@ -1,8 +1,9 @@
-# Architecture — Self-Checkout, Layered
+# Architecture — Self-Checkout: Layered, with a Pipelined Analytics Stage
 
-Week 2 of the semester project. Same API contract, same database, same
-concurrency behaviour as Week 1's monolith — the **only** variable is how the
-code is structured.
+Weeks 2 and 3 of the semester project. Same API contract, same database, same
+checkout behaviour as Week 1's monolith throughout — the only things that
+changed are how the code is structured (Week 2) and how the windowed analytics
+are executed (Week 3).
 
 Week 1 organized classes by technical type (`controller/`, `service/`,
 `repository/`). That reads like layers but nothing enforced it: HTTP types had
@@ -216,7 +217,7 @@ differences smaller than that carry no signal.
 graph TD
     API["<b>api</b> — HTTP only · CLOSED<br/>4 controllers · dto/ (12 records) · error/"]
     TX["<b>transactions</b> — CLOSED<br/>CatalogService · TransactionService · InventoryService<br/>result/ (7 records) · exception/ (6 types)"]
-    AN["<b>analytics</b> — OPEN<br/>AnalyticsService · ScanRecorder<br/>result/ (2 records) · RecomputeExecutorConfig"]
+    AN["<b>analytics</b> — OPEN<br/>AnalyticsService · ScanRecorder<br/>result/ (2 records) · pipeline/ (5 filters)"]
     PER["<b>persistence</b> — JPA only · CLOSED<br/>entity/ (8) · repository/ (6 + 2 projections)"]
     CFG["config — shared kernel<br/>SelfCheckoutProperties"]
     DB[("PostgreSQL")]
@@ -408,7 +409,220 @@ threads queued on it, which remains the dominant latency factor.
 
 ---
 
-## 6. Known limitations
+## 6. Week 3 — the analytics pipeline
+
+### 6.1 Why only analytics
+
+Checkout is not a pipeline and should not be forced into one. `complete()` is a
+single atomic unit of work: lock the basket, lock each item row in SKU order,
+clamp and decrement, record any threshold crossing, mark it paid — all or
+nothing. Splitting that across stages connected by queues would mean splitting
+one database transaction across threads, which either breaks atomicity or
+reinvents a distributed commit for no gain.
+
+The windowed analytics are the opposite: a stream of independent events, each
+one cheap, where the answer is a periodic aggregate and a few hundred
+milliseconds of lag costs nothing. That is exactly the shape a pipeline fits,
+so that is the part that was refactored.
+
+### 6.2 The design
+
+Five filters, one thread each, connected by five bounded
+`ArrayBlockingQueue`s behind a `Pipe<T>` interface. Full description and
+diagram in **[PIPELINE.md](PIPELINE.md)**.
+
+```
+request thread --offer--> [ingest] --+--> [window] --> [rank] --> [sink] --> popular_snapshots
+                                     |
+                                     +--> [scan-log writer] --------------> scan_log
+```
+
+The pipeline lives entirely inside the `analytics` layer. The transactions
+layer still calls exactly one method, `ScanRecorder.recordScan(sku)`, and knows
+nothing about sequences, windows, queues or threads. `LayeredArchitectureTest`
+still passes unchanged.
+
+### 6.3 Correctness rules
+
+1. **Only committed scans enter** — the handover is registered on
+   `afterCommit`, so a rolled-back scan never reaches the pipeline. Same
+   guarantee as Week 2.
+2. **Thread confinement** — each filter's state is touched by one thread only,
+   so there are no locks inside filters; every message between them is an
+   immutable record.
+3. **Identical window semantics** — size 1000, slide 500, half-open
+   `(start, end]`, top 10, ties by SKU ascending.
+4. **Asymmetric backpressure, deliberately** — see §6.4.
+5. **Graceful shutdown drains** — the front of the pipeline is poisoned, each
+   stage finishes its backlog before poisoning the next, and the writer flushes
+   its final batch.
+6. **A bad message never kills a stage** — caught per message, logged with the
+   event, counted, loop continues.
+7. **Duplicate windows fail loudly** — `UNIQUE (window_end)` on
+   `popular_snapshots`, and the sink does **not** use `ON CONFLICT DO NOTHING`.
+   One thread owns boundaries, so a duplicate could only be a bug; swallowing
+   it would hide exactly what the constraint exists to catch.
+
+**Why the Week 2 `AtomicLong` boundary logic is gone.** It existed because
+`scan_log.seq` was a `BIGSERIAL`, and a rolled-back insert burns its number, so
+an exact multiple of 500 might never appear and a window could be skipped
+forever. The ingest filter numbers only committed scans, one at a time, on one
+thread, so the sequence is gapless and `seq % 500 == 0` is now exactly right.
+
+**One consequence to be careful about:** `scan_log.seq` is now assigned by the
+application and the counter restarts at 1 on every boot. That is safe only
+because `schema.sql` drops and recreates the table on every start. If
+`spring.sql.init.mode` were ever turned off, the second start would collide on
+the primary key. The warning is in `schema.sql` too.
+
+### 6.4 Two kinds of backpressure
+
+| Boundary | Behaviour | Why |
+|---|---|---|
+| **Between filters** | blocking `put` | A slow stage should make the stage above it wait. Nothing is discarded and the backlog stays inside the pipeline. |
+| **Request thread → ingest** | non-blocking `offer`, 10 ms ceiling | A request thread must never wait on analytics. In Week 2 an analytics failure could not touch checkout, and that property is preserved: a refused event is counted, logged at WARN, and the scan completes normally. |
+
+Without that split, a wedged analytics stage would fill 65,536 slots and then
+block **every scan** — turning an analytics outage into a checkout outage. The
+asymmetry is the price of keeping "analytics can never take checkout down"
+true, and the drop counter makes any loss impossible to miss rather than
+silent.
+
+### 6.5 Observability — the evidence
+
+Per-filter in/out/error counters, per-pipe depth, high-water depth and
+full-wait counts, plus a drop counter, logged as one line every 10 seconds.
+
+**Stress run (100 stations, 120 s), final line:**
+
+```
+ingest  in=456040 out=456040   window in=456040 out=912   rank in=912 out=912
+sink    in=912    out=912      scanlog in=7298  out=456040
+ingestPipe  max=5/65536     windowPipe max=5/65536     scanLogPipe max=238/65536
+rankPipe    max=1/256       sinkPipe   max=1/256
+droppedAtIngress=0
+```
+
+Reading it: **in == out at every stage**, so nothing was lost or stuck. The
+deepest any pipe ever got was **238 of 65,536** (0.4 %), so backpressure never
+engaged — **0 full-pipe waits, 0 drops, 0 stage errors, 0 WARN/ERROR lines**.
+`scanlog in=7298` counts *batches* and `out=456040` counts *rows*, i.e. an
+average of **62.5 rows per INSERT** — the adaptive batching working. At 10
+stations the same average is 1.46, because the writer drains faster than events
+arrive and there is simply nothing to batch.
+
+Independently confirmed in the database: `scan_log` held exactly 456,040 rows
+with `max(seq) = 456040` and 456,040 distinct values — gapless, no duplicates,
+no loss.
+
+**Shutdown test:** 1,200 scans sent, `SIGTERM` immediately after, process
+exited cleanly; `scan_log` then held exactly 1,200 gapless rows.
+
+### 6.6 Measured results
+
+Both runs: server restarted beforehand, machine idle (1-minute load average
+below 4), invariant check run before any restart.
+
+| Metric | Default (10 st, 60 s) | Stress (100 st, 120 s) |
+|---|---|---|
+| Transactions | 20,545 | 43,436 |
+| Transactions / sec | 342.3 | 361.2 |
+| Items scanned | 216,507 | 456,040 |
+| Scans / sec | 3,606.7 | 3,792.6 |
+| **Total errors** | **0** | **0** |
+| Invariant violations | **0** | **0** |
+| Events dropped | **0** | **0** |
+| Windows written | 433 | 912 |
+
+| Operation | Run | p50 | p95 | p99 | max |
+|---|---|---|---|---|---|
+| START_TRANSACTION | default | 0.63 | 1.05 | 1.83 | 58.79 |
+| START_TRANSACTION | stress | 15.23 | 24.40 | 33.64 | 235.59 |
+| SCAN_ITEM | default | 1.08 | 1.67 | 2.52 | 30.21 |
+| SCAN_ITEM | stress | 15.41 | 24.51 | 32.82 | 171.67 |
+| COMPLETE_TRANSACTION | default | 17.25 | 34.78 | 45.46 | 92.65 |
+| COMPLETE_TRANSACTION | stress | 113.21 | 173.70 | 305.87 | 731.03 |
+
+0 errors across **800,509 total requests**.
+
+### 6.7 Week 2 vs Week 3
+
+| Metric | Week 2 | Week 3 | Δ |
+|---|---|---|---|
+| **Default — transactions/sec** | 327.4 | 342.3 | +4.6 % |
+| Default — SCAN p50 | 1.24 | 1.08 | **−12.9 %** |
+| Default — SCAN p99 | 3.55 | 2.52 | **−29.0 %** |
+| Default — COMPLETE p50 | 15.16 | 17.25 | +13.8 % |
+| Default — COMPLETE p99 | 47.44 | 45.46 | −4.2 % |
+| **Stress — transactions/sec** | 348.1 | 361.2 | +3.8 % |
+| Stress — SCAN p50 | 16.04 | 15.41 | −3.9 % |
+| Stress — SCAN p99 | 34.33 | 32.82 | −4.4 % |
+| Stress — COMPLETE p50 | 114.67 | 113.21 | −1.3 % |
+| Stress — COMPLETE p99 | 326.29 | 305.87 | −6.3 % |
+| **Errors** | 0 | 0 | — |
+
+**Reading these honestly.** Week 2 measured roughly 15 % run-to-run variance on
+throughput for unchanged code, so the **+4.6 % and +3.8 % throughput figures sit
+inside the noise band and should not be claimed as a win**. Each configuration
+was therefore run twice:
+
+| | run 1 | run 2 | Week 2 |
+|---|---|---|---|
+| default tx/sec | 342.3 | 347.8 | 327.4 |
+| default SCAN p99 | 2.52 | 2.40 | 3.55 |
+| stress tx/sec | 361.2 | 355.0 | 348.1 |
+| stress SCAN p99 | 32.82 | 34.05 | 34.33 |
+
+The signal that *is* consistent and outside the noise is **scan latency at low
+load**: SCAN p99 fell from 3.55 ms to 2.52 and 2.40 ms across both repeats, a
+~30 % reduction, with p50 down ~13 %. That is the one thing the pipeline
+actually targets — the per-scan `INSERT` left the request's transaction
+entirely — and it is exactly where the design predicted the gain would show.
+
+At 100 stations the picture is flatter, also as predicted: the binding
+constraint there is the hot-row lock on `SKU-000001` during `complete` plus the
+saturated connection pool, and the pipeline does not touch that path. The small
+COMPLETE improvements are a plausible second-order effect of the scan path no
+longer competing for pool connections, but they are within noise and are **not**
+claimed as a result.
+
+### 6.8 The async `scan_log` trade-off
+
+`scan_log` rows are now written on a background thread in batches. On a hard
+kill (`SIGKILL`, power loss) up to one unflushed batch plus whatever sat in the
+pipes would be lost. This is analytics data only: checkout remains fully
+transactional, and stock, receipts and the invariant are untouched.
+
+A graceful stop loses nothing — verified. Every test run in this course starts
+from a freshly recreated database, so there is no recovery-on-restart to build.
+A production version would replay from a durable append-only log or a broker
+with publisher confirms and manual acknowledgements.
+
+### 6.9 Why not RabbitMQ or Kafka this week
+
+The pipeline is in-process, so an in-memory queue hands a message to the next
+filter in nanoseconds. A network broker would add a serialization step, a
+socket round trip and a second process to operate — real latency and real
+operational cost — in exchange for durability this workload does not need,
+given the database is wiped before every run anyway.
+
+The `Pipe<T>` interface exists precisely so that decision stays reversible: a
+`RabbitPipe<T>` would be one more implementation and no change to any filter.
+That is a worthwhile A/B experiment, but on a separate branch, not in the
+submission.
+
+### 6.10 What Week 3 did not change
+
+Checkout behaviour is untouched: same schema for `items`/`transactions`/
+`transaction_items`, same pessimistic row locks, same ascending SKU lock order,
+same two-pass lock-then-mutate, same clamping and `applied_quantity`, same
+low-stock semantics, same Hikari pool size of 32. Verified by a 27-call golden
+response diff (byte-identical, including every 400/404/409 case) and by all
+three checkout behaviour scripts passing unchanged.
+
+---
+
+## 7. Known limitations
 
 1. **Layering changed nothing operational.** One process, one database, one
    point of failure, vertical scaling only (§2, priority 3).
@@ -423,3 +637,9 @@ threads queued on it, which remains the dominant latency factor.
    at 100 stations.
 8. **Analytics are eventually consistent** by design (§5.7).
 9. **The basket upsert assumes sequential scans per transaction** (§5.9).
+10. **`scan_log` is written asynchronously** — a hard kill can lose up to one
+    unflushed batch of analytics rows (§6.8).
+11. **The scan sequence restarts at 1 on every boot**, which is safe only
+    because the schema is recreated on every start (§6.3).
+12. **The throughput gain is within run-to-run noise** (§6.7); only the
+    low-load scan latency improvement is outside it.

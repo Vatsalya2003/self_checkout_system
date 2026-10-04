@@ -68,11 +68,19 @@ CREATE TABLE low_stock_alerts (
 
 -- One row per physical scan, across every station. seq is the global scan
 -- counter that the popular-items window slices up.
+--
+-- Week 3: seq is a plain BIGINT ASSIGNED BY THE APPLICATION (the pipeline's
+-- ingest filter), not a BIGSERIAL. Only committed scans are numbered, one at
+-- a time by one thread, so the sequence has no gaps -- which is what lets the
+-- window filter test "seq % 500 == 0" directly instead of the old
+-- claim-the-boundary dance.
+--
+-- WARNING: the ingest counter restarts at 1 on every application start. That
+-- is only safe because this script drops and recreates the table on every
+-- boot (spring.sql.init.mode=always). If that initialization were ever turned
+-- off, the second start would collide on this primary key.
 CREATE TABLE scan_log (
-    seq          BIGSERIAL PRIMARY KEY,   -- auto-incrementing. Always goes UP, but can
-                                          -- SKIP numbers (a rolled-back insert still
-                                          -- burns one) -- which is why the window
-                                          -- boundary check never tests seq % 500 = 0
+    seq          BIGINT PRIMARY KEY,
     sku          VARCHAR(32) NOT NULL REFERENCES items(sku),
     scanned_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -84,5 +92,9 @@ CREATE TABLE popular_snapshots (
     window_start BIGINT NOT NULL,     -- these two are scan seq numbers, NOT timestamps:
     window_end   BIGINT NOT NULL,     -- the window is seq in (window_start, window_end]
     computed_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    items_json   TEXT NOT NULL        -- the ranked top 10, stored as a JSON array
+    items_json   TEXT NOT NULL,       -- the ranked top 10, stored as a JSON array
+    -- Exactly one thread produces window boundaries, so two rows with the same
+    -- window_end could only mean a bug in the pipeline. The constraint makes
+    -- that fail loudly instead of quietly duplicating a window.
+    CONSTRAINT popular_snapshots_window_end_key UNIQUE (window_end)
 );

@@ -5,7 +5,11 @@ decision was made, and how to run and explain it.
 
 The code is organized into **four layers** — `api`, `transactions`,
 `analytics`, `persistence` — with the dependency rules between them enforced by
-an automated test. §3 and the new §4.5 cover how they talk to each other.
+an automated test. §3 and §4.5 cover how they talk to each other.
+
+Inside the analytics layer, the windowed analytics run as a **pipeline of five
+filters connected by bounded queues** — see §4.6 and
+[PIPELINE.md](PIPELINE.md).
 
 For **measured results and architectural trade-offs**, see
 [ARCHITECTURE.md](ARCHITECTURE.md). This guide deliberately does not repeat the
@@ -18,7 +22,7 @@ numbers — it explains the *machinery* that produced them.
 1. [What the system does](#1-what-the-system-does)
 2. [Tech stack, and why each piece](#2-tech-stack-and-why-each-piece)
 3. [Architecture](#3-architecture)
-4. [How a request flows](#4-how-a-request-flows) · [how the layers talk](#45-how-the-layers-talk-to-each-other)
+4. [How a request flows](#4-how-a-request-flows) · [how the layers talk](#45-how-the-layers-talk-to-each-other) · [the analytics pipeline](#46-one-scan-event-through-the-analytics-pipeline)
 5. [The database](#5-the-database)
 6. [API reference](#6-api-reference)
 7. [File-by-file walkthrough](#7-file-by-file-walkthrough)
@@ -109,7 +113,7 @@ graph TD
         N1["AnalyticsService implements ScanRecorder"]
         N2["ScanRecorder — the one-method door in"]
         N3["result/ — 2 domain records"]
-        N4["RecomputeExecutorConfig — the background thread"]
+        N4["pipeline/ — 5 filters over bounded queues"]
     end
 
     subgraph per["persistence — JPA only (CLOSED)"]
@@ -391,6 +395,67 @@ sequenceDiagram
    `GlobalExceptionHandler`, which is the only class allowed to turn
    "the basket wasn't open" into "409".
 
+### 4.6 One scan event through the analytics pipeline
+
+§4.5 followed a scan down through the layers. This follows what happens to it
+*afterwards*, on the analytics side, once the scan has committed.
+
+The thing to notice: the request thread's involvement ends at a single
+in-memory handover. Everything else happens on background threads, so a scan
+request does no analytics database work at all.
+
+```mermaid
+sequenceDiagram
+    participant REQ as Tomcat request thread
+    participant AS as AnalyticsService
+    participant ING as ingest thread
+    participant WIN as window thread
+    participant RNK as rank thread
+    participant SNK as sink thread
+    participant LOG as scan-log thread
+    participant DB as PostgreSQL
+
+    REQ->>AS: recordScan("SKU-000001")
+    Note over AS: no I/O — just registers<br/>an afterCommit callback
+    REQ->>DB: COMMIT (the scan's own transaction)
+    Note over REQ: only now does analytics hear about it;<br/>a rolled-back scan never fires
+    REQ->>ING: ingestPipe.offer(ScanEvent, 10 ms)
+    Note over REQ: non-blocking. If the pipe were full the<br/>event is counted + logged and the scan<br/>still succeeds — analytics can never<br/>stall checkout.
+    REQ-->>REQ: request finishes
+
+    ING->>ING: seq = ++counter (gapless)
+    par tee, arm 1
+        ING->>WIN: windowPipe.put(SequencedScanEvent)
+    and tee, arm 2
+        ING->>LOG: scanLogPipe.put(SequencedScanEvent)
+    end
+
+    WIN->>WIN: ring buffer: add new SKU, evict the<br/>one falling out of the last 1000
+    alt seq % 500 != 0
+        WIN-->>WIN: nothing to emit
+    else boundary reached
+        WIN->>RNK: rankPipe.put(WindowCounts) — immutable copy
+        RNK->>RNK: sort by count desc, then SKU asc; take 10;<br/>attach names from the lazy catalog cache
+        RNK->>SNK: sinkPipe.put(RankedWindow)
+        SNK->>DB: INSERT popular_snapshots
+    end
+
+    LOG->>LOG: take one row, then sweep up everything<br/>else already queued (max 1000)
+    LOG->>DB: one multi-row INSERT into scan_log
+```
+
+**Why the tee.** The same event has two unrelated destinations: the live window
+needs it immediately in memory, and `scan_log` needs it durably on disk. They
+run at completely different rates — the window emits once per 500 events, the
+writer flushes a batch whenever it can — so decoupling them means neither waits
+for the other.
+
+**Why the batching is adaptive.** The writer takes one row, then sweeps up
+whatever else is already waiting. Under light load that sweep finds nothing and
+the batch is one row. Under stress it averaged **62.5 rows per INSERT**. If the
+writer is ever held up — waiting for a pooled connection, say — the backlog
+simply makes the *next* write bigger, so falling behind is self-correcting.
+
 ## 5. The database
 
 ```mermaid
@@ -479,7 +544,7 @@ subtle part of the whole project.**
 
 | Column | Type | What it is |
 |---|---|---|
-| `seq` | `BIGSERIAL` PK | The global scan counter. Always increases, but **can skip numbers**. See §8.5. |
+| `seq` | `BIGINT` PK | The global scan counter, **assigned by the pipeline's ingest filter** (not a `BIGSERIAL` since Week 3). Only committed scans are numbered, one at a time by one thread, so it is gapless. The counter restarts at 1 each boot, which is safe only because the schema is recreated on every start. |
 | `sku` | `VARCHAR(32)` FK | What was scanned. |
 | `scanned_at` | `TIMESTAMPTZ` | When. |
 
@@ -649,9 +714,18 @@ Organized by layer, top to bottom.
 | File | Role |
 |---|---|
 | `ScanRecorder` | The one-method interface the transactions layer calls. Keeps the dependency narrow and one-directional. |
-| `AnalyticsService` | Implements `ScanRecorder`. `recordScan` writes `scan_log` and checks the boundary; `recomputeWindow` runs the aggregate on the background thread; `latest` serves the endpoint. |
+| `AnalyticsService` | Implements `ScanRecorder`. Now just the two ends: `recordScan` registers the `afterCommit` handover, `latest` serves the endpoint. All the work moved into `pipeline/`. |
 | `analytics/result/*` | `PopularWindowView`, `PopularEntry`. `PopularEntry` is also the on-disk JSON format inside `popular_snapshots`. |
-| `RecomputeExecutorConfig` | The single daemon thread. Analytics-specific, so it lives here rather than in `config/`. |
+| `pipeline/Pipe` · `BlockingQueuePipe` | The pipe abstraction and its bounded-queue implementation. The seam that would let a broker replace queues. |
+| `pipeline/IngestFilter` | Assigns the gapless global scan sequence; the wiring tees its output to two pipes. |
+| `pipeline/WindowFilter` | Ring buffer of the last 1000 scans plus running counts; emits a window every 500. Owns the boundary logic. |
+| `pipeline/RankFilter` | Counts → top 10, ties by SKU ascending, names attached. |
+| `pipeline/SinkFilter` | One `popular_snapshots` row per window. Does **not** swallow duplicates. |
+| `pipeline/ScanLogWriterFilter` | Maps events to rows and writes a batch. |
+| `pipeline/FilterLoop` · `ScanLogWriterLoop` | The thread halves. Filters stay plain classes so they test without Spring. |
+| `pipeline/AnalyticsPipeline` | Builds the pipes, starts the five threads, poison-pill shutdown, and the one entry point `submit(...)`. |
+| `pipeline/PipelineMetrics` | In/out/error per stage, pipe depths, drops. Logged every 10 s — the evidence in ARCHITECTURE.md §6.5. |
+| `pipeline/ScanEvent` · `SequencedScanEvent` · `WindowCounts` · `RankedWindow` | The immutable messages carried between filters. |
 
 ### `persistence/` — all the SQL
 
@@ -660,7 +734,10 @@ Organized by layer, top to bottom.
 | `repository/ItemRepository` | `findBySkuForUpdate` | `@Lock(PESSIMISTIC_WRITE)` → `SELECT ... FOR UPDATE`. **The lock that prevents lost updates.** |
 | `repository/TransactionRepository` | `findByIdForUpdate` | Serializes two completes of the same basket. |
 | `repository/TransactionItemRepository` | `findByTransactionIdOrderBySkuAsc` | The `OrderBySkuAsc` **is** the deadlock prevention. |
-| `repository/ScanLogRepository` | `topInWindow(start, end, limit)` | The windowed aggregate, half-open `(start, end]`. |
+| `repository/ScanLogRepository` | `topInWindow(start, end, limit)` | The windowed aggregate, half-open `(start, end]`. No longer used in production — it is the brute-force oracle the window tests check against. |
+| `repository/ScanLogBatchWriter` | `insertBatch(rows)` | Multi-row `INSERT` via `JdbcTemplate`. Plain JDBC because `scan_log` rows are write-only facts that nothing ever loads as entities. |
+| `repository/SnapshotWriter` | `insert(...)` | One `popular_snapshots` row. |
+| `repository/CatalogNameLookup` | `nameOf(sku)` | SKU → display name. Cached, loaded **lazily** — `data.sql` runs during startup, so an eager load could find an empty table. |
 | `repository/LowStockAlertRepository` | `findBelowThreshold` | `LEFT JOIN` + `coalesce` for the ad-hoc threshold fallback. |
 | `repository/PopularSnapshotRepository` | `findFirstByOrderByIdDesc` | Newest window; the table is append-only. |
 | `repository/ScanCount`, `LowStockRow` | — | Query projections. |
@@ -811,17 +888,15 @@ still consumes its number permanently. If scan 1000 happens to be the one that
 rolls back, the number 1000 never appears in the table and that window is
 skipped *forever*.
 
-**The fix** — ask which boundary this scan has *passed*, then claim it:
+**That was the Week 2 fix** — ask which boundary this scan has *passed*, then
+claim it atomically with `compareAndSet`, so exactly one of 100 threads wins.
 
-```java
-long boundary = (seq / slide) * slide;          // 1499 → 1000, gaps don't matter
-if (boundary <= lastBoundary.get()) return;     // nothing new
-if (!lastBoundary.compareAndSet(previous, boundary)) return;  // someone else won
-```
-
-`compareAndSet` is an atomic "set it only if nobody changed it since I read
-it". Exactly one thread wins per boundary, so a window is never computed twice
-even with 100 threads scanning at once.
+**Week 3 removed the problem instead of working around it.** The sequence no
+longer comes from a `BIGSERIAL`: the pipeline's ingest filter numbers events
+itself, one at a time, on one thread, and only ever sees scans that already
+committed. No rollbacks, no gaps, one writer — so `seq % 500 == 0` is now
+simply correct, and the whole `AtomicLong` dance is gone. Fixing the cause beat
+defending against the symptom.
 
 ### 8.6 Low-stock semantics
 
@@ -953,6 +1028,19 @@ layer starts depending on something it shouldn't.
 > `./mvnw test` on its own also runs `contextLoads`, which boots the app and
 > therefore **re-runs `schema.sql` and wipes the database**. Never run it
 > between a load test and its invariant check.
+
+### What the test suite covers
+
+29 tests, none of which need a running server:
+
+| Group | What it checks |
+|---|---|
+| `LayeredArchitectureTest` | The 6 layer dependency rules. |
+| `WindowFilterTest` | Eviction at 1000, emission exactly every 500, half-open ranges, counts across boundaries, snapshots immutable. |
+| `RankFilterTest` | Top 10, tie-break by SKU, fewer than 10 distinct SKUs, empty windows. |
+| `ScanLogWriterFilterTest` | Batching, the `maxBatch` cap, flush-on-idle, and the shutdown flush. |
+| `BlockingQueuePipeTest` | `offer` refuses instead of blocking; poison never jumps the queue; depth/wait accounting. |
+| `PipelineEndToEndTest` | 2,600 events through the wired filters on real threads, every window compared with a brute-force recount; plus "one bad message does not kill a stage". |
 
 ### Run the behavioural tests
 

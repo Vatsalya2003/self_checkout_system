@@ -1,4 +1,4 @@
-# Self-Checkout System — Layered Architecture
+# Self-Checkout System — Layered Architecture with a Pipelined Analytics Stage
 
 A monolithic backend for a supermarket self-checkout system: customers start a
 transaction at a station, scan items one unit at a time, then pay. Stock is decremented
@@ -11,6 +11,13 @@ in `CS6510-2026/spec/self-checkout-openapi.yaml`.
 The code is split into four layers — **api**, **transactions**, **analytics**,
 **persistence** — and the dependency rules between them are enforced by an ArchUnit test,
 not by convention.
+
+The windowed analytics run as a **5-stage pipeline of filters connected by pipes**:
+**ingest** (numbers each committed scan and tees it) → **window** (last 1000 scans, emits
+every 500) → **rank** (top 10, ties by SKU) → **sink** (writes `popular_snapshots`), with
+ingest also teeing to a **scan-log writer** (batched multi-row INSERT into `scan_log`).
+The pipes are bounded Java `ArrayBlockingQueue`s, one thread per filter.
+**See [PIPELINE.md](PIPELINE.md)** for the full description and diagram.
 
 **New to this codebase? Start with [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)** — a full
 walkthrough with diagrams: how a request flows, what every table and column is for,
@@ -187,6 +194,7 @@ src/main/java/com/selfcheckout/self_checkout/
   api/            HTTP only — controllers, dto/ (wire shapes), error/ (exception → status)
   transactions/   checkout business rules — services, result/ (domain records), exception/
   analytics/      popularity windows — AnalyticsService, ScanRecorder, result/
+    pipeline/     the 5 filters, the Pipe abstraction, wiring and metrics
   persistence/    database access only — entity/, repository/
   config/         shared kernel — SelfCheckoutProperties
 src/test/java/com/selfcheckout/self_checkout/
@@ -208,8 +216,13 @@ read-only endpoint. See [ARCHITECTURE.md](ARCHITECTURE.md) §4 for why, and
 
 ```bash
 ./mvnw test -Dtest=LayeredArchitectureTest     # six rules, ~1s, no database
-./mvnw test                                     # also runs contextLoads
+./mvnw test                                     # all 29 tests
 ```
+
+The suite also covers the analytics pipeline with no Spring and no database: the
+window, rank, scan-log writer and pipe classes individually, plus an end-to-end test
+that pushes 2,600 events through the wired filters on real threads and compares every
+emitted window against a brute-force recount.
 
 > **`./mvnw test` boots the application, which re-runs `schema.sql` and wipes the
 > database.** Never run it between a load test and its invariant check.
