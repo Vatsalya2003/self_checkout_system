@@ -97,7 +97,24 @@ public class TransactionService {
     // that's what keeps this path fast even when completions are queuing up.
     @Transactional
     public ScanOutcome scan(String transactionId, String sku) {
-        Transaction tx = transactionRepository.findById(transactionId)
+        // Lock the transaction row, exactly as complete() does.
+        //
+        // Without this, a scan racing a complete on the SAME basket could
+        // write the whole row back -- status included -- AFTER complete had
+        // marked it COMPLETED and moved stock, resurrecting a paid basket as
+        // OPEN so it could be paid for a second time. Hibernate writes every
+        // column on an update, so even "I only touched itemCount" overwrites
+        // the status. scripts/test-scan-complete-race.py reproduces it.
+        //
+        // Cost under the real workload: effectively zero. One station drives
+        // one basket strictly sequentially, so two requests never contend for
+        // the same transaction row, and different baskets are different rows.
+        // It is one extra uncontended row lock, not a shared bottleneck.
+        //
+        // No deadlock risk: scan locks only the transaction row and never an
+        // item row, so it cannot be half of a cycle with complete's
+        // transaction-then-items ordering.
+        Transaction tx = transactionRepository.findByIdForUpdate(transactionId)
                 .orElseThrow(() -> new TransactionNotFoundException(
                         "Transaction " + transactionId + " not found"));
 
