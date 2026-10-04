@@ -48,6 +48,8 @@ understated the baseline and mis-ranked which costs matter.
 | 5 stress | 100 stations, 120 s | 849.3 | 650.7 | 0.09 / 0.34 | 93.45 / 354.11 | 0 | PASS | no (~320 %) | see warning below |
 | 4 | Raw scans optional (off), non-blocking tee, batched sink on its own pool | 997.5 | 989.5 | 0.09 / 0.36 | 4.94 / 39.38 | 0 | PASS | — | **kept** |
 | 4 stress | 100 stations, 120 s | 993.3 | 999.8 | 0.10 / 0.33 | 80.56 / 286.58 | 0 | PASS | — | **kept** |
+| 6 | Write the transaction header before taking the item lock | 1051.7 | 1007.9 | 0.09 / 0.38 | 4.35 / 41.54 | 0 | PASS | — | **kept** |
+| 6 stress | 100 stations, 120 s | 1012.2 | 998.1 | 0.10 / 0.33 | 77.49 / 290.08 | 0 | PASS | — | **kept** |
 
 ### Reading the phases
 
@@ -292,3 +294,145 @@ stations: the extra 90 stations add queueing, not work. It shows up entirely in
 `COMPLETE` latency — p50 4.94 ms at 10 stations against 80.56 ms at 100, for
 the same throughput — while `SCAN` and `START` stay flat at ~0.1 ms because
 they touch no database at all.
+
+---
+
+## Phase 6 — what actually sets the ceiling, and shortening it
+
+### The statement profile, before and after
+
+Re-measured with the same per-session `log_statement=all` method as Phase 1.
+The global setting is still `none`.
+
+| Operation | Phase 1 (Week 3 code) | Now | Change |
+|---|---|---|---|
+| `POST /transactions` (start) | 4 | **0** | no database work at all |
+| `POST /{id}/items` (scan, new line) | 8 + 3 background | **0** | no database work at all |
+| `POST /{id}/items` (scan, repeat SKU) | 7 + 3 background | **0** | no database work at all |
+| `POST /{id}/complete`, L distinct SKUs | 3L + 5 → ≈ 33 at L = 9.32 | **6** (7 with a low-stock crossing) | constant in L |
+| `GET /items` | 1 | **0** | served from the catalog cache |
+| `GET /transactions/{id}` | 4 | 4 | unchanged (JPA, low volume) |
+| `GET /inventory/low-stock` | 3 | 4 | unchanged (JPA, low volume) |
+| `GET /analytics/popular-items` | 3 | 4 | unchanged (JPA, low volume) |
+
+A full checkout cycle went from about **120 request-path statements to 6**.
+The merge-on-save SELECTs and the full-row Hibernate UPDATEs are gone from
+start, scan and complete; what remains on JPA is three read-only endpoints the
+load client barely touches, where plain JDBC would be churn for no measurable
+gain.
+
+The complete path is now:
+
+```
+BEGIN
+INSERT INTO transactions ...                          <- before the lock
+SELECT sku, stock FROM items WHERE sku IN (...) ORDER BY sku FOR NO KEY UPDATE
+UPDATE items SET stock = v.stock FROM (VALUES ...)
+INSERT INTO transaction_items ... VALUES (...),(...)
+COMMIT
+```
+
+### Statements held under the item lock
+
+| | Phase 1 | After Phase 5 | After Phase 6 |
+|---|---|---|---|
+| statements held | 3L + 2 ≈ **30** | **4** | **3** |
+
+### The measurement that makes this a lever and not a guess
+
+`CheckoutTimings` splits a checkout's database time in two: how long the bulk
+lock statement took (the **wait**), and how long the rows were then held, lock
+granted to commit (the **critical section**).
+
+| | 10 stations | 100 stations |
+|---|---|---|
+| lock wait | 7,626 µs | 101,224 µs |
+| critical section | 1,127 µs | 1,119 µs |
+
+The wait grows 13× with load; the critical section does not move. That is the
+whole point: the wait is a queue, the critical section is the server's own
+work, and only the second one is something the code can change. Because every
+basket containing the hottest SKU has to pass through that window one at a
+time, it is also what sets the ceiling:
+
+```
+ceiling ≈ 1 / (critical section × fraction of baskets holding that SKU)
+        ≈ 1 / (0.001127 s × 0.66) ≈ 1,344 tx/s
+```
+
+Measured throughput was ~995 tx/s, about 74 % of that, which is the right
+order — other SKUs serialize too, and 66 % is a measured approximation.
+
+### The change, and its honest effect
+
+Moving the header INSERT before the lock takes one statement out of the
+critical section. Same database transaction, so a failure still rolls the
+header back; only the lock-hold duration changes.
+
+| | before | after |
+|---|---|---|
+| critical section | 1,127 µs | **1,016 µs** (−9.8 %) |
+| tx/s, 10 stations | 997.5 / 989.5 | **1051.7 / 1007.9** (+3.7 % on the mean) |
+| tx/s, 100 stations | 993.3 / 999.8 | **1012.2 / 998.1** (+0.9 %, inside noise) |
+| COMPLETE p50, 10 stations | 4.94 / 4.84 ms | **4.35 / 4.41 ms** (−10 %) |
+
+The critical-section shrink is direct and repeatable. The throughput gain is
+real at 10 stations and indistinguishable from noise at 100, which says the
+ceiling is not set by that one SKU alone. Kept because it is strictly less
+work inside a lock and costs nothing.
+
+### Considered and rejected: folding the UPDATE and the line INSERT into one CTE
+
+```sql
+WITH upd AS (UPDATE items SET ... FROM (VALUES ...) ...)
+INSERT INTO transaction_items ...
+```
+
+This would remove one more round trip from the critical section. It is
+rejected because it fuses two cleanly separated persistence operations
+(`StockUpdater` and `CompletedTransactionWriter`) into one SQL string for an
+expected few percent. Not worth the loss of explainability here.
+
+Also rejected: `synchronous_commit = off`. It would cut the commit cost, which
+is a large part of the remaining 1,016 µs, but a crash would lose paid
+transactions. Correctness beats speed.
+
+---
+
+## Measurement validity: the machine throttles under sustained load
+
+After roughly 45 minutes of continuous stress runs, throughput on an
+**unchanged** binary and configuration fell from ~1,036 tx/s to 805, and in the
+worst period to 304–367. The cause was not the code:
+
+- the critical section — the server's own work — grew from 1,013 µs to
+  1,318 µs for identical statements
+- `SCAN` p50 rose from 0.102 ms to 0.129 ms and `START` from 0.118 to 0.152 ms,
+  i.e. **everything** slowed by about the same fraction, including paths that
+  touch no database
+- during the worst period a browser renderer was measured at 117 % CPU and
+  `ANECompilerService` at 85 %, with a load average of 12.7 on 8 cores
+
+`pmset -g therm` reports nothing on this machine, so thermal state is inferred
+from the uniform slowdown rather than read directly. Postgres was ruled out:
+the database is 58 MB, there is no `pg_catalog` bloat, and checkpoint counts
+are normal.
+
+**Consequence for method.** Back-to-back A/B runs are only comparable inside a
+short window. The pool-size sweep below is therefore run **interleaved**
+(16, 32, 64, 16, 32, 64, …) rather than grouped, so that any drift is shared
+by all three arms instead of being charged to whichever ran last, with a
+cooldown first. Every run taken during the degraded period is kept below and
+labelled, not deleted.
+
+### Runs taken during the degraded period — kept, not used
+
+| Config | tx/s | note |
+|---|---|---|
+| pool=16, 100 st | 595.1 | contaminated |
+| pool=32, 100 st | 697.6 | contaminated |
+| pool=16, 100 st | 367.3 | contaminated, background CPU peaked at 118 % |
+| pool=32, 100 st | 332.7 | contaminated |
+| pool=64, 100 st | 303.5 | contaminated, background CPU peaked at 232 % |
+| pool=16, 100 st | 347.2 | contaminated |
+| pool=32, 100 st (A/A re-test) | 805.4 | partial recovery; critical section 1,318 µs vs 1,013 µs |

@@ -15,7 +15,8 @@ not by convention.
 The windowed analytics run as a **5-stage pipeline of filters connected by pipes**:
 **ingest** (numbers each committed scan and tees it) → **window** (last 1000 scans, emits
 every 500) → **rank** (top 10, ties by SKU) → **sink** (writes `popular_snapshots`), with
-ingest also teeing to a **scan-log writer** (batched multi-row INSERT into `scan_log`).
+ingest also teeing to an optional **scan-log writer** (batched multi-row INSERT into
+`scan_log`, off by default — see [Configuration](#configuration)).
 The pipes are bounded Java `ArrayBlockingQueue`s, one thread per filter.
 **See [PIPELINE.md](PIPELINE.md)** for the full description and diagram.
 
@@ -27,6 +28,17 @@ work (the lost-update race, lock ordering, the sold-out case, the hopping window
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the architectural characteristics, the
 prioritized trade-offs, measured results, and the design decisions behind the
 concurrency handling.
+
+See [perf-results.md](perf-results.md) for the performance work: every change, what it
+measured before and after, and the ones that were tried and reverted. Note that
+**performance runs must use the packaged jar**, not `./mvnw spring-boot:run` — the Maven
+plugin starts the JVM with `-XX:TieredStopAtLevel=1`, which caps the JIT and costs about
+20 % throughput:
+
+```bash
+./mvnw -DskipTests package
+java -Xmx1g -jar target/self-checkout-0.0.1-SNAPSHOT.jar
+```
 
 ---
 
@@ -121,7 +133,16 @@ In `src/main/resources/application.properties`:
 | `selfcheckout.low-stock-threshold` | 50 | A SKU is low when stock is **strictly below** this |
 | `selfcheckout.popular-window-size` | 1000 | Scans covered by the popularity window |
 | `selfcheckout.popular-slide-interval` | 500 | How often (in scans) the window is recomputed |
+| `selfcheckout.analytics.persist-raw-scans` | `false` | Write every individual scan to `scan_log`. Off because the windows are computed in memory and the raw rows are only an audit trail. `scripts/test-popular-window.py` turns it on. |
+| `selfcheckout.analytics.writer-pool-size` | 2 | Connections for the pipeline's background writers, in their own pool so they never queue behind checkout |
 | `spring.datasource.hikari.maximum-pool-size` | 32 | See ARCHITECTURE.md §4.10 for why |
+
+To run with the audit trail on:
+
+```bash
+java -Xmx1g -jar target/self-checkout-0.0.1-SNAPSHOT.jar \
+  --selfcheckout.analytics.persist-raw-scans=true
+```
 
 ---
 
@@ -173,12 +194,17 @@ written and alerts recorded.
 
 ### Behavioural tests — against a freshly restarted server
 
-Each script restarts nothing itself; restart the server first so stock is back at 10,000.
+Each script restarts nothing itself. **Restart the server before each one** — they
+assume a clean database (stock back at 10,000, no alerts, empty `scan_log`). Running
+them back to back without a restart fails on leftover state rather than on a real bug.
 
 ```bash
 python3 scripts/test-concurrent-completions.py        # no lost updates, no deadlocks
 python3 scripts/test-oversell-and-double-complete.py  # clamping + one-winner completion
 python3 scripts/test-low-stock.py                     # threshold semantics
+python3 scripts/test-scan-complete-race.py            # a scan racing a complete cannot
+                                                      # corrupt a paid transaction
+# this one needs the audit trail, so start the server with persist-raw-scans=true
 python3 scripts/test-popular-window.py                # hopping window cadence + contents
 ```
 
@@ -192,10 +218,12 @@ of each file explains what it proves and why it matters.
 ```
 src/main/java/com/selfcheckout/self_checkout/
   api/            HTTP only — controllers, dto/ (wire shapes), error/ (exception → status)
-  transactions/   checkout business rules — services, result/ (domain records), exception/
+  transactions/   checkout business rules — services, result/, exception/
+                  OpenBasket + OpenTransactionStore: unpaid baskets live in memory
   analytics/      popularity windows — AnalyticsService, ScanRecorder, result/
-    pipeline/     the 5 filters, the Pipe abstraction, wiring and metrics
+    pipeline/     the filters, the Pipe abstraction, wiring and metrics
   persistence/    database access only — entity/, repository/
+                  AnalyticsWriterPool: a separate 2-connection pool for the pipeline
   config/         shared kernel — SelfCheckoutProperties
 src/test/java/com/selfcheckout/self_checkout/
   architecture/   LayeredArchitectureTest — the dependency rules, as a test
@@ -204,7 +232,8 @@ src/main/resources/
   data.sql              seeds 2000 items x 10,000 stock
   application.properties
 scripts/        invariant check + behavioural tests
-reports/        the two committed load-test reports
+reports/        the committed load-test reports
+  perf/         every raw run from the performance work, including reverted ones
 ```
 
 Dependencies only ever point downwards: `api → transactions → persistence`, with

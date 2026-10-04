@@ -26,7 +26,7 @@ numbers — it explains the *machinery* that produced them.
 5. [The database](#5-the-database)
 6. [API reference](#6-api-reference)
 7. [File-by-file walkthrough](#7-file-by-file-walkthrough)
-8. [Deep dives](#8-deep-dives)
+8. [Deep dives](#8-deep-dives) — including [why a basket is not a row](#88-why-an-unpaid-basket-is-not-a-database-row), [`FOR NO KEY UPDATE`](#89-for-update-vs-for-no-key-update--a-250-mistake), [the critical section](#810-the-critical-section-is-the-ceiling)
 9. [How to run everything](#9-how-to-run-everything)
 10. [Troubleshooting](#10-troubleshooting)
 11. [Glossary](#11-glossary)
@@ -173,114 +173,126 @@ the day the API shape and the domain shape need to differ. See ARCHITECTURE.md
 
 ### 4.1 Start a transaction
 
-The simplest path — nothing is locked, nothing can conflict.
+Nothing is locked, nothing can conflict — and since the performance work,
+nothing is written either. An unpaid basket is not a database row.
 
 ```mermaid
 sequenceDiagram
     participant C as Station
     participant TC as TransactionController
     participant TS as TransactionService
-    participant TR as TransactionRepository
-    participant DB as PostgreSQL
+    participant OTS as OpenTransactionStore
 
     C->>TC: POST /transactions {"stationId":"station-07"}
     TC->>TS: start("station-07")
-    Note over TS: @Transactional begins
     TS->>TS: reject blank stationId → 400
-    TS->>TS: new Transaction(UUID, stationId)<br/>status=OPEN, itemCount=0, total=0
-    TS->>TR: save(tx)
-    TR->>DB: INSERT INTO transactions
-    Note over TS: commit
-    TS-->>TC: TransactionResponse
+    TS->>TS: new OpenBasket(UUID, stationId, now)<br/>state=OPEN, itemCount=0, total=0
+    TS->>OTS: put(basket)
+    Note over OTS: a ConcurrentHashMap entry.<br/>No transaction, no SQL, no connection.
+    TS-->>TC: TransactionView
     TC-->>C: 201 Created + JSON
 ```
 
+This used to be `BEGIN · SELECT · INSERT · COMMIT`. The `SELECT` was pure
+waste: Spring Data saw our assigned UUID, could not tell a new row from an
+existing one, and checked before inserting. **Measured: 4 statements → 0.**
+
 ### 4.2 Scan an item
 
-Still no locks. This is the hot path — it runs ~10x more often than the others,
-so it deliberately does as little as possible.
+The hot path — it runs about 10× more often than the others. It is now pure
+memory too.
 
 ```mermaid
 sequenceDiagram
     participant C as Station
     participant TC as TransactionController
     participant TS as TransactionService
-    participant R as Repositories
-    participant PS as PopularItemsService
-    participant DB as PostgreSQL
+    participant OTS as OpenTransactionStore
+    participant CC as CatalogCache
+    participant SR as ScanRecorder
 
     C->>TC: POST /transactions/{id}/items {"sku":"SKU-000001"}
     TC->>TS: scan(id, sku)
-    Note over TS: @Transactional begins
 
-    TS->>R: findById(transaction)
-    alt not found
-        TS-->>C: 404 TRANSACTION_NOT_FOUND
+    TS->>OTS: find(id)
+    alt not in memory
+        Note over TS: ask the database: is it COMPLETED (409)<br/>or unknown (404)? Both answers must stay apart.
+        TS-->>C: 404 TRANSACTION_NOT_FOUND / 409 TRANSACTION_NOT_OPEN
     end
-    alt status != OPEN
-        TS-->>C: 409 TRANSACTION_NOT_OPEN
-    end
-    TS->>R: findById(item)
+    TS->>CC: find(sku)
     alt unknown or blank SKU
         TS-->>C: 404 ITEM_NOT_FOUND
     end
 
-    Note over TS,DB: items.stock is never read or locked here
-    TS->>R: basket line: insert, or quantity + 1
-    TS->>TS: tx.addScan(price)<br/>dirty checking writes the UPDATE later
-    TS->>R: INSERT INTO scan_log → returns seq
-    TS->>PS: onScanRecorded(seq)
-    Note over PS: cheap check only:<br/>has this seq crossed a 500 boundary?
-    Note over TS: commit
+    Note over TS,CC: items.stock is never read or locked here
+    TS->>TS: basket.addUnit(sku, price)
+    Note over TS: synchronized on THIS basket only.<br/>Uncontended in practice (one station per basket),<br/>but it is what makes a scan racing a complete safe.
+    alt a complete already claimed the basket
+        TS-->>C: 409 TRANSACTION_NOT_OPEN
+    end
+
+    TS->>SR: recordScan(sku)
+    Note over SR: non-blocking offer into the analytics<br/>pipeline. Never waits, never fails the scan.
     TS-->>C: 200 ScanResult
 ```
 
+The catalog is immutable (2,000 rows, loaded once), so the price lookup is a
+map read rather than a query. **Measured: 7–8 statements → 0.**
+
 ### 4.3 Complete the transaction — the important one
 
-This is where the locks are, and where the sort matters.
+This is where every database write for the whole basket happens at once, and
+where the locks are.
 
 ```mermaid
 sequenceDiagram
     participant C as Station
     participant TS as TransactionService
-    participant TR as TransactionRepository
-    participant TIR as TransactionItemRepository
-    participant IR as ItemRepository
+    participant OB as OpenBasket
+    participant CW as CompletedTransactionWriter
+    participant SU as StockUpdater
     participant DB as PostgreSQL
 
     C->>TS: POST /transactions/{id}/complete
-    Note over TS: @Transactional begins
 
-    TS->>TR: findByIdForUpdate(id)
-    TR->>DB: SELECT ... FOR UPDATE on transactions
-    Note over DB: 🔒 transaction row locked.<br/>A second complete of the SAME basket<br/>blocks right here.
-
-    alt not found → 404
-    else not OPEN → 409 TRANSACTION_NOT_OPEN
-    else basket empty → 409 TRANSACTION_EMPTY
+    TS->>OB: claimForCompletion()
+    Note over OB: OPEN → COMPLETING, in memory, under the<br/>basket's own monitor. A second complete and a<br/>late scan both get 409 from here on.
+    alt not OPEN → 409 TRANSACTION_NOT_OPEN
+    else basket empty → 409 TRANSACTION_EMPTY (stays OPEN)
     end
 
-    TS->>TIR: findByTransactionIdOrderBySkuAsc(id)
-    Note over TIR: ORDER BY sku ASC.<br/>This sort is the deadlock prevention —<br/>every basket locks in the same global order.
+    Note over TS,DB: one database transaction starts here
+    TS->>TS: sort SKUs ascending
+    Note over TS: the same global lock order for every basket —<br/>this is the deadlock prevention.
 
-    loop PASS 1 — take every lock, ascending SKU
-        TS->>IR: findBySkuForUpdate(sku)
-        IR->>DB: SELECT ... FOR UPDATE on items
-        Note over DB: 🔒 item row locked until commit
-    end
+    TS->>CW: insertHeader(...)
+    CW->>DB: INSERT INTO transactions
+    Note over DB: deliberately BEFORE the lock: the header<br/>depends on nothing the lock protects.
 
-    loop PASS 2 — now mutate, nothing can interleave
-        TS->>TS: applied = min(stockBefore, quantity)<br/>clamp so stock can never go negative
-        TS->>TS: item.setStock(before − applied)
-        TS->>TS: line.setAppliedQuantity(applied)
-        TS->>TS: if crossed below threshold<br/>→ queue a LowStockAlert
-    end
+    TS->>SU: lockAndReadStock(sortedSkus)
+    SU->>DB: SELECT sku, stock FROM items WHERE sku IN (...)<br/>ORDER BY sku FOR NO KEY UPDATE
+    Note over DB: 🔒 every item row in the basket, in ONE statement.<br/>FOR NO KEY UPDATE, not FOR UPDATE — see §8.9.
 
-    TS->>DB: INSERT low_stock_alerts (if any crossings)
-    TS->>TS: tx.complete(now)
-    Note over TS,DB: commit — dirty checking writes every<br/>UPDATE, and the commit releases ALL locks 🔓
+    TS->>TS: in Java, holding no new locks:<br/>applied = min(stockBefore, quantity)<br/>after = before − applied<br/>collect threshold crossings
+
+    TS->>SU: applyStock(newStock)
+    SU->>DB: UPDATE items SET stock = v.stock<br/>FROM (VALUES ...) AS v
+    TS->>CW: insertLines(...)
+    CW->>DB: INSERT INTO transaction_items ... VALUES (...),(...)
+    TS->>DB: INSERT low_stock_alerts (only if something crossed)
+
+    Note over TS,DB: COMMIT — releases ALL item locks 🔓
+    TS->>OB: remove from memory (or releaseClaim on failure)
     TS-->>C: 200 Receipt (quantity = units SCANNED)
 ```
+
+**Six statements, whatever the basket size.** It used to be `3L + 5` — about
+33 for a typical 9-SKU basket — because Hibernate issued a `SELECT` before
+each `INSERT` and an `UPDATE` per row.
+
+Only **three** of those six are held under the item lock (`UPDATE items`,
+`INSERT transaction_items`, `COMMIT`), down from about 30. That number matters
+more than the total: see §8.10.
 
 ### 4.4 Popular-items window recompute
 
@@ -703,7 +715,10 @@ Organized by layer, top to bottom.
 
 | File | Key methods | Notes |
 |---|---|---|
-| `TransactionService` | `start`, `scan`, `complete`, `get` | **Read this first.** `scan` takes no locks; `complete` holds all of them. Contains no HTTP type. |
+| `TransactionService` | `start`, `scan`, `complete`, `get` | **Read this first.** `start` and `scan` touch no database at all; `complete` does every write for the basket at once and holds all the locks. Contains no HTTP type. |
+| `OpenBasket` | `addUnit`, `claimForCompletion`, `snapshot` | One unpaid basket, in memory, guarded by its own monitor. `claimForCompletion` is a one-way door — it is what makes a double complete 409 and a late scan 409. |
+| `OpenTransactionStore` | `put`, `find`, `remove` | The `ConcurrentHashMap` of open baskets. Nothing else knows baskets are not rows. |
+| `CheckoutTimings` | `record`, `logSummary` | Splits a completion's database time into lock **wait** and **critical section**. The second one is what sets the ceiling — see §8.10. |
 | `CatalogService` | `listItems()` | Entity → `CatalogItem`. Its sort order makes `SKU-000001` the hottest item under the load client's Zipf sampler. |
 | `InventoryService` | `lowStock(Integer)` | Only *reads* alerts; they are *written* by `complete()`. |
 | `transactions/result/*` (7 records) | — | `CatalogItem`, `TransactionView`, `ScanOutcome`, `ReceiptView`, `ReceiptLineView`, `LowStockView`, `LowStockEntry`. `TransactionView.status` is a `String`, not the persistence enum. |
@@ -717,27 +732,32 @@ Organized by layer, top to bottom.
 | `AnalyticsService` | Implements `ScanRecorder`. Now just the two ends: `recordScan` registers the `afterCommit` handover, `latest` serves the endpoint. All the work moved into `pipeline/`. |
 | `analytics/result/*` | `PopularWindowView`, `PopularEntry`. `PopularEntry` is also the on-disk JSON format inside `popular_snapshots`. |
 | `pipeline/Pipe` · `BlockingQueuePipe` | The pipe abstraction and its bounded-queue implementation. The seam that would let a broker replace queues. |
-| `pipeline/IngestFilter` | Assigns the gapless global scan sequence; the wiring tees its output to two pipes. |
+| `pipeline/IngestFilter` | Assigns the gapless global scan sequence. |
+| `pipeline/IngestTee` | The fan-out, and the place the two branches stop being symmetric: blocking `put` to the window branch, non-blocking `offer` + counted drop to the optional scan-log branch. |
 | `pipeline/WindowFilter` | Ring buffer of the last 1000 scans plus running counts; emits a window every 500. Owns the boundary logic. |
 | `pipeline/RankFilter` | Counts → top 10, ties by SKU ascending, names attached. |
-| `pipeline/SinkFilter` | One `popular_snapshots` row per window. Does **not** swallow duplicates. |
-| `pipeline/ScanLogWriterFilter` | Maps events to rows and writes a batch. |
-| `pipeline/FilterLoop` · `ScanLogWriterLoop` | The thread halves. Filters stay plain classes so they test without Spring. |
-| `pipeline/AnalyticsPipeline` | Builds the pipes, starts the five threads, poison-pill shutdown, and the one entry point `submit(...)`. |
-| `pipeline/PipelineMetrics` | In/out/error per stage, pipe depths, drops. Logged every 10 s — the evidence in ARCHITECTURE.md §6.5. |
+| `pipeline/SinkFilter` | Writes a batch of windows as one multi-row `INSERT`. Does **not** swallow duplicates. |
+| `pipeline/ScanLogWriterFilter` | Maps events to rows and writes a batch. Only wired when raw scan persistence is on. |
+| `pipeline/FilterLoop` · `BatchingLoop` | The thread halves. `BatchingLoop` is shared by the sink and the scan-log writer: wait for one message, sweep up everything else queued, write the lot in one statement — so falling behind makes the next write *cheaper* per row. Filters stay plain classes so they test without Spring. |
+| `pipeline/AnalyticsPipeline` | Builds the pipes, starts the threads (four, or five with raw scans on), poison-pill shutdown, and the one entry point `submit(...)`. |
+| `pipeline/PipelineMetrics` | In/out/error per stage, pipe depths, drops (two kinds, counted separately). Logged every 10 s — the evidence in ARCHITECTURE.md §6.5. |
 | `pipeline/ScanEvent` · `SequencedScanEvent` · `WindowCounts` · `RankedWindow` | The immutable messages carried between filters. |
 
 ### `persistence/` — all the SQL
 
 | File | Notable method | Why it matters |
 |---|---|---|
-| `repository/ItemRepository` | `findBySkuForUpdate` | `@Lock(PESSIMISTIC_WRITE)` → `SELECT ... FOR UPDATE`. **The lock that prevents lost updates.** |
+| `repository/JdbcStockUpdater` | `lockAndReadStock`, `applyStock` | **The lock that prevents lost updates**, now one statement for the whole basket: `... WHERE sku IN (...) ORDER BY sku FOR NO KEY UPDATE`. Both the `ORDER BY` and the `NO KEY` are load-bearing — see §8.2 and §8.9. |
+| `repository/JdbcCompletedTransactionWriter` | `insertHeader`, `insertLines` | Split so the header can be written *before* the lock is taken (§8.10). Plain JDBC because Spring Data's `save()` on an assigned id issues a `SELECT` before every `INSERT`. |
+| `repository/JdbcLowStockAlertWriter` | `insertCrossings` | One multi-row `INSERT ... ON CONFLICT (sku) DO NOTHING`. Skipped entirely when nothing crossed. |
+| `repository/CatalogCache` · `LazyCatalogCache` · `CatalogEntry` | `find(sku)`, `all()` | The 2,000-row catalog is immutable, so it is read once and served from memory. This is why `GET /items` and every scan's price lookup issue no SQL. Loaded **lazily** — `data.sql` runs during startup, so an eager load could find an empty table. |
+| `persistence/AnalyticsWriterPool` | `dataSource()` | A second, 2-connection Hikari pool used only by the pipeline's background writers, so they never queue behind checkout. Measured reason in §8.11. |
+| `repository/ItemRepository` | — | Still used by the read-only endpoints. |
 | `repository/TransactionRepository` | `findByIdForUpdate` | Serializes two completes of the same basket. |
-| `repository/TransactionItemRepository` | `findByTransactionIdOrderBySkuAsc` | The `OrderBySkuAsc` **is** the deadlock prevention. |
+| `repository/TransactionItemRepository` | `findByTransactionIdOrderBySkuAsc` | Used by `GET /transactions/{id}` for a basket that has already been paid for. |
 | `repository/ScanLogRepository` | `topInWindow(start, end, limit)` | The windowed aggregate, half-open `(start, end]`. No longer used in production — it is the brute-force oracle the window tests check against. |
 | `repository/ScanLogBatchWriter` | `insertBatch(rows)` | Multi-row `INSERT` via `JdbcTemplate`. Plain JDBC because `scan_log` rows are write-only facts that nothing ever loads as entities. |
-| `repository/SnapshotWriter` | `insert(...)` | One `popular_snapshots` row. |
-| `repository/CatalogNameLookup` | `nameOf(sku)` | SKU → display name. Cached, loaded **lazily** — `data.sql` runs during startup, so an eager load could find an empty table. |
+| `repository/JdbcSnapshotWriter` | `insertBatch(rows)` | A batch of `popular_snapshots` rows in one statement and one commit. Takes a raw `Connection` rather than `JdbcTemplate` so it can time pool-wait, execute and commit *separately* — which is how the sink's real problem was found (§8.11). |
 | `repository/LowStockAlertRepository` | `findBelowThreshold` | `LEFT JOIN` + `coalesce` for the ad-hoc threshold fallback. |
 | `repository/PopularSnapshotRepository` | `findFirstByOrderByIdDesc` | Newest window; the table is append-only. |
 | `repository/ScanCount`, `LowStockRow` | — | Query projections. |
@@ -750,8 +770,10 @@ Organized by layer, top to bottom.
 | `src/test/.../architecture/LayeredArchitectureTest.java` | Six ArchUnit rules encoding the dependency table. Does not start Spring. |
 | `src/test/.../SelfCheckoutApplicationTests.java` | `contextLoads` smoke test. **Boots the app, so it re-runs `schema.sql` and wipes the database.** |
 | `scripts/check-invariant.sql` | The three correctness checks. Run after a load test, before restarting. |
-| `scripts/_client.py`, `scripts/test-*.py` | Shared helper + four behavioural tests. |
-| `reports/*.json` | The two committed load-test reports. |
+| `src/test/.../transactions/OpenBasketTest.java` | The guarantees the database used to give the basket and now have to come from the class: first-scan line order, and claim-once. |
+| `src/test/.../analytics/pipeline/IngestTeeTest.java` | That a full audit branch is dropped from rather than waited on, and that the window branch is unaffected. |
+| `scripts/_client.py`, `scripts/test-*.py` | Shared helper + five behavioural tests. Each one wants a **freshly restarted server**; chaining them without a restart fails on leftover state, not on a bug. |
+| `reports/*.json` | The committed load-test reports. `reports/perf/` holds every raw run from the performance work, including the ones that were reverted or contaminated. |
 
 ## 8. Deep dives
 
@@ -948,6 +970,137 @@ cycle ≈ 20 + 10.5 × 19.7 + 111 ≈ 337 ms
 ```
 
 The stations are simply serialized by their own round-trip latency.
+
+> **Read this alongside §8.10.** That measurement was taken before the
+> performance work. Scans no longer open a transaction or take a connection at
+> all, so they can no longer queue behind completions at the pool: `SCAN` p50
+> at 100 stations is now ~0.10 ms rather than ~17 ms. The pool is still the
+> place where completions queue, but the operations that take no locks have
+> been taken out of that queue entirely.
+
+### 8.8 Why an unpaid basket is not a database row
+
+A basket being scanned has exactly one writer (its own station), is read by
+nobody else, and is thrown away if the customer walks off. Storing it in
+Postgres bought nothing and cost four statements per start and seven or eight
+per scan.
+
+It now lives in an `OpenBasket` guarded by its own monitor, in a
+`ConcurrentHashMap`. The database only ever sees a basket that was actually
+paid for.
+
+What that costs, stated plainly:
+
+- **An unpaid basket does not survive a restart.** That is acceptable here
+  (the customer is standing at the till and can rescan) and it is the only
+  thing lost — a *paid* basket is as durable as it ever was, because the
+  commit still happens before the receipt is returned.
+- **One process only.** Two servers would each have their own map and would
+  not recognise each other's baskets. Scaling out would mean a shared store
+  (Redis, or back to the database) — the same trade the single-process design
+  already makes elsewhere.
+
+The guarantees the database used to provide had to be re-created in the class,
+which is why `OpenBasketTest` exists: line ordering, and "a basket can only be
+claimed for completion once".
+
+### 8.9 `FOR UPDATE` vs `FOR NO KEY UPDATE` — a 250× mistake
+
+The bulk lock says `FOR NO KEY UPDATE`. Changing it to the more obvious
+`FOR UPDATE` collapsed the server: **2.9 tx/s and 9,239 errors**, with
+deadlocks, against 742 tx/s and zero errors.
+
+The reason is a Postgres detail that is easy to miss. `scan_log`,
+`transaction_items` and `low_stock_alerts` all carry a foreign key to `items`.
+Whenever Postgres validates one of those foreign keys it takes a
+**`FOR KEY SHARE`** lock on the parent `items` row. And:
+
+| | `FOR KEY SHARE` |
+|---|---|
+| `FOR NO KEY UPDATE` | compatible ✅ |
+| `FOR UPDATE` | **conflicts** ❌ |
+
+So with `FOR UPDATE`, every basket's own line inserts fought the lock that
+basket was already holding, against every other basket doing the same.
+`FOR NO KEY UPDATE` is also the correct intent: we change `stock`, never the
+primary key.
+
+This is why the lock statement has a comment on it telling you not to
+"simplify" it.
+
+### 8.10 The critical section is the ceiling
+
+`CheckoutTimings` splits a completion's database time into two numbers that
+behave completely differently:
+
+| | 10 stations | 100 stations |
+|---|---|---|
+| **lock wait** — how long the lock statement took | 7,626 µs | 101,224 µs |
+| **critical section** — lock granted → commit | 1,127 µs | 1,119 µs |
+
+The wait grows 13× with load. The critical section does not move at all.
+
+That is the whole diagnosis in two rows. The wait is a *queue* — the server
+cannot shorten it directly. The critical section is the server's own work, and
+because every basket containing the hottest SKU has to pass through it one at
+a time, it is what sets the ceiling:
+
+```
+ceiling ≈ 1 / (critical section × fraction of baskets holding that SKU)
+        ≈ 1 / (0.001127 s × 0.66) ≈ 1,344 tx/s
+```
+
+Measured throughput was ~995 tx/s, about 74 % of that — the right order, since
+other SKUs serialize too.
+
+**So the only useful question is "what can be moved out of the critical
+section?"** The transaction header could: it depends on nothing the lock
+protects. Moving its `INSERT` above the lock statement cut the critical
+section to 1,016 µs (−9.8 %) and raised throughput ~3.7 % at 10 stations. It
+is the same database transaction either way, so a failure still rolls the
+header back.
+
+The lines cannot move — their `applied_quantity` is only known after the stock
+is read under the lock.
+
+### 8.11 "The sink is slow" is not a diagnosis
+
+Once checkout got about twice as fast, the analytics pipeline stopped keeping
+up: `sinkPipe` sat full at 256/256 with 1,299 full-waits, and the backlog
+pushed all the way up to the window stage.
+
+The obvious reading — "writing a snapshot takes ~55 ms, make it faster" — is
+wrong, and the fix for it would have been wrong too. Three completely
+different problems hide behind one slow write, so `JdbcSnapshotWriter` was
+changed to take a raw `Connection` and time them apart:
+
+| Per snapshot write | shared pool | dedicated pool |
+|---|---|---|
+| waiting for a pooled connection | **66,480 µs** | 11 µs |
+| executing the `INSERT` | 230 µs | 204 µs |
+| commit | 156 µs | 216 µs |
+| **total** | **66,866 µs** | **431 µs** |
+
+**99.4 % of it was queueing, not working.** At 100 stations, checkout keeps
+the 32-connection pool saturated while it waits on item row locks, and the
+sink was simply last in that queue. No amount of tuning the `INSERT` would
+have touched it.
+
+Two separate fixes came out of this, and they fix two separate things:
+
+1. **Batching** (`BatchingLoop`) removed the *backpressure*. Draining
+   everything queued into one multi-row `INSERT` means a backlog makes the
+   next write cheaper per row. `sinkPipe` max depth went from 256/256 to
+   1/4096.
+2. **A dedicated 2-connection pool** (`AnalyticsWriterPool`) removed the
+   *wait*, 155× per window.
+
+Honest footnote: the dedicated pool did **not** raise checkout throughput —
+the sink only took a connection about 20 times a second, so checkout was never
+really waiting on it. It is kept because it makes the analytics branch
+independent of checkout pressure, which is the entire point of separating
+them, and because with raw scan persistence switched on the writer does
+~1.2 M inserts instead of 2,500.
 
 ---
 

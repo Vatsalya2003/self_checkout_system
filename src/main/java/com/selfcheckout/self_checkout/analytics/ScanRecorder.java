@@ -18,9 +18,12 @@ public interface ScanRecorder {
     /**
      * Record one scanned unit.
      *
-     * Runs inside the caller's database transaction (no @Transactional here,
-     * so it simply joins the one already in progress). That matters: if the
-     * scan rolls back, the scan_log row must roll back with it.
+     * No @Transactional here, deliberately. Scanning no longer opens a
+     * database transaction at all -- the basket lives in memory until it is
+     * paid for -- so there is nothing to join and nothing to wait for. If a
+     * caller DOES happen to have a transaction open, this still defers until
+     * that transaction commits, so a rolled-back caller never reaches
+     * analytics.
      */
     void recordScan(String sku);
 }

@@ -55,19 +55,22 @@ public class AnalyticsService implements ScanRecorder {
     /**
      * The ScanRecorder door: "one unit of this SKU was just scanned".
      *
-     * Does no I/O at all now. It only registers a callback; the handover to
-     * the pipeline happens after the scan's COMMIT, on this same request
-     * thread, and is a bounded in-memory offer.
+     * Does no I/O at all. The handover is a bounded in-memory offer on the
+     * calling thread.
      *
-     * Registering on afterCommit keeps the Week 2 guarantee intact: a scan
-     * that rolls back never reaches analytics, because afterCommit simply
-     * never fires.
+     * Two paths, because the caller may or may not be in a transaction:
+     *
+     *  - IN a transaction: defer to afterCommit, so a caller that rolls back
+     *    never reaches analytics. This is the Week 2 guarantee.
+     *  - NOT in a transaction: submit immediately. This is what scanning now
+     *    does -- the basket is in memory and the scan is already final by the
+     *    time we get here, so there is no commit to wait for.
      */
     @Override
     public void recordScan(String sku) {
-        // Captured here, inside the transaction, so the timestamp reflects
-        // when the item was actually scanned rather than when the pipeline
-        // got round to it.
+        // Captured here rather than in the pipeline, so the timestamp is when
+        // the item was actually scanned, not when a background thread got
+        // round to it.
         Instant scannedAt = Instant.now();
 
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
@@ -78,7 +81,7 @@ public class AnalyticsService implements ScanRecorder {
                 }
             });
         } else {
-            // No transaction in progress (e.g. called directly from a test).
+            // No transaction in progress. This is the normal path for a scan.
             pipeline.submit(sku, scannedAt);
         }
     }
