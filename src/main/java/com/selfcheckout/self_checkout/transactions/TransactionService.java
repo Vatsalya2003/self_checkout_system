@@ -2,14 +2,12 @@ package com.selfcheckout.self_checkout.transactions;
 
 import com.selfcheckout.self_checkout.analytics.ScanRecorder;
 import com.selfcheckout.self_checkout.config.SelfCheckoutProperties;
-import com.selfcheckout.self_checkout.persistence.entity.Item;
-import com.selfcheckout.self_checkout.persistence.entity.LowStockAlert;
 import com.selfcheckout.self_checkout.persistence.entity.Transaction;
 import com.selfcheckout.self_checkout.persistence.repository.CatalogCache;
 import com.selfcheckout.self_checkout.persistence.repository.CatalogEntry;
 import com.selfcheckout.self_checkout.persistence.repository.CompletedTransactionWriter;
-import com.selfcheckout.self_checkout.persistence.repository.ItemRepository;
-import com.selfcheckout.self_checkout.persistence.repository.LowStockAlertRepository;
+import com.selfcheckout.self_checkout.persistence.repository.LowStockAlertWriter;
+import com.selfcheckout.self_checkout.persistence.repository.StockUpdater;
 import com.selfcheckout.self_checkout.persistence.repository.TransactionRepository;
 import com.selfcheckout.self_checkout.transactions.exception.EmptyTransactionException;
 import com.selfcheckout.self_checkout.transactions.exception.InvalidRequestException;
@@ -47,9 +45,9 @@ public class TransactionService {
     private final OpenTransactionStore openTransactions;
     private final CatalogCache catalog;
     private final TransactionRepository transactionRepository;
-    private final ItemRepository itemRepository;
     private final CompletedTransactionWriter completedWriter;
-    private final LowStockAlertRepository lowStockAlertRepository;
+    private final StockUpdater stockUpdater;
+    private final LowStockAlertWriter lowStockAlertWriter;
     private final SelfCheckoutProperties properties;
     private final ScanRecorder scanRecorder;
 
@@ -63,18 +61,18 @@ public class TransactionService {
     public TransactionService(OpenTransactionStore openTransactions,
                               CatalogCache catalog,
                               TransactionRepository transactionRepository,
-                              ItemRepository itemRepository,
                               CompletedTransactionWriter completedWriter,
-                              LowStockAlertRepository lowStockAlertRepository,
+                              StockUpdater stockUpdater,
+                              LowStockAlertWriter lowStockAlertWriter,
                               SelfCheckoutProperties properties,
                               ScanRecorder scanRecorder,
                               PlatformTransactionManager transactionManager) {
         this.openTransactions = openTransactions;
         this.catalog = catalog;
         this.transactionRepository = transactionRepository;
-        this.itemRepository = itemRepository;
         this.completedWriter = completedWriter;
-        this.lowStockAlertRepository = lowStockAlertRepository;
+        this.stockUpdater = stockUpdater;
+        this.lowStockAlertWriter = lowStockAlertWriter;
         this.properties = properties;
         this.scanRecorder = scanRecorder;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
@@ -205,42 +203,46 @@ public class TransactionService {
 
         Instant completedAt = Instant.now();
         int threshold = properties.lowStockThreshold();
-        List<LowStockAlert> crossings = new ArrayList<>();
-        List<CompletedTransactionWriter.Line> lines = new ArrayList<>(skus.size());
-        Map<String, Item> locked = new LinkedHashMap<>();
 
-        // Pass 1 -- take every lock, in order, before changing anything.
-        for (String sku : skus) {
-            locked.put(sku, itemRepository.findBySkuForUpdate(sku)
-                    .orElseThrow(() -> new ItemNotFoundException("Item " + sku + " not found")));
+        // ---- the only statement that takes locks: one, for the whole basket
+        Map<String, Integer> stockBefore = stockUpdater.lockAndReadStock(skus);
+        if (stockBefore.size() != skus.size()) {
+            for (String sku : skus) {
+                if (!stockBefore.containsKey(sku)) {
+                    throw new ItemNotFoundException("Item " + sku + " not found");
+                }
+            }
         }
 
-        // Pass 2 -- all locks held, so these reads and writes are atomic.
+        // ---- everything else is arithmetic in Java, holding no new locks
+        Map<String, Integer> newStock = new LinkedHashMap<>();
+        List<String> crossings = new ArrayList<>();
+        List<CompletedTransactionWriter.Line> lines = new ArrayList<>(skus.size());
         for (String sku : skus) {
-            Item item = locked.get(sku);
             int quantity = claimed.lines().get(sku);
+            int before = stockBefore.get(sku);
 
             // Clamp: scans are never gated by stock, so a hot SKU can be
             // scanned more often than it has units. Take what is really there
             // so stock can never go negative, and record it separately so the
             // shortfall stays visible instead of corrupting the invariant.
-            int before = item.getStock();
             int applied = Math.min(before, quantity);
             int after = before - applied;
-            item.setStock(after);
 
+            newStock.put(sku, after);
+            // strict "<" on both sides: landing exactly ON the threshold is
+            // not below it
             if (before >= threshold && after < threshold) {
-                crossings.add(new LowStockAlert(sku, completedAt));
+                crossings.add(sku);
             }
             lines.add(new CompletedTransactionWriter.Line(sku, quantity, applied));
         }
 
-        if (!crossings.isEmpty()) {
-            lowStockAlertRepository.saveAll(crossings);
-        }
-
+        // ---- three bulk writes, then commit
+        stockUpdater.applyStock(newStock);
         completedWriter.insertCompleted(basket.id(), basket.stationId(), claimed.itemCount(),
                 claimed.runningTotal(), basket.startedAt(), completedAt, lines);
+        lowStockAlertWriter.insertCrossings(crossings, completedAt);
 
         // The receipt lists lines in the order they were first scanned, and
         // shows the SCANNED quantity -- that is what the customer is holding,

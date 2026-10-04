@@ -42,6 +42,10 @@ understated the baseline and mis-ranked which costs matter.
 | Baseline | `pipeline-v1`, unchanged | 404.6 | 407.2 | 0.85 / 2.86 | 13.82 / 50.43 | 0 | PASS | no (~505 % of 800 %) | — |
 | Baseline stress | 100 stations, 120 s | 420.3 | 431.9 | 12.52 / 34.61 | 90.84 / 328.56 | 0 | PASS | no (~500 % of 800 %) | — |
 | 0.5 | Fix scan/complete race: `scan()` locks the transaction row | 422.4 | 413.3 | 0.85 / 2.65 | 13.22 / 45.19 | 0 | PASS | no (~506 % of 800 %) | **kept** |
+| 2+3 | Catalog cached in memory; open baskets in memory (start + scan do no DB) | 669.0 | 670.2 | 0.09 / 0.38 | 15.59 / 50.02 | 0 | PASS | no (~294 % of 800 %) | **kept** |
+| 5 (first attempt) | Bulk lock with plain `FOR UPDATE` | 2.9 | 5.0 | 0.64 / 5.41 | 1148 / 9146 | **9,239** | PASS | no (~20 %) | **reverted** |
+| 5 | Lock late + batch: 1 bulk `FOR NO KEY UPDATE` + 3 bulk writes | 742.1 | 677.1 (3rd: 744.9) | 0.09 / 0.45 | 6.11 / 56.61 | 0 | PASS | no (~344 % of 800 %) | **kept** |
+| 5 stress | 100 stations, 120 s | 849.3 | 650.7 | 0.09 / 0.34 | 93.45 / 354.11 | 0 | PASS | no (~320 %) | see warning below |
 
 ### Reading the phases
 
@@ -124,3 +128,39 @@ waiting on round trips, not computing — which is exactly why cutting the
    rewrites the name and price of an item on every single stock change, and the
    transaction row is rewritten across all 7 columns on every scan. That is
    also the mechanism behind the Phase 0.5 race bug.
+
+**Phases 2 + 3 — catalog cache and in-memory baskets (measured together).**
+The catalog cache alone is a prerequisite, not a win: it removes one SELECT
+from a scan that was doing eight. Holding open baskets in memory removes the
+other seven, and all four statements of `start`. Together: **404.6 → 669.0 tx/s,
++65 %**. Scan p50 fell 0.85 → 0.09 ms and start p50 0.50 → 0.10 ms, because
+neither endpoint touches Postgres any more. Total CPU fell from ~505 % to
+~294 % of 800 % — the work did not move, it stopped existing. Complete got
+slightly *slower* (13.82 → 15.59 ms p50), which is expected: it now writes the
+header and all the lines that scans used to write incrementally. After this,
+complete is **91 % of the cycle**.
+
+**Phase 5, first attempt — reverted, and the most instructive failure here.**
+The bulk lock was written as `SELECT ... WHERE sku IN (...) ORDER BY sku FOR
+UPDATE`. Throughput collapsed to **2.9 tx/s with 9,239 errors** and the logs
+filled with `ERROR: deadlock detected`.
+
+The cause is a lock-mode detail that is easy to miss. `scan_log`,
+`transaction_items` and `low_stock_alerts` all have a foreign key to `items`,
+and Postgres takes a **`FOR KEY SHARE`** lock on the parent row whenever it
+validates one. `FOR KEY SHARE` is compatible with `FOR NO KEY UPDATE` but
+**conflicts with `FOR UPDATE`**. Hibernate's `PESSIMISTIC_WRITE` had been
+emitting `for no key update` all along, so checkouts and the analytics
+scan-log writer never contended. Writing the "obvious" `FOR UPDATE` made every
+scan-log batch fight the checkout holding those rows, and they deadlocked.
+
+Changing one clause to `FOR NO KEY UPDATE` — the exact mode Hibernate used —
+restored it. `FOR NO KEY UPDATE` still excludes other checkouts from the same
+row, which is all the stock invariant requires.
+
+**Phase 5 — lock late, commit early.** Complete went from `3L + 5` statements
+to a fixed **6**, and from `3L + 2 ≈ 30` statements inside the item locks to
+**4**. Throughput **669 → 742.1 / 677.1 / 744.9** (a third run was added
+because the first two spanned 9.6 %); taking the median, roughly **+8 %** at 10
+stations. The far bigger effect is at 100 stations: **420 → 849.3 tx/s**, and
+complete p50 fell 90.84 → 93.45 ms while serving twice the transactions.
