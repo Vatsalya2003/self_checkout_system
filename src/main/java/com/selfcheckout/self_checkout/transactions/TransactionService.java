@@ -1,7 +1,16 @@
 package com.selfcheckout.self_checkout.transactions;
 
-import com.selfcheckout.self_checkout.config.SelfCheckoutProperties;
 import com.selfcheckout.self_checkout.analytics.ScanRecorder;
+import com.selfcheckout.self_checkout.config.SelfCheckoutProperties;
+import com.selfcheckout.self_checkout.persistence.entity.Item;
+import com.selfcheckout.self_checkout.persistence.entity.LowStockAlert;
+import com.selfcheckout.self_checkout.persistence.entity.Transaction;
+import com.selfcheckout.self_checkout.persistence.repository.CatalogCache;
+import com.selfcheckout.self_checkout.persistence.repository.CatalogEntry;
+import com.selfcheckout.self_checkout.persistence.repository.CompletedTransactionWriter;
+import com.selfcheckout.self_checkout.persistence.repository.ItemRepository;
+import com.selfcheckout.self_checkout.persistence.repository.LowStockAlertRepository;
+import com.selfcheckout.self_checkout.persistence.repository.TransactionRepository;
 import com.selfcheckout.self_checkout.transactions.exception.EmptyTransactionException;
 import com.selfcheckout.self_checkout.transactions.exception.InvalidRequestException;
 import com.selfcheckout.self_checkout.transactions.exception.ItemNotFoundException;
@@ -11,18 +20,10 @@ import com.selfcheckout.self_checkout.transactions.result.ReceiptLineView;
 import com.selfcheckout.self_checkout.transactions.result.ReceiptView;
 import com.selfcheckout.self_checkout.transactions.result.ScanOutcome;
 import com.selfcheckout.self_checkout.transactions.result.TransactionView;
-import com.selfcheckout.self_checkout.persistence.entity.Item;
-import com.selfcheckout.self_checkout.persistence.entity.LowStockAlert;
-import com.selfcheckout.self_checkout.persistence.entity.Transaction;
-import com.selfcheckout.self_checkout.persistence.entity.TransactionItem;
-import com.selfcheckout.self_checkout.persistence.entity.TransactionItemId;
-import com.selfcheckout.self_checkout.persistence.entity.TransactionStatus;
-import com.selfcheckout.self_checkout.persistence.repository.ItemRepository;
-import com.selfcheckout.self_checkout.persistence.repository.LowStockAlertRepository;
-import com.selfcheckout.self_checkout.persistence.repository.TransactionItemRepository;
-import com.selfcheckout.self_checkout.persistence.repository.TransactionRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -31,253 +32,254 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-// SERVICE layer -- the heart of the project. Everything interesting about
-// concurrency happens in complete().
+// TRANSACTIONS layer -- the heart of the project.
 //
-// Layer rules I'm sticking to: controllers do HTTP only, services hold the
-// business rules and the transaction boundaries, repositories do SQL.
-// Services are the ONLY place @Transactional appears.
+// Where the data lives, after the performance work:
+//   OPEN basket   -> memory only (OpenTransactionStore). Nobody has paid.
+//   PAID basket   -> the database, in one transaction, fully durable.
+//   stock         -> the database, always, under row locks.
+//
+// So start and scan do NO database work at all, and complete is the only
+// endpoint that talks to Postgres on the checkout path.
 @Service
 public class TransactionService {
 
-    // All dependencies are final and set in the constructor ("constructor
-    // injection"). Spring sees the constructor and passes the beans in; no
-    // @Autowired needed, and the object can never exist half-built.
+    private final OpenTransactionStore openTransactions;
+    private final CatalogCache catalog;
     private final TransactionRepository transactionRepository;
     private final ItemRepository itemRepository;
-    private final TransactionItemRepository transactionItemRepository;
+    private final CompletedTransactionWriter completedWriter;
     private final LowStockAlertRepository lowStockAlertRepository;
     private final SelfCheckoutProperties properties;
-    // Only a ScanRecorder, not the whole analytics service: this layer is not
-    // allowed to know how windows are computed.
     private final ScanRecorder scanRecorder;
 
-    public TransactionService(TransactionRepository transactionRepository,
+    // An explicit transaction boundary instead of @Transactional on a private
+    // helper. complete() calls that helper from inside this same class, which
+    // means Spring's proxy is never involved and the annotation would be
+    // silently ignored -- every statement would autocommit and the item row
+    // locks would be released the instant they were taken.
+    private final TransactionTemplate transactionTemplate;
+
+    public TransactionService(OpenTransactionStore openTransactions,
+                              CatalogCache catalog,
+                              TransactionRepository transactionRepository,
                               ItemRepository itemRepository,
-                              TransactionItemRepository transactionItemRepository,
+                              CompletedTransactionWriter completedWriter,
                               LowStockAlertRepository lowStockAlertRepository,
                               SelfCheckoutProperties properties,
-                              ScanRecorder scanRecorder) {
+                              ScanRecorder scanRecorder,
+                              PlatformTransactionManager transactionManager) {
+        this.openTransactions = openTransactions;
+        this.catalog = catalog;
         this.transactionRepository = transactionRepository;
         this.itemRepository = itemRepository;
-        this.transactionItemRepository = transactionItemRepository;
+        this.completedWriter = completedWriter;
         this.lowStockAlertRepository = lowStockAlertRepository;
         this.properties = properties;
         this.scanRecorder = scanRecorder;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
-    // Open a new basket. @Transactional = everything in this method is one
-    // database transaction: it all commits together or none of it does.
-    @Transactional
+    /**
+     * Open a basket. Pure memory -- no transaction, no SQL.
+     *
+     * This used to be BEGIN + SELECT + INSERT + COMMIT, and the SELECT was
+     * pure waste: Spring Data saw our assigned UUID, assumed the row might
+     * already exist, and checked before inserting.
+     */
     public TransactionView start(String stationId) {
         if (stationId == null || stationId.isBlank()) {
             throw new InvalidRequestException("stationId is required");
         }
-        // Random UUID so two stations can never collide on an id.
-        Transaction tx = new Transaction(UUID.randomUUID().toString(), stationId);
-        transactionRepository.save(tx);
-        return toView(tx);
+        OpenBasket basket = new OpenBasket(UUID.randomUUID().toString(), stationId, Instant.now());
+        openTransactions.put(basket);
+        return new TransactionView(basket.id(), basket.stationId(), "OPEN",
+                0, java.math.BigDecimal.ZERO, basket.startedAt());
     }
 
     /**
-     * Scan exactly one physical unit of one SKU into an open basket.
+     * Scan one unit. Also pure memory.
      *
-     * Checks run in the order the reference mock server uses, so the same
-     * request gets the same status code from either server:
-     *   1. transaction missing            -> 404
-     *   2. transaction not OPEN           -> 409
-     *   3. SKU missing (or blank/absent)  -> 404
-     * Only after all three pass do we write anything.
+     * Checks stay in exactly the order they were, so the status codes are
+     * unchanged:
+     *   1. basket missing            -> 404
+     *   2. basket not OPEN           -> 409
+     *   3. SKU missing (or blank)    -> 404
      *
-     * Deliberately does NOT look at or touch items.stock. The customer already
-     * has the item in hand; the spec says stock moves at completion, and scans
-     * are never gated by stock.
+     * Still never reads or locks stock: the customer already has the item in
+     * hand, and the spec says stock moves at completion.
      */
-    // Because we never touch items here, scans take NO row locks at all --
-    // that's what keeps this path fast even when completions are queuing up.
-    @Transactional
     public ScanOutcome scan(String transactionId, String sku) {
-        // Lock the transaction row, exactly as complete() does.
-        //
-        // Without this, a scan racing a complete on the SAME basket could
-        // write the whole row back -- status included -- AFTER complete had
-        // marked it COMPLETED and moved stock, resurrecting a paid basket as
-        // OPEN so it could be paid for a second time. Hibernate writes every
-        // column on an update, so even "I only touched itemCount" overwrites
-        // the status. scripts/test-scan-complete-race.py reproduces it.
-        //
-        // Cost under the real workload: effectively zero. One station drives
-        // one basket strictly sequentially, so two requests never contend for
-        // the same transaction row, and different baskets are different rows.
-        // It is one extra uncontended row lock, not a shared bottleneck.
-        //
-        // No deadlock risk: scan locks only the transaction row and never an
-        // item row, so it cannot be half of a cycle with complete's
-        // transaction-then-items ordering.
-        Transaction tx = transactionRepository.findByIdForUpdate(transactionId)
-                .orElseThrow(() -> new TransactionNotFoundException(
-                        "Transaction " + transactionId + " not found"));
-
-        if (tx.getStatus() != TransactionStatus.OPEN) {
-            throw new TransactionNotOpenException(
-                    "Transaction " + transactionId + " is " + tx.getStatus());
+        OpenBasket basket = openTransactions.find(transactionId);
+        if (basket == null) {
+            // Either it never existed or it has already been paid for. Both
+            // answers have to stay distinguishable, so ask the database before
+            // deciding -- a completed basket is 409, an unknown one is 404.
+            throw notFoundOrNotOpen(transactionId);
         }
 
-        // A null/blank sku can never match a catalog row, so it lands here as a
-        // 404 rather than a 400: the spec documents only 404 and 409 for this
-        // endpoint, and the mock server answers a missing sku the same way.
-        Item item = (sku == null || sku.isBlank())
-                ? null
-                : itemRepository.findById(sku).orElse(null);
+        CatalogEntry item = (sku == null || sku.isBlank()) ? null : catalog.find(sku);
+        if (basket.snapshot().state() != OpenBasket.State.OPEN) {
+            throw new TransactionNotOpenException("Transaction " + transactionId + " is COMPLETED");
+        }
         if (item == null) {
             throw new ItemNotFoundException(
                     "Item " + (sku == null ? "<missing>" : sku) + " not found");
         }
 
-        // Upsert the basket line: first unit of this SKU creates it, later ones bump quantity.
-        // Read-then-write is safe here ONLY because one station drives one
-        // transaction one scan at a time, so two scans of the same basket never
-        // overlap. If the client ever scanned in parallel this would need to
-        // become a single INSERT ... ON CONFLICT DO UPDATE.
-        TransactionItem line = transactionItemRepository
-                .findById(new TransactionItemId(transactionId, item.getSku()))
-                .orElse(null);
-        if (line == null) {
-            transactionItemRepository.save(new TransactionItem(transactionId, item.getSku()));
-        } else {
-            line.addUnit();   // managed entity: JPA dirty-checking writes the UPDATE at flush
+        // One lock, on this basket only. Two stations never share a basket, so
+        // it is uncontended in practice -- but it is what makes a scan racing
+        // a complete safe (see scripts/test-scan-complete-race.py).
+        OpenBasket.Snapshot after = basket.addUnit(item.sku(), item.price());
+        if (after == null) {
+            // A complete claimed the basket between our check and here.
+            throw new TransactionNotOpenException("Transaction " + transactionId + " is COMPLETED");
         }
 
-        tx.addScan(item.getPrice());          // itemCount + 1, runningTotal + price
-                                              // tx is managed too, so no save() call is needed
-        // Hand the scan to the analytics layer. It writes the scan_log row
-        // (joining this same DB transaction) and decides whether a window
-        // boundary was crossed. Same statement order as before -- this call
-        // sits exactly where the scan_log insert used to.
-        scanRecorder.recordScan(item.getSku());
+        // The scan is now "committed" as far as the basket is concerned, so
+        // the analytics pipeline can hear about it. There is no database
+        // transaction to wait for any more, so this is submitted directly --
+        // still the same non-blocking offer, still never blocking checkout.
+        scanRecorder.recordScan(item.sku());
 
-        return new ScanOutcome(tx.getId(), item.getSku(), item.getName(),
-                item.getPrice(), tx.getItemCount(), tx.getRunningTotal());
+        return new ScanOutcome(transactionId, item.sku(), item.name(),
+                item.price(), after.itemCount(), after.runningTotal());
     }
 
     /**
-     * Take payment and move stock. This is the one place stock changes.
+     * Take payment and move stock. The only checkout endpoint that touches the
+     * database.
      *
-     * Why this needs locking at all: Tomcat serves each request on its own
-     * thread, and each thread gets its own JDBC connection, so two stations
-     * completing baskets that share a SKU are two independent Postgres
-     * sessions with independent snapshots. If both read stock = 10000 and both
-     * write back an absolute number, one decrement is silently lost and no
-     * error is raised anywhere. So every read-check-write below happens under
-     * a row lock held until commit.
+     * Order of events:
+     *   1. claim the basket in memory (OPEN -> COMPLETING) so a second
+     *      complete gets 409 and a late scan gets 409
+     *   2. one database transaction: lock the item rows in ascending SKU
+     *      order, clamp, decrement, write the header + lines + any low-stock
+     *      crossings
+     *   3. drop the basket from memory
      *
-     * Why the basket is sorted by SKU: locks are held until commit, so a
-     * transaction holding SKU-A while waiting for SKU-B can deadlock against
-     * one holding SKU-B and waiting for SKU-A. Postgres would detect that
-     * after deadlock_timeout and kill one of them with an error. Acquiring
-     * locks in one global order (ascending SKU) makes that cycle impossible
-     * rather than merely unlikely -- it removes the circular-wait condition.
+     * If step 2 fails the claim is released, so the basket goes back to OPEN
+     * and can be retried rather than being stranded.
      */
-    @Transactional
     public ReceiptView complete(String transactionId) {
-        // Lock the transaction row first: two concurrent completes of the SAME
-        // transaction serialize here, and the loser sees COMPLETED below.
-        Transaction tx = transactionRepository.findByIdForUpdate(transactionId)
-                .orElseThrow(() -> new TransactionNotFoundException(
-                        "Transaction " + transactionId + " not found"));
-
-        // The loser of that race arrives here and sees COMPLETED -> clean 409,
-        // instead of decrementing stock a second time.
-        if (tx.getStatus() != TransactionStatus.OPEN) {
-            throw new TransactionNotOpenException(
-                    "Transaction " + transactionId + " is " + tx.getStatus());
+        OpenBasket basket = openTransactions.find(transactionId);
+        if (basket == null) {
+            throw notFoundOrNotOpen(transactionId);
         }
 
-        // ...OrderBySkuAsc is the deadlock prevention. Do not change the sort.
-        List<TransactionItem> lines = transactionItemRepository.findByTransactionIdOrderBySkuAsc(transactionId);
-        if (lines.isEmpty()) {
+        OpenBasket.Snapshot claimed = basket.claimForCompletion();
+        if (claimed == null) {
+            throw new TransactionNotOpenException("Transaction " + transactionId + " is COMPLETED");
+        }
+        if (claimed.lines().isEmpty()) {
+            // Deliberately NOT claimed: an empty basket stays OPEN and can
+            // still be scanned into and completed later, exactly as it did
+            // when this was a rolled-back database transaction.
             throw new EmptyTransactionException(
                     "Transaction " + transactionId + " has no scanned items");
         }
 
-        // Pass 1 -- acquire every item lock, ascending SKU, before mutating
-        // anything. Keeping acquisition separate from mutation means no item
-        // is left dirty while we are still taking locks.
-        // (If we mutated as we went, Hibernate would auto-flush those pending
-        // UPDATEs before each following query, scattering writes through the
-        // locking phase. Two passes keep it "lock everything, then change it".)
-        Map<String, Item> locked = new LinkedHashMap<>();
-        for (TransactionItem line : lines) {
-            Item item = itemRepository.findBySkuForUpdate(line.getSku())
-                    .orElseThrow(() -> new ItemNotFoundException(
-                            "Item " + line.getSku() + " not found"));
-            locked.put(line.getSku(), item);
+        try {
+            ReceiptView receipt = transactionTemplate.execute(
+                    status -> writePaidTransaction(basket, claimed));
+            openTransactions.remove(transactionId);
+            return receipt;
+        } catch (RuntimeException e) {
+            basket.releaseClaim();      // let the customer try again
+            throw e;
         }
+    }
 
-        // Pass 2 -- every lock is held, so these reads and writes are atomic.
+    /**
+     * Everything that touches the database, inside one transaction opened by
+     * the TransactionTemplate above. Every item lock taken here is held until
+     * that transaction commits.
+     */
+    private ReceiptView writePaidTransaction(OpenBasket basket, OpenBasket.Snapshot claimed) {
+        // Ascending SKU order. Every checkout takes its item locks in this one
+        // global order, which is what makes a deadlock impossible: a cycle
+        // would need some transaction to hold a higher SKU while waiting for a
+        // lower one, and sorted acquisition never does that.
+        List<String> skus = new ArrayList<>(claimed.lines().keySet());
+        skus.sort(String::compareTo);
+
         Instant completedAt = Instant.now();
         int threshold = properties.lowStockThreshold();
         List<LowStockAlert> crossings = new ArrayList<>();
-        List<ReceiptLineView> receiptLines = new ArrayList<>(lines.size());
-        for (TransactionItem line : lines) {
-            Item item = locked.get(line.getSku());
+        List<CompletedTransactionWriter.Line> lines = new ArrayList<>(skus.size());
+        Map<String, Item> locked = new LinkedHashMap<>();
 
-            // Clamp: scans are never gated by stock, so a hot SKU can be
-            // scanned more times than it has units. Take what is actually
-            // there and record it, so stock can never go negative and the
-            // shortfall stays visible instead of corrupting the invariant.
-            int before = item.getStock();
-            int applied = Math.min(before, line.getQuantity());
-            int after = before - applied;
-            item.setStock(after);
-            line.setAppliedQuantity(applied);
-
-            // Low-stock alert, recorded in this same DB transaction while we
-            // still hold this item's row lock -- so exactly one completer can
-            // observe any given crossing. Stock is never replenished here, so
-            // "crossed below" happens at most once per SKU for the whole run.
-            // Strictly "<" on both sides: landing exactly ON the threshold is
-            // not "below" it.
-            if (before >= threshold && after < threshold) {
-                crossings.add(new LowStockAlert(item.getSku(), completedAt));
-            }
-
-            // The receipt shows the SCANNED quantity: that is what the
-            // customer physically has, regardless of the clamp.
-            receiptLines.add(new ReceiptLineView(item.getSku(), item.getName(),
-                    item.getPrice(), line.getQuantity()));
+        // Pass 1 -- take every lock, in order, before changing anything.
+        for (String sku : skus) {
+            locked.put(sku, itemRepository.findBySkuForUpdate(sku)
+                    .orElseThrow(() -> new ItemNotFoundException("Item " + sku + " not found")));
         }
 
-        // Saved after the loop, not inside it: a native/modifying write mid-loop
-        // would force Hibernate to flush the dirty Items on every iteration.
+        // Pass 2 -- all locks held, so these reads and writes are atomic.
+        for (String sku : skus) {
+            Item item = locked.get(sku);
+            int quantity = claimed.lines().get(sku);
+
+            // Clamp: scans are never gated by stock, so a hot SKU can be
+            // scanned more often than it has units. Take what is really there
+            // so stock can never go negative, and record it separately so the
+            // shortfall stays visible instead of corrupting the invariant.
+            int before = item.getStock();
+            int applied = Math.min(before, quantity);
+            int after = before - applied;
+            item.setStock(after);
+
+            if (before >= threshold && after < threshold) {
+                crossings.add(new LowStockAlert(sku, completedAt));
+            }
+            lines.add(new CompletedTransactionWriter.Line(sku, quantity, applied));
+        }
+
         if (!crossings.isEmpty()) {
             lowStockAlertRepository.saveAll(crossings);
         }
 
-        tx.complete(completedAt);
+        completedWriter.insertCompleted(basket.id(), basket.stationId(), claimed.itemCount(),
+                claimed.runningTotal(), basket.startedAt(), completedAt, lines);
 
-        // No explicit save() anywhere in pass 2: tx, the Items and the basket
-        // lines are all managed entities, so Hibernate diffs them against what
-        // it loaded (dirty checking) and writes the UPDATEs at commit. The
-        // locks are released by that same commit.
-        return new ReceiptView(tx.getId(), tx.getStationId(), tx.getItemCount(),
-                tx.getRunningTotal(), tx.getStartedAt(), completedAt, receiptLines);
+        // The receipt lists lines in the order they were first scanned, and
+        // shows the SCANNED quantity -- that is what the customer is holding,
+        // regardless of the clamp.
+        List<ReceiptLineView> receiptLines = new ArrayList<>(claimed.lines().size());
+        for (Map.Entry<String, Integer> e : claimed.lines().entrySet()) {
+            CatalogEntry c = catalog.find(e.getKey());
+            receiptLines.add(new ReceiptLineView(e.getKey(), c.name(), c.price(), e.getValue()));
+        }
+        return new ReceiptView(basket.id(), basket.stationId(), claimed.itemCount(),
+                claimed.runningTotal(), basket.startedAt(), completedAt, receiptLines);
     }
 
-    // Debug/instructor endpoint. readOnly = true tells Hibernate not to bother
-    // dirty-checking anything, since we promise not to change it.
+    /** Debug/instructor endpoint: memory first for open baskets, then the database. */
     @Transactional(readOnly = true)
     public TransactionView get(String transactionId) {
+        OpenBasket basket = openTransactions.find(transactionId);
+        if (basket != null) {
+            OpenBasket.Snapshot s = basket.snapshot();
+            return new TransactionView(basket.id(), basket.stationId(), "OPEN",
+                    s.itemCount(), s.runningTotal(), basket.startedAt());
+        }
         Transaction tx = transactionRepository.findById(transactionId)
                 .orElseThrow(() -> new TransactionNotFoundException(
                         "Transaction " + transactionId + " not found"));
-        return toView(tx);
-    }
-
-    // Entity -> domain result. id becomes transactionId, and the enum becomes
-    // text here so the persistence enum never travels up to the api layer.
-    private TransactionView toView(Transaction tx) {
         return new TransactionView(tx.getId(), tx.getStationId(), tx.getStatus().name(),
                 tx.getItemCount(), tx.getRunningTotal(), tx.getStartedAt());
+    }
+
+    /**
+     * Not in memory: either it was already paid for (409) or it never existed
+     * (404). Only the database can tell them apart, and this is an error path,
+     * so the extra read costs nothing on the hot path.
+     */
+    private RuntimeException notFoundOrNotOpen(String transactionId) {
+        return transactionRepository.findById(transactionId)
+                .<RuntimeException>map(tx -> new TransactionNotOpenException(
+                        "Transaction " + transactionId + " is " + tx.getStatus()))
+                .orElseGet(() -> new TransactionNotFoundException(
+                        "Transaction " + transactionId + " not found"));
     }
 }
