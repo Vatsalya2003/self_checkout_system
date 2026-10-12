@@ -1,0 +1,52 @@
+Timing is off.
+Pager usage is off.
+
+==============================================================
+ CHECK 1  no SKU may ever have negative stock
+          expected: 0 rows
+==============================================================
+ sku | stock 
+-----+-------
+(0 rows)
+
+
+==============================================================
+ CHECK 2  for every SKU:
+            starting_stock - current_stock
+              = SUM(applied_quantity) over COMPLETED transactions
+          expected: 0 rows
+
+          A row here means units left the shelf without being
+          accounted for (a lost update) or were subtracted twice.
+          This is the property concurrent implementations break.
+==============================================================
+ sku | current_stock | removed_from_shelf | sum_applied_quantity | discrepancy 
+-----+---------------+--------------------+----------------------+-------------
+(0 rows)
+
+
+==============================================================
+ CHECK 3  sold-out SKUs: scanned units the shelf could not cover
+          informational, not a failure
+
+          Scans are never gated by stock (a customer already holds
+          the item), so a hot SKU can be scanned more times than it
+          has units. The decrement is clamped at zero and the
+          shortfall shows up here instead of corrupting CHECK 2.
+==============================================================
+    sku     | final_stock | units_scanned | units_applied | units_short 
+------------+-------------+---------------+---------------+-------------
+ SKU-000001 |           0 |         31386 |         10000 |       21386
+ SKU-000002 |           0 |         15709 |         10000 |        5709
+ SKU-000003 |           0 |         10301 |         10000 |         301
+(3 rows)
+
+
+==============================================================
+ SUMMARY
+==============================================================
+ negative_stock_skus | invariant_violations | completed_transactions | abandoned_open_transactions | total_scans | popular_windows_written | low_stock_alerts_recorded 
+---------------------+----------------------+------------------------+-----------------------------+-------------+-------------------------+---------------------------
+                   0 |                    0 |                  24331 |                           0 |      255975 |                     511 |                         3
+(1 row)
+

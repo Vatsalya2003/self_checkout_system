@@ -1,0 +1,33 @@
+Timing is off.
+Pager usage is off.
+
+==============================================================
+ CHECK 1  scan_log is gapless: seqs are exactly 1..max
+          expected: rows = max_seq, min_seq = 1, gaps = 0
+==============================================================
+  rows  | min_seq | max_seq | gaps 
+--------+---------+---------+------
+ 255975 |       1 |  255975 |    0
+(1 row)
+
+
+==============================================================
+ CHECK 2  every stored window equals a brute-force recount of
+          scan_log over the same (window_start, window_end]
+          expected: mismatched_entries = 0
+==============================================================
+ windows_checked | mismatched_entries 
+-----------------+--------------------
+             511 |                  0
+(1 row)
+
+
+==============================================================
+ CHECK 3  one window per slide interval (informational)
+          expected: windows = floor(max_seq / 500)
+==============================================================
+ windows | expected_windows | last_window_end 
+---------+------------------+-----------------
+     511 |              511 |          255500
+(1 row)
+
