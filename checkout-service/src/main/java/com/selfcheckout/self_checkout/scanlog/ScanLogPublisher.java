@@ -7,6 +7,7 @@ import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -36,16 +37,22 @@ import java.util.concurrent.atomic.AtomicLong;
  *     only when it builds a batch -- so a dropped event never uses a number.
  *     The window filter's "seq % 500 == 0" boundaries depend on that.
  *
- *  3. Committed seqs are always exactly 1..K with no holes. The writer does
+ *  3. Batches are collected for up to max-linger-ms (default 50 ms) or 1,000
+ *     rows, whichever comes first, so a busy run writes a few big INSERTs a
+ *     second instead of thousands of tiny ones -- each INSERT is a commit, and
+ *     every commit is a WAL flush competing with the payments' own commits.
+ *     Costs at most that much extra analytics lag; changes no window.
+ *
+ *  4. Committed seqs are always exactly 1..K with no holes. The writer does
  *     one INSERT at a time (autocommit) and only builds batch N+1 after batch
  *     N has committed. analytics-service can therefore read "seq > last ORDER
  *     BY seq" and never see a later scan before an earlier one is visible.
  *
- *  4. A failed write is retried with the SAME seqs, never renumbered, so a
+ *  5. A failed write is retried with the SAME seqs, never renumbered, so a
  *     database hiccup cannot open a hole. The counter only moves on after a
  *     batch has committed.
  *
- *  5. After a restart the counter carries on from MAX(seq) in scan_log, so a
+ *  6. After a restart the counter carries on from MAX(seq) in scan_log, so a
  *     restarted checkout-service keeps the sequence gapless.
  *
  * The write logic lives in writeOnce(), apart from the thread, so the tests
@@ -66,6 +73,7 @@ public class ScanLogPublisher implements ScanRecorder {
     private final ScanLogBatchWriter writer;
     private final BlockingQueue<ScanEvent> queue;
     private final long offerMillis;
+    private final long lingerMillis;
 
     private long nextSeq;                         // owned by the writer thread only
     private volatile boolean stopping = false;
@@ -82,15 +90,17 @@ public class ScanLogPublisher implements ScanRecorder {
     private volatile long lastSeq = 0;
 
     @Autowired
-    public ScanLogPublisher(ScanLogBatchWriter writer) {
-        this(writer, QUEUE_CAPACITY, OFFER_MILLIS);
+    public ScanLogPublisher(ScanLogBatchWriter writer,
+                            @Value("${selfcheckout.scan-log.max-linger-ms:50}") long lingerMillis) {
+        this(writer, QUEUE_CAPACITY, OFFER_MILLIS, lingerMillis);
     }
 
-    /** For tests: a small queue and a short offer wait. */
-    ScanLogPublisher(ScanLogBatchWriter writer, int capacity, long offerMillis) {
+    /** For tests: a small queue, a short offer wait, and usually no linger. */
+    ScanLogPublisher(ScanLogBatchWriter writer, int capacity, long offerMillis, long lingerMillis) {
         this.writer = writer;
         this.queue = new ArrayBlockingQueue<>(capacity);
         this.offerMillis = offerMillis;
+        this.lingerMillis = lingerMillis;
     }
 
     @PostConstruct
@@ -104,7 +114,8 @@ public class ScanLogPublisher implements ScanRecorder {
         m.setDaemon(true);
         m.start();
         metricsThread = m;
-        log.info("scan-log publisher started: next seq {}", nextSeq);
+        log.info("scan-log publisher started: next seq {}, batches of up to {} rows or {} ms",
+                nextSeq, MAX_BATCH, lingerMillis);
     }
 
     /** Continue numbering after the highest seq already in scan_log. */
@@ -154,18 +165,30 @@ public class ScanLogPublisher implements ScanRecorder {
     }
 
     /**
-     * Wait up to pollMillis for one event, sweep up whatever else is already
-     * queued (at most MAX_BATCH), number them and write them in one INSERT.
-     * Returns false if nothing arrived.
+     * Wait up to pollMillis for one event, then keep collecting for up to
+     * lingerMillis more (or until MAX_BATCH rows), number them and write them
+     * in one INSERT. Returns false if nothing arrived.
      */
     boolean writeOnce(long pollMillis) throws InterruptedException {
         ScanEvent first = queue.poll(pollMillis, TimeUnit.MILLISECONDS);
         if (first == null) {
             return false;
         }
-        List<ScanEvent> events = new ArrayList<>(Math.min(MAX_BATCH, queue.size() + 1));
+        List<ScanEvent> events = new ArrayList<>(MAX_BATCH);
         events.add(first);
-        queue.drainTo(events, MAX_BATCH - 1);
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(lingerMillis);
+        while (events.size() < MAX_BATCH) {
+            queue.drainTo(events, MAX_BATCH - events.size());
+            long remaining = deadline - System.nanoTime();
+            if (events.size() >= MAX_BATCH || remaining <= 0 || stopping) {
+                break;
+            }
+            ScanEvent next = queue.poll(remaining, TimeUnit.NANOSECONDS);
+            if (next == null) {
+                break;                              // linger expired with nothing new
+            }
+            events.add(next);
+        }
 
         // Numbered here, by the only thread that numbers anything.
         List<ScanLogRow> rows = new ArrayList<>(events.size());

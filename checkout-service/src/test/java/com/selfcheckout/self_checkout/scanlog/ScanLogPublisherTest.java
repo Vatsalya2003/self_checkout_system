@@ -42,7 +42,7 @@ class ScanLogPublisherTest {
     @DisplayName("numbers scans 1, 2, 3, ... with no gaps across batches")
     void gaplessAcrossBatches() throws Exception {
         FakeWriter w = new FakeWriter();
-        ScanLogPublisher p = new ScanLogPublisher(w, 100, 10);
+        ScanLogPublisher p = new ScanLogPublisher(w, 100, 10, 0);
         p.resumeFrom(w.maxSeq());
         for (int i = 0; i < 7; i++) p.recordScan("SKU-" + i);
         assertTrue(p.writeOnce(10));
@@ -62,7 +62,7 @@ class ScanLogPublisherTest {
     void retriesWithSameSeqs() throws Exception {
         FakeWriter w = new FakeWriter();
         w.failNext = 2;
-        ScanLogPublisher p = new ScanLogPublisher(w, 100, 10);
+        ScanLogPublisher p = new ScanLogPublisher(w, 100, 10, 0);
         p.resumeFrom(0);
         p.recordScan("SKU-A");
         p.recordScan("SKU-B");
@@ -79,7 +79,7 @@ class ScanLogPublisherTest {
     @DisplayName("a full queue drops the scan event instead of blocking the request thread")
     void fullQueueDropsAndCounts() {
         FakeWriter w = new FakeWriter();
-        ScanLogPublisher p = new ScanLogPublisher(w, 2, 5);     // capacity 2, wait 5 ms
+        ScanLogPublisher p = new ScanLogPublisher(w, 2, 5, 0);     // capacity 2, wait 5 ms
         long t0 = System.nanoTime();
         p.recordScan("SKU-1");
         p.recordScan("SKU-2");
@@ -95,7 +95,7 @@ class ScanLogPublisherTest {
     @DisplayName("a dropped event uses no seq number, so the sequence stays gapless")
     void dropsDoNotConsumeSeqs() throws Exception {
         FakeWriter w = new FakeWriter();
-        ScanLogPublisher p = new ScanLogPublisher(w, 2, 1);
+        ScanLogPublisher p = new ScanLogPublisher(w, 2, 1, 0);
         p.resumeFrom(0);
         p.recordScan("SKU-1");
         p.recordScan("SKU-2");
@@ -108,11 +108,30 @@ class ScanLogPublisherTest {
     }
 
     @Test
+    @DisplayName("collects for up to the linger time, so a burst becomes one INSERT")
+    void lingerCollectsABatch() throws Exception {
+        FakeWriter w = new FakeWriter();
+        ScanLogPublisher p = new ScanLogPublisher(w, 100, 10, 200);
+        p.resumeFrom(0);
+        p.recordScan("SKU-1");
+        Thread late = new Thread(() -> {
+            try { Thread.sleep(30); } catch (InterruptedException ignored) { }
+            p.recordScan("SKU-2");
+            p.recordScan("SKU-3");
+        });
+        late.start();
+        assertTrue(p.writeOnce(10));
+        late.join();
+        assertEquals(1, w.committed.size(), "the late scans joined the same batch");
+        assertEquals(List.of(1L, 2L, 3L), w.allSeqs());
+    }
+
+    @Test
     @DisplayName("after a restart, numbering continues from MAX(seq) in scan_log")
     void resumesAfterRestart() throws Exception {
         FakeWriter w = new FakeWriter();
         w.maxSeq = 41_500;
-        ScanLogPublisher p = new ScanLogPublisher(w, 10, 10);
+        ScanLogPublisher p = new ScanLogPublisher(w, 10, 10, 0);
         p.resumeFrom(w.maxSeq());
         p.recordScan("SKU-1");
         assertTrue(p.writeOnce(10));
