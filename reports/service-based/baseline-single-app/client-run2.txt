@@ -1,0 +1,44 @@
+Self-Checkout Load Client starting...
+  baseUrl=http://localhost:8080 stations=10 duration=60s basket=[1..20]
+Fetching catalog...
+Catalog loaded: 2000 items.
+Starting 10 simulated station(s) for 60s...
+Duration elapsed, waiting for in-flight transactions to finish...
+Fetching low-stock alerts and popular items...
+
+================ LOAD TEST REPORT ================
+Base URL:        http://localhost:8080
+Stations:        10
+Duration:        60.0s (requested 60s)
+Transactions:    65185 (1086.2/sec)
+Items scanned:   682105 (11366.4/sec)
+
+Operation                    OK   Errors   Mean(ms)    P50(ms)    P95(ms)    P99(ms)    Max(ms)     Err%
+START_TRANSACTION         65185        0       0.14       0.11       0.25       0.53      35.33    0.00%
+SCAN_ITEM                682105        0       0.12       0.10       0.22       0.42      13.07    0.00%
+COMPLETE_TRANSACTION      65185        0       7.76       4.24      24.81      37.20     122.88    0.00%
+
+Low-stock alerts (8):
+  SKU-000001   Item 1                         stock=0      threshold=50
+  SKU-000002   Item 2                         stock=0      threshold=50
+  SKU-000003   Item 3                         stock=0      threshold=50
+  SKU-000004   Item 4                         stock=0      threshold=50
+  SKU-000005   Item 5                         stock=0      threshold=50
+  SKU-000006   Item 6                         stock=0      threshold=50
+  SKU-000007   Item 7                         stock=0      threshold=50
+  SKU-000008   Item 8                         stock=0      threshold=50
+
+Most popular items (top 10):
+  #1   SKU-000001   Item 1                         scans=133
+  #2   SKU-000002   Item 2                         scans=62
+  #3   SKU-000003   Item 3                         scans=39
+  #4   SKU-000006   Item 6                         scans=30
+  #5   SKU-000004   Item 4                         scans=29
+  #6   SKU-000005   Item 5                         scans=23
+  #7   SKU-000007   Item 7                         scans=19
+  #8   SKU-000008   Item 8                         scans=13
+  #9   SKU-000009   Item 9                         scans=13
+  #10  SKU-000010   Item 10                        scans=12
+===================================================
+
+JSON report written to: /Users/rohitdabhi/Desktop/ADV_SOFT_DEV/self-checkout/reports/service-based/baseline-single-app/report-20261012-144646.json
