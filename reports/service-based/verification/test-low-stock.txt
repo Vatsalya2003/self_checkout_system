@@ -1,0 +1,27 @@
+configured threshold = 50
+  [PASS] no alerts before anything sells: got 0, expected 0
+
+=== land exactly ON the threshold (50) -- must NOT alert ===
+  [PASS] stock is exactly 50: got '50', expected '50'
+  [PASS] no alert recorded (strict '<'): got '0', expected '0'
+
+=== one more unit -- now strictly below ===
+  [PASS] stock is 49: got '49', expected '49'
+  [PASS] alert recorded: got '1', expected '1'
+  [PASS] endpoint reports exactly one alert: got 1, expected 1
+  [PASS] alert carries the effective threshold: got 50, expected 50
+  [PASS] alert carries current stock: got 49, expected 49
+
+=== stock keeps falling -- alert must not duplicate or move ===
+  [PASS] still exactly one alert row: got '1', expected '1'
+  [PASS] triggeredAt unchanged: got '2026-10-12 15:14:53.947003-07', expected '2026-10-12 15:14:53.947003-07'
+
+=== ad-hoc ?threshold applies to the query only ===
+  [PASS] every catalog SKU qualifies at 10001: got 2000, expected 2000
+  [PASS] echoed threshold is the ad-hoc one: got 10001, expected 10001
+  [PASS] all rows stamped with the ad-hoc threshold: got True, expected True
+  [PASS] a real crossing keeps its recorded trigger time: got True, expected True
+  [PASS] a SKU with no recorded crossing falls back to generatedAt: got '2026-10-12T22:14:54.058565Z', expected '2026-10-12T22:14:54.058565Z'
+  [PASS] ad-hoc query persisted nothing: got '1', expected '1'
+
+RESULT: PASS

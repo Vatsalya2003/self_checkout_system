@@ -1,0 +1,18 @@
+windowSize=1000 slideInterval=500
+  [PASS] empty but well-formed before any scan: got [], expected []
+1500 scans in 1.0s
+pipeline drained: scan_log=1500 snapshots=3
+snapshots written: ['0,500', '0,1000', '500,1500']
+  [PASS] one snapshot per slide interval: got 3, expected 3
+  [PASS] scan_log received every scan exactly once: got '1500', expected '1500'
+  [PASS] the scan sequence has no gaps: got '1500', expected '1500'
+latest window = (500,1500]
+  [PASS] latest window ends at the last boundary: got 1500, expected 1500
+  [PASS] window spans exactly windowSize: got 1000, expected 1000
+  [PASS] ranks are 1-based and dense: got [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], expected [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+  [PASS] the window slid: the second-half SKU now leads: got 'SKU-000002', expected 'SKU-000002'
+  [PASS] stored counts match a raw SQL aggregate over the same window: got ['SKU-000002=375', 'SKU-000001=125', 'SKU-000339=5'], expected ['SKU-000002=375', 'SKU-000001=125', 'SKU-000339=5']
+  [PASS] limit=3 returns 3 items: got 3, expected 3
+  [PASS] limit=1 returns 1 items: got 1, expected 1
+
+RESULT: PASS
