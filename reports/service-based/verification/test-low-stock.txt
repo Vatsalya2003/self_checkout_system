@@ -14,14 +14,14 @@ configured threshold = 50
 
 === stock keeps falling -- alert must not duplicate or move ===
   [PASS] still exactly one alert row: got '1', expected '1'
-  [PASS] triggeredAt unchanged: got '2026-10-12 15:14:53.947003-07', expected '2026-10-12 15:14:53.947003-07'
+  [PASS] triggeredAt unchanged: got '2026-10-12 15:39:52.588027-07', expected '2026-10-12 15:39:52.588027-07'
 
 === ad-hoc ?threshold applies to the query only ===
   [PASS] every catalog SKU qualifies at 10001: got 2000, expected 2000
   [PASS] echoed threshold is the ad-hoc one: got 10001, expected 10001
   [PASS] all rows stamped with the ad-hoc threshold: got True, expected True
   [PASS] a real crossing keeps its recorded trigger time: got True, expected True
-  [PASS] a SKU with no recorded crossing falls back to generatedAt: got '2026-10-12T22:14:54.058565Z', expected '2026-10-12T22:14:54.058565Z'
+  [PASS] a SKU with no recorded crossing falls back to generatedAt: got '2026-10-12T22:39:52.713278Z', expected '2026-10-12T22:39:52.713278Z'
   [PASS] ad-hoc query persisted nothing: got '1', expected '1'
 
 RESULT: PASS

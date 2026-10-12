@@ -1,6 +1,6 @@
 windowSize=1000 slideInterval=500
   [PASS] empty but well-formed before any scan: got [], expected []
-1500 scans in 1.0s
+1500 scans in 1.2s
 pipeline drained: scan_log=1500 snapshots=3
 snapshots written: ['0,500', '0,1000', '500,1500']
   [PASS] one snapshot per slide interval: got 3, expected 3

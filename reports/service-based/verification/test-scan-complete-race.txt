@@ -4,6 +4,6 @@ racing 200 baskets, 3 scans against each complete
   [PASS] every raced basket ends COMPLETED: got 0, expected 0
   [PASS] header item_count matches the stored lines: got 0, expected 0
   [PASS] the receipt matches what was stored: got 0, expected 0
-  [PASS] stock removed equals units applied: got 529, expected 529
+  [PASS] stock removed equals units applied: got 553, expected 553
 
 RESULT: PASS
