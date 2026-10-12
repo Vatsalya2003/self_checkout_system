@@ -3,7 +3,7 @@
 Weeks 2 to 4 of the semester project. Same API contract, same database, same
 externally visible checkout behaviour as Week 1's monolith throughout — what
 changed is how the code is structured (Week 2), how the windowed analytics are
-executed (Week 3), and how much work a request actually does (Week 4, §7).
+executed (Week 3, part 1), and how much work a request actually does (Week 3, part 2 — the performance work, §7).
 
 Week 1 organized classes by technical type (`controller/`, `service/`,
 `repository/`). That reads like layers but nothing enforced it: HTTP types had
@@ -13,7 +13,7 @@ test that fails the build**.
 
 All numbers come from JSON reports produced by the unmodified course load
 client against the code as committed: the two graded runs in
-[`reports/`](reports/), and for the Week 4 performance work every run in
+[`reports/`](reports/), and for the Week 3 performance work every run in
 `reports/perf/` — including the ones that were reverted or taken while the
 machine was throttling, which are kept and labelled rather than dropped.
 Anything not measured is labelled a prediction.
@@ -30,12 +30,12 @@ Anything not measured is labelled a prediction.
 | 4 | **Modifiability — enforced layer boundaries** | No class outside `api` may reference `org.springframework.http..` or `org.springframework.web..`; no class in `api` may reference `..persistence..`; `persistence` and `analytics` may not reference anything above them. | `LayeredArchitectureTest`, 6 rules, run by `./mvnw test`. **Measured: 5 of 6 failed before the refactor, 6 of 6 pass after.** |
 | 5 | **Modifiability — layer isolation** | Each layer is replaceable without touching its neighbours' internals: business code must compile with no knowledge of HTTP, and the API must compile with no knowledge of JPA. | Same test, rules 2 and 3. **Measured: 47 HTTP-leak violations before, 0 after.** |
 | 6 | **Behavioural equivalence with Week 1** | Every endpoint returns byte-identical bodies, status codes and error codes to the monolith, for the happy path and all 400/404/409 cases. | 27-call golden script captured from the `monolith` tag, re-run against the layered build and diffed with IDs/timestamps normalized. **Measured: identical.** |
-| 7 | **Performance / latency (default load)** | At 10 stations for 60 s: `SCAN_ITEM` p95 < 10 ms, `COMPLETE_TRANSACTION` p95 < 100 ms. | Default report. **Measured (Week 4 final): scan p95 0.20 ms, complete p95 28.45 / 28.53 ms.** (Week 2: 2.19 / 32.68 ms.) |
-| 8 | **Performance / latency (stress)** | At 100 stations for 120 s: `COMPLETE_TRANSACTION` p99 < 1000 ms, no request exceeds the client's 10 s timeout. | Stress report. **Measured (Week 4 final): complete p99 305.22 / 285.03 ms, max 1302 / 748 ms.** The 1,302 ms outlier is one request of 121,005; the requirement is on p99, which holds. |
-| 9 | **Throughput** | Sustain ≥ 1000 scans/sec at 100 stations. | Stress report. **Measured (Week 4 final): 10,591 / 10,950 scans/sec, 1007.8 / 1040.2 transactions/sec** — 10× the requirement. (Week 2: 3,651.7 scans/sec.) |
+| 7 | **Performance / latency (default load)** | At 10 stations for 60 s: `SCAN_ITEM` p95 < 10 ms, `COMPLETE_TRANSACTION` p95 < 100 ms. | Default report. **Measured (Week 3 final, pipeline-v2): scan p95 0.20 ms, complete p95 28.45 / 28.53 ms.** (Week 2: 2.19 / 32.68 ms.) |
+| 8 | **Performance / latency (stress)** | At 100 stations for 120 s: `COMPLETE_TRANSACTION` p99 < 1000 ms, no request exceeds the client's 10 s timeout. | Stress report. **Measured (Week 3 final, pipeline-v2): complete p99 305.22 / 285.03 ms, max 1302 / 748 ms.** The 1,302 ms outlier is one request of 121,005; the requirement is on p99, which holds. |
+| 9 | **Throughput** | Sustain ≥ 1000 scans/sec at 100 stations. | Stress report. **Measured (Week 3 final, pipeline-v2): 10,591 / 10,950 scans/sec, 1007.8 / 1040.2 transactions/sec** — 10× the requirement. (Week 2: 3,651.7 scans/sec.) |
 | 10 | **Scalability** | 10 → 100 stations must not break any correctness requirement; degradation must be latency only. | Both runs pass CHECK 1 and CHECK 2 identically. **Measured: correctness unchanged.** |
-| 11 | **Availability / robustness** | Zero errors on every operation for the full duration of both runs; no deadlocks, no connection-acquisition timeouts, no unhandled exceptions. | Client error counts + server log scan. **Measured (Week 4 final): 0 errors of 4,624,769 requests across four runs; 0 deadlocks; 0 WARN/ERROR lines.** |
-| 12 | **Analytics consistency** | One window written per `slideInterval` scans, each covering `windowSize` scans, ranks 1-based and dense. | `scripts/test-popular-window.py` + snapshot counts. **Measured (Week 4 final): 2,629 windows for 1,314,701 scans = exactly ⌊n/500⌋; 0 dropped events; in == out at every filter.** |
+| 11 | **Availability / robustness** | Zero errors on every operation for the full duration of both runs; no deadlocks, no connection-acquisition timeouts, no unhandled exceptions. | Client error counts + server log scan. **Measured (Week 3 final, pipeline-v2): 0 errors of 4,624,769 requests across four runs; 0 deadlocks; 0 WARN/ERROR lines.** |
+| 12 | **Analytics consistency** | One window written per `slideInterval` scans, each covering `windowSize` scans, ranks 1-based and dense. | `scripts/test-popular-window.py` + snapshot counts. **Measured (Week 3 final, pipeline-v2): 2,629 windows for 1,314,701 scans = exactly ⌊n/500⌋; 0 dropped events; in == out at every filter.** |
 | 13 | **Alerting** | An alert is recorded exactly once per SKU, at the moment stock first goes strictly below the threshold, and stays queryable with its real trigger time. | `scripts/test-low-stock.py`. **Measured: 50 does not alert, 49 does, further drops neither duplicate nor move `triggeredAt`.** |
 | 14 | **Observability** | Every correctness property checkable after a run from the database alone. | `scripts/check-invariant.sql`. |
 | 15 | **Simplicity / reinitializability** | A full reset to a known state is one action, no manual SQL. | Restarting the server re-runs `schema.sql` + `data.sql`. **Verified before every run here.** |
@@ -627,7 +627,7 @@ three checkout behaviour scripts passing unchanged.
 
 ## 7. Performance — making it do less, not making it work harder
 
-Week 4 kept the architecture and the contract exactly as they were and went
+The performance work (the second half of Week 3) kept the architecture and the contract exactly as they were and went
 after throughput. Every claim here is backed by a run recorded in
 [`perf-results.md`](perf-results.md), with the raw JSON in `reports/perf/`.
 
@@ -647,7 +647,7 @@ after throughput. Every claim here is backed by a run recorded in
 The Week 1–3 reports in [`reports/`](reports/) were produced with
 `./mvnw spring-boot:run`. That plugin starts the JVM with
 `-XX:TieredStopAtLevel=1`, which caps the JIT at C1 — worth about 20 % of
-throughput. Every Week 4 number, **including the baseline it is compared
+throughput. Every performance-work number, **including the baseline it is compared
 against**, was taken from the packaged jar instead, so the comparison is
 like-for-like. The earlier submitted reports have not been re-run or altered.
 
@@ -711,7 +711,7 @@ These are costs, stated as costs:
 
 | Change | What it buys | What it costs |
 |---|---|---|
-| Baskets in memory | 11–12 statements per basket gone | **An unpaid basket does not survive a restart**, and the design is now firmly single-process: two servers would not see each other's baskets. A *paid* basket is as durable as before. |
+| Baskets in memory | ~87 statements per basket gone (4 to start + 7–8 per scan) | **An unpaid basket does not survive a restart**, and the design is now firmly single-process: two servers would not see each other's baskets. A *paid* basket is as durable as before. |
 | Catalog cached | every price lookup is a map read | **Price and name changes need a restart.** Safe only because this catalog is seeded once and never updated. |
 | Raw scan persistence off by default | ~1.25 M inserts per stress run gone | **No row-level audit trail** unless switched back on. The graded requirement — top-10 windows in the database — is unaffected, because windows are computed from the event stream, not from those rows. |
 | Separate 2-connection pool for the pipeline | sink write 66.9 ms → 0.43 ms | Two more Postgres connections, and a second pool to reason about. |
@@ -760,7 +760,7 @@ Moving baskets into memory silently changed the order of `lines[]` on a
 receipt. `OpenBasket` stored lines in a `LinkedHashMap` — correctly, so they
 appear in the order first scanned — but published snapshots with
 `Map.copyOf`, whose iteration order is unspecified. No test covered line
-order; the 28-response golden diff against the pre-Week-4 build did. Fixed,
+order; the 28-response golden diff against the pipeline-v1 build did. Fixed,
 and now locked down by `OpenBasketTest.linesKeepFirstScanOrder`, which was
 confirmed to fail against the old code.
 
@@ -777,7 +777,7 @@ confirmed to fail against the old code.
 5. **Single measurement runs**, against a Week 1 baseline whose own spread was
    about 15% (§3.2, §3.4).
 6. **Client and server share one machine.**
-7. **~~The pool size is reasoned, not optimized~~** — measured in Week 4
+7. **~~The pool size is reasoned, not optimized~~** — measured in the Week 3 performance work
    (§7.6). 32 is a deliberate throughput-over-tail-latency choice; 16 would
    give a better p99.
 8. **Analytics are eventually consistent** by design (§5.7).
