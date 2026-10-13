@@ -1,0 +1,17 @@
+label=default-run2 stations=10 duration=60
+load before: { 2.88 4.41 4.47 }
+load after:  { 5.76 4.87 4.63 }
+cpu catalog       0.1 %  (of one core, avg over 61 s)
+cpu checkout     95.6 %  (of one core, avg over 61 s)
+cpu inventory     0.1 %  (of one core, avg over 61 s)
+cpu analytics     4.6 %  (of one core, avg over 61 s)
+cpu postgres    101.2 %  (of one core, avg over 61 s)
+cpu nginx        32.5 %  (of one core, avg over 61 s)
+2026-10-12T16:19:48.711-07:00  INFO 91528 --- [checkout-service] [scanlog-metrics] c.s.s.scanlog.ScanLogPublisher           : scan-log publisher | accepted=605002 written=605002 dropped=0 lost=0 | batches=876 avgBatch=690 | queue depth=0 max=296 cap=65536 | lastSeq=605002 | writeErrors=0
+2026-10-12T16:19:20.194-07:00  INFO 91535 --- [analytics-service] [ipeline-metrics] c.s.s.a.pipeline.AnalyticsPipeline       : analytics lag | lastSeq=444962 | behind scan_log now=777 max=851 mean=33 scans | read lag mean=80 max=236 ms | gapStalls=0
+2026-10-12T16:19:30.223-07:00  INFO 91535 --- [analytics-service] [ipeline-metrics] c.s.s.a.pipeline.AnalyticsPipeline       : analytics lag | lastSeq=555476 | behind scan_log now=0 max=851 mean=35 scans | read lag mean=80 max=236 ms | gapStalls=0
+2026-10-12T16:19:40.267-07:00  INFO 91535 --- [analytics-service] [ipeline-metrics] c.s.s.a.pipeline.AnalyticsPipeline       : analytics lag | lastSeq=605002 | behind scan_log now=0 max=851 mean=37 scans | read lag mean=79 max=236 ms | gapStalls=0
+  tx/s=963.8 tx=57838 items=605002 wall=60.0s
+  START_TRANSACTION      ok=57838 err=0 mean=0.176 p50=0.130 p95=0.279 p99=0.542 max=98.8 ms
+  SCAN_ITEM              ok=605002 err=0 mean=0.145 p50=0.119 p95=0.245 p99=0.454 max=43.5 ms
+  COMPLETE_TRANSACTION   ok=57838 err=0 mean=8.679 p50=4.512 p95=29.890 p99=47.517 max=456.1 ms

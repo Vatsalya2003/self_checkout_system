@@ -1,0 +1,2 @@
+label=week3-stress-run2 load before: { 2.97 4.90 5.14 }
+  tx/s=1033.1 START_TR err=0 p50=0.114 SCAN_ITE err=0 p50=0.098 COMPLETE err=0 p50=76.103
