@@ -1,0 +1,56 @@
+Timing is off.
+Pager usage is off.
+
+==============================================================
+ CHECK 1  no SKU may ever have negative stock
+          expected: 0 rows
+==============================================================
+ sku | stock 
+-----+-------
+(0 rows)
+
+
+==============================================================
+ CHECK 2  for every SKU:
+            starting_stock - current_stock
+              = SUM(applied_quantity) over COMPLETED transactions
+          expected: 0 rows
+
+          A row here means units left the shelf without being
+          accounted for (a lost update) or were subtracted twice.
+          This is the property concurrent implementations break.
+==============================================================
+ sku | current_stock | removed_from_shelf | sum_applied_quantity | discrepancy 
+-----+---------------+--------------------+----------------------+-------------
+(0 rows)
+
+
+==============================================================
+ CHECK 3  sold-out SKUs: scanned units the shelf could not cover
+          informational, not a failure
+
+          Scans are never gated by stock (a customer already holds
+          the item), so a hot SKU can be scanned more times than it
+          has units. The decrement is clamped at zero and the
+          shortfall shows up here instead of corrupting CHECK 2.
+==============================================================
+    sku     | final_stock | units_scanned | units_applied | units_short 
+------------+-------------+---------------+---------------+-------------
+ SKU-000001 |           0 |         78441 |         10000 |       68441
+ SKU-000002 |           0 |         39305 |         10000 |       29305
+ SKU-000003 |           0 |         25740 |         10000 |       15740
+ SKU-000004 |           0 |         19505 |         10000 |        9505
+ SKU-000005 |           0 |         15885 |         10000 |        5885
+ SKU-000006 |           0 |         13178 |         10000 |        3178
+ SKU-000007 |           0 |         11140 |         10000 |        1140
+(7 rows)
+
+
+==============================================================
+ SUMMARY
+==============================================================
+ negative_stock_skus | invariant_violations | completed_transactions | abandoned_open_transactions | total_scans | popular_windows_written | low_stock_alerts_recorded 
+---------------------+----------------------+------------------------+-----------------------------+-------------+-------------------------+---------------------------
+                   0 |                    0 |                  60956 |                           0 |      639819 |                    1279 |                         7
+(1 row)
+

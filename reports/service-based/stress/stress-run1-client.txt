@@ -1,0 +1,50 @@
+Self-Checkout Load Client starting...
+  baseUrl=http://localhost:8080 stations=100 duration=120s basket=[1..20]
+Fetching catalog...
+Catalog loaded: 2000 items.
+Starting 100 simulated station(s) for 120s...
+Duration elapsed, waiting for in-flight transactions to finish...
+Fetching low-stock alerts and popular items...
+
+================ LOAD TEST REPORT ================
+Base URL:        http://localhost:8080
+Stations:        100
+Duration:        120.1s (requested 120s)
+Transactions:    115261 (960.1/sec)
+Items scanned:   1207935 (10061.5/sec)
+
+Operation                    OK   Errors   Mean(ms)    P50(ms)    P95(ms)    P99(ms)    Max(ms)     Err%
+START_TRANSACTION        115261        0       0.26       0.15       0.29       0.48     118.05    0.00%
+SCAN_ITEM               1207935        0       0.17       0.13       0.25       0.39     127.04    0.00%
+COMPLETE_TRANSACTION     115261        0     102.09      81.45     206.89     303.57     970.58    0.00%
+
+Low-stock alerts (14):
+  SKU-000001   Item 1                         stock=0      threshold=50
+  SKU-000002   Item 2                         stock=0      threshold=50
+  SKU-000003   Item 3                         stock=0      threshold=50
+  SKU-000004   Item 4                         stock=0      threshold=50
+  SKU-000005   Item 5                         stock=0      threshold=50
+  SKU-000006   Item 6                         stock=0      threshold=50
+  SKU-000007   Item 7                         stock=0      threshold=50
+  SKU-000008   Item 8                         stock=0      threshold=50
+  SKU-000009   Item 9                         stock=0      threshold=50
+  SKU-000010   Item 10                        stock=0      threshold=50
+  SKU-000011   Item 11                        stock=0      threshold=50
+  SKU-000012   Item 12                        stock=0      threshold=50
+  SKU-000013   Item 13                        stock=0      threshold=50
+  SKU-000014   Item 14                        stock=0      threshold=50
+
+Most popular items (top 10):
+  #1   SKU-000001   Item 1                         scans=124
+  #2   SKU-000002   Item 2                         scans=62
+  #3   SKU-000003   Item 3                         scans=43
+  #4   SKU-000004   Item 4                         scans=36
+  #5   SKU-000005   Item 5                         scans=33
+  #6   SKU-000006   Item 6                         scans=27
+  #7   SKU-000009   Item 9                         scans=21
+  #8   SKU-000007   Item 7                         scans=20
+  #9   SKU-000010   Item 10                        scans=12
+  #10  SKU-000013   Item 13                        scans=12
+===================================================
+
+JSON report written to: /Users/rohitdabhi/Desktop/ADV_SOFT_DEV/self-checkout/reports/service-based/stress/report-20261012-171449.json
