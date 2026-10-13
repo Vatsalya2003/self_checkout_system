@@ -25,9 +25,9 @@ public class JdbcStockUpdater implements StockUpdater {
         }
         // FOR NO KEY UPDATE, not FOR UPDATE. This is NOT a detail.
         //
-        // scan_log, transaction_items and low_stock_alerts all have a foreign
-        // key to items, and Postgres takes a FOR KEY SHARE lock on the parent
-        // row whenever it checks one. FOR KEY SHARE is compatible with
+        // transaction_items and low_stock_alerts have a foreign key to items
+        // (scan_log had one too until Week 4), and Postgres takes a FOR KEY
+        // SHARE lock on the parent row whenever it checks one. FOR KEY SHARE is compatible with
         // FOR NO KEY UPDATE but CONFLICTS with FOR UPDATE.
         //
         // Hibernate's PESSIMISTIC_WRITE emitted "for no key update" here, so

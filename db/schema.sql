@@ -84,9 +84,17 @@ CREATE TABLE low_stock_alerts (
 --
 -- After a restart the writer continues from MAX(seq), so a restarted
 -- checkout-service never collides on this primary key.
+--
+-- No foreign key to items, on purpose (Week 4, measured). Every FK check takes
+-- a FOR KEY SHARE lock on the item row, and an UPDATE of a row that is share-
+-- locked has to record both in a MultiXact -- on exactly the hot rows every
+-- checkout queues for. With ~1M scan rows per stress run that cost 22 % of
+-- stress throughput (686 vs 839 tx/s, reports/service-based/fk-measurement/).
+-- It guarded nothing: checkout only logs a scan after resolving the SKU in
+-- the catalog, and the catalog is never modified.
 CREATE TABLE scan_log (
     seq          BIGINT PRIMARY KEY,
-    sku          VARCHAR(32) NOT NULL REFERENCES items(sku),
+    sku          VARCHAR(32) NOT NULL,
     scanned_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
