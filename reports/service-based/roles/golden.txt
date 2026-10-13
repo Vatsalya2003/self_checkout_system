@@ -1,0 +1,1 @@
+IDENTICAL: all 29 responses match reports/golden/single-app.txt

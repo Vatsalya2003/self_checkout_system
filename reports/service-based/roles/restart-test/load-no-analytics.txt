@@ -1,0 +1,36 @@
+Self-Checkout Load Client starting...
+  baseUrl=http://localhost:8080 stations=10 duration=10s basket=[1..20]
+Fetching catalog...
+Catalog loaded: 2000 items.
+Starting 10 simulated station(s) for 10s...
+Duration elapsed, waiting for in-flight transactions to finish...
+Fetching low-stock alerts and popular items...
+Could not fetch popular items: Unexpected status 502 from http://localhost:8080/analytics/popular-items?limit=10: <html>
+<head><title>502 Bad Gateway</title></head>
+<body>
+<center><h1>502 Bad Gateway</h1></center>
+<hr><center>nginx/1.31.6</center>
+</body>
+</html>
+
+
+================ LOAD TEST REPORT ================
+Base URL:        http://localhost:8080
+Stations:        10
+Duration:        10.0s (requested 10s)
+Transactions:    8616 (860.7/sec)
+Items scanned:   90601 (9050.8/sec)
+
+Operation                    OK   Errors   Mean(ms)    P50(ms)    P95(ms)    P99(ms)    Max(ms)     Err%
+START_TRANSACTION          8616        0       0.19       0.15       0.36       0.65       6.30    0.00%
+SCAN_ITEM                 90601        0       0.17       0.13       0.33       0.56       7.25    0.00%
+COMPLETE_TRANSACTION       8616        0       9.61       5.28      32.45      49.95     104.23    0.00%
+
+Low-stock alerts (1):
+  SKU-000001   Item 1                         stock=0      threshold=50
+
+Most popular items (top 0):
+  (none)
+===================================================
+
+JSON report written to: /Users/rohitdabhi/Desktop/ADV_SOFT_DEV/CS6510-2026/load-client/reports/service-based/roles/restart-test/report-20261012-172534.json

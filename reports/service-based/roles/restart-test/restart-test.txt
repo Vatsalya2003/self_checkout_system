@@ -1,0 +1,40 @@
+== warm-up load 10 s
+Operation                    OK   Errors   Mean(ms)    P50(ms)    P95(ms)    P99(ms)    Max(ms)     Err%
+  scan_log: 67666 rows, max seq 67666, gaps 0
+  via :8080  items=200  start-tx=201  low-stock=200  popular=200
+== stop catalog-service
+  via :8080  items=502  start-tx=201  low-stock=200  popular=200
+  catalog-service back up after 1.8 s
+  via :8080  items=200  start-tx=201  low-stock=200  popular=200
+== stop inventory-service
+  via :8080  items=200  start-tx=201  low-stock=502  popular=200
+  inventory-service back up after 3.1 s
+  via :8080  items=200  start-tx=201  low-stock=200  popular=200
+== stop analytics-service, keep scanning for 10 s without it
+Operation                    OK   Errors   Mean(ms)    P50(ms)    P95(ms)    P99(ms)    Max(ms)     Err%
+  via :8080  items=200  start-tx=201  low-stock=200  popular=502
+  scan_log: 158267 rows, max seq 158267, gaps 0; last stored window_end before restart: 67500
+  analytics-service back up after 2.8 s
+  caught up: last window_end 158000
+2026-10-12T17:25:36.909-07:00  INFO 5467 --- [analytics-service] [           main] c.s.s.a.pipeline.AnalyticsPipeline       : restored the window from scan_log: 1000 rows in (66500, 67500]
+  via :8080  items=200  start-tx=201  low-stock=200  popular=200
+== checkout-service restart with an open basket
+  open basket dcc2eae1-0de8-44d4-a6b2-3c7c37258a08 before restart: {"transactionId":"dcc2eae1-0de8-44d4-a6b2-3c7c37258a08","stationId":"restart-probe","status":"OPEN","itemCount":1,"runningTotal":1.37,"startedAt":"2026-10-13T00:25:37.489228Z"}
+  via :8080  items=200  start-tx=502  low-stock=200  popular=200
+  checkout-service back up after 2.8 s
+  same basket after restart:  404 {"error":"TRANSACTION_NOT_FOUND","message":"Transaction dcc2eae1-0de8-44d4-a6b2-3c7c37258a08 not found"}
+  scan into it after restart: 404
+  scan-log publisher started: next seq 158269, batches of up to 1000 rows or 50 ms
+  max seq before stop: 158267
+Operation                    OK   Errors   Mean(ms)    P50(ms)    P95(ms)    P99(ms)    Max(ms)     Err%
+  scan_log: 231548 rows, max seq 231548, gaps 0
+  via :8080  items=200  start-tx=201  low-stock=200  popular=200
+  rows  | min_seq | max_seq | gaps 
+ 231548 |       1 |  231548 |    0
+(1 row)
+ windows_checked | mismatched_entries 
+             463 |                  0
+(1 row)
+                   0 |                    0 |                  22032 |                           0 |      231548 |                     463 |                         2
+(1 row)
+

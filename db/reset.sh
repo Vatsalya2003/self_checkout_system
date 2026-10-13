@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Reset the shared database: drop every table, recreate them, reseed the catalog.
+# Reset the shared database: drop every table, recreate them, reseed the catalog,
+# and re-apply each service's grants (db/roles.sql).
 #
 # This is the ONE thing allowed to run schema.sql and data.sql. Since Week 4
 # there are four services sharing the database, so "every boot rebuilds the
@@ -13,5 +14,5 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 export PGDATABASE="${PGDATABASE:-self_checkout}"
-PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -f schema.sql -f data.sql
+PGOPTIONS="-c client_min_messages=warning" psql -q -v ON_ERROR_STOP=1 -f schema.sql -f data.sql -f roles.sql
 echo "reset $PGDATABASE: $(psql -tAc 'SELECT count(*) FROM items') items, stock $(psql -tAc 'SELECT min(stock) || '"'"'..'"'"' || max(stock) FROM items'), $(psql -tAc 'SELECT count(*) FROM scan_log') scan_log rows"

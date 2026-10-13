@@ -1,0 +1,10 @@
+stock before: {'SKU-000001': 10000, 'SKU-000002': 10000, 'SKU-000003': 10000}
+built 60 transactions of 6 units each
+completion statuses: {200: 60}
+  [PASS] all completions returned 200: got {200: 60}, expected {200: 60}
+stock after: {'SKU-000001': 9820, 'SKU-000002': 9880, 'SKU-000003': 9940}
+  [PASS] SKU-000001 decremented by exactly 180: got 180, expected 180
+  [PASS] SKU-000002 decremented by exactly 120: got 120, expected 120
+  [PASS] SKU-000003 decremented by exactly 60: got 60, expected 60
+
+RESULT: PASS

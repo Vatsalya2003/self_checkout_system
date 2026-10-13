@@ -1,0 +1,25 @@
+Each service role attempting writes it does not own (each in BEGIN ... ROLLBACK):
+-- catalog_svc
+   ERROR:  permission denied for table items  <- UPDATE items SET stock=stock WHERE sku='SKU-000001'
+   ERROR:  permission denied for table items  <- UPDATE items SET price=price WHERE sku='SKU-000001'
+   ERROR:  permission denied for table scan_log  <- INSERT INTO scan_log VALUES (999999999,'SKU-000001',now())
+   ERROR:  permission denied for table popular_snapshots  <- INSERT INTO popular_snapshots(window_start,window_end,computed_at,items_json) VALUES (0,0,now(),'[]')
+   ERROR:  permission denied for table transactions  <- DELETE FROM transactions
+-- inventory_svc
+   ERROR:  permission denied for table items  <- UPDATE items SET stock=stock WHERE sku='SKU-000001'
+   ERROR:  permission denied for table items  <- UPDATE items SET price=price WHERE sku='SKU-000001'
+   ERROR:  permission denied for table scan_log  <- INSERT INTO scan_log VALUES (999999999,'SKU-000001',now())
+   ERROR:  permission denied for table popular_snapshots  <- INSERT INTO popular_snapshots(window_start,window_end,computed_at,items_json) VALUES (0,0,now(),'[]')
+   ERROR:  permission denied for table transactions  <- DELETE FROM transactions
+-- analytics_svc
+   ERROR:  permission denied for table items  <- UPDATE items SET stock=stock WHERE sku='SKU-000001'
+   ERROR:  permission denied for table items  <- UPDATE items SET price=price WHERE sku='SKU-000001'
+   ERROR:  permission denied for table scan_log  <- INSERT INTO scan_log VALUES (999999999,'SKU-000001',now())
+   ALLOWED  <- INSERT INTO popular_snapshots(window_start,window_end,computed_at,items_json) VALUES (0,0,now(),'[]')
+   ERROR:  permission denied for table transactions  <- DELETE FROM transactions
+-- checkout_svc
+   ALLOWED  <- UPDATE items SET stock=stock WHERE sku='SKU-000001'
+   ERROR:  permission denied for table items  <- UPDATE items SET price=price WHERE sku='SKU-000001'
+   ALLOWED  <- INSERT INTO scan_log VALUES (999999999,'SKU-000001',now())
+   ERROR:  permission denied for table popular_snapshots  <- INSERT INTO popular_snapshots(window_start,window_end,computed_at,items_json) VALUES (0,0,now(),'[]')
+   ERROR:  permission denied for table transactions  <- DELETE FROM transactions
