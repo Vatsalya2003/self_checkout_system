@@ -15,7 +15,7 @@ set -u
 R=$HOME/Desktop/ADV_SOFT_DEV/self-checkout; cd "$R"
 CLIENT=$HOME/Desktop/ADV_SOFT_DEV/CS6510-2026/load-client
 JAVA="$(/usr/libexec/java_home -v 21)/bin/java"
-OUT=${1:-reports/service-based/restart-test}; mkdir -p "$OUT"
+OUT=${1:-reports/service-based/restart-test}; mkdir -p "$OUT"; OUT=$(cd "$OUT" && pwd)   # absolute: the load client runs from its own directory
 port() { case $1 in catalog-service) echo 8081;; checkout-service) echo 8082;; inventory-service) echo 8083;; analytics-service) echo 8084;; esac; }
 heap() { [ "$1" = checkout-service ] && echo 1g || echo 512m; }
 code() { curl -s -o /dev/null -w '%{http_code}' "$@"; }
