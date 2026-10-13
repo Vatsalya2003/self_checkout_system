@@ -1,4 +1,4 @@
-# Developer Guide — Self-Checkout, Layered
+# Developer Guide — Self-Checkout: Services over a Shared Database
 
 A walkthrough of the whole project: what it does, how it is built, why each
 decision was made, and how to run and explain it.
@@ -17,8 +17,126 @@ numbers — it explains the *machinery* that produced them.
 
 ---
 
+## Week 4: four services, one database
+
+**Read this first.** Since Week 4 the system is **four services** (catalog, checkout,
+inventory, analytics). Each is its own Maven module, jar, process and port, and all four
+share one PostgreSQL database. An nginx gateway on `:8080` gives clients one base URL.
+[SERVICES.md](SERVICES.md) is the one-page summary.
+
+The rest of this guide (§1–§12) was written for the single application. Its explanations
+still hold *inside* each service: the request flows, locking, sold-out handling, the
+in-memory baskets and the window/rank/sink filters. The code just moved to the module
+that owns it. Where something changed, this section says so.
+
+### Repository layout
+
+```
+pom.xml                  parent pom: lists the modules, fixes shared versions
+shared-data/             library: read-only catalog cache, shared config properties
+shared-web/              library: error JSON shape, exception handler, domain exceptions
+catalog-service/         GET /items                                   :8081
+checkout-service/        POST/GET /transactions/**                    :8082
+inventory-service/       GET /inventory/low-stock                     :8083
+analytics-service/       GET /analytics/popular-items                 :8084
+gateway/nginx.conf       path routing on :8080, keep-alive to every service
+db/schema.sql, data.sql  the one shared schema and seed data
+db/roles.sql             one role per service, granted only what it uses
+db/reset.sh              recreate the tables, reseed, re-grant (services never touch the schema)
+scripts/start-all.sh     start the 4 jars, then the gateway (--build to rebuild)
+scripts/stop-all.sh      stop everything
+scripts/*.py, *.sql      behavioural tests, golden diff, invariant and window checks
+```
+
+Every service keeps the Week 2 layering inside itself (`api → business → persistence`),
+checked by its own ArchUnit test in `src/test/java/…/architecture/`.
+
+### File tour, by service
+
+| Module | Files worth opening first |
+|---|---|
+| **shared-data** | `LazyCatalogCache`: loads `items` once with plain JDBC. Every service that needs names or prices uses it. `SelfCheckoutProperties`: threshold, window size, slide. |
+| **shared-web** | `ApiError`, `GlobalExceptionHandler` and the six domain exceptions. These keep the error bodies byte-for-byte what the single app returned. |
+| **catalog-service** | `ItemController` → `CatalogService` → the cache. No SQL of its own. |
+| **checkout-service** | `TransactionService`, `OpenBasket` and `OpenTransactionStore`: the whole sale, unchanged from Week 3. `JdbcStockUpdater`: lock late, commit early. `scanlog/ScanLogPublisher`: the hand-off to analytics (below). `ScanLogWriterPool`: its own 2-connection pool. |
+| **inventory-service** | `InventoryController` → `InventoryService` → `LowStockAlertRepository` (one JPQL join). Read-only; `Item` has no setter for stock. |
+| **analytics-service** | `pipeline/ScanLogPoller`: new, it reads `scan_log`. `pipeline/AnalyticsPipeline`: the wiring, restore-on-restart and lag metrics. `WindowFilter`, `RankFilter` and `SinkFilter` are unchanged from Week 3. `JdbcSnapshotWriter` is the only class in the service that writes. |
+
+**Removed in the split** (dead code, or replaced by `scan_log`): the Week 3 `IngestFilter`
+and `IngestTee` (numbering moved into checkout's publisher), `ScanLogWriterFilter`, the
+`ScanLog` entity and repository, `TransactionItem`/`TransactionItemId`, `ItemRepository`,
+`ScanCount`, and the `selfcheckout.analytics.persist-raw-scans` flag. `scan_log` is now
+**always written**, because it is the hand-off.
+
+### One scan, crossing the services
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Load client
+    participant G as nginx :8080
+    participant K as checkout-service :8082
+    participant Q as publisher queue<br/>(65,536, in checkout)
+    participant W as scan-log writer thread<br/>(in checkout)
+    participant L as scan_log (PostgreSQL)
+    participant P as ScanLogPoller<br/>(in analytics :8084)
+    participant F as window → rank → sink
+
+    C->>G: POST /transactions/{id}/items
+    G->>K: same request (keep-alive)
+    K->>K: add to the in-memory basket (no SQL)
+    K->>Q: offer(sku), at most 10 ms; if full, drop + count
+    K-->>G: 200 ScanResult
+    G-->>C: 200 ScanResult
+    Note over W: collects ≤ 1,000 events or 50 ms
+    W->>W: numbers them seq N+1 … N+k (the only thread that numbers)
+    W->>L: one multi-row INSERT (retried with the same seqs on failure)
+    loop every 50 ms
+        P->>L: SELECT … WHERE seq > last ORDER BY seq LIMIT 5000
+        L-->>P: rows
+        P->>P: hand on only while seq = last + 1 (stall on a gap)
+    end
+    P->>F: SequencedScanEvent
+    F->>F: every 500th seq: top 10 of the last 1,000
+    F->>L: INSERT popular_snapshots (batched)
+```
+
+The scan's response never waits for any of steps 7–14. The two services never call each
+other; the table is the only thing they share. Three rules keep the windows exact:
+
+1. **Gapless seq.** One thread numbers events, and only once they are in a batch, so a
+   dropped event never uses a number. Batch N+1 is built only after batch N commits, so
+   the committed rows are always exactly `1..K`.
+2. **The poller never skips.** If it ever saw `seq = last + 2` it would stop and wait
+   (counted as `gapStalls`, which stays 0 in every run).
+3. **Restarts resume.** Checkout continues from `MAX(seq)`. Analytics reloads the last
+   1,000 scans before the newest stored window, then carries on from there.
+   `scripts/test-service-restart.sh` exercises both.
+
+### Running it
+
+```bash
+db/reset.sh                     # once, and before every load run
+scripts/start-all.sh --build    # build + start; logs in logs/<service>.log
+# ... load client against http://localhost:8080 ...
+psql self_checkout -f scripts/check-invariant.sql
+psql self_checkout -f scripts/check-windows.sql   # gapless scan_log, every window matches
+scripts/stop-all.sh
+```
+
+**Two Week 3 habits to unlearn.** First, restarting no longer resets anything: the
+services run with `spring.sql.init.mode=never`, so use `db/reset.sh`. Second, `./mvnw
+test` no longer wipes the database either, for the same reason.
+
+**What to watch in the logs during a run.** Checkout prints `scan-log publisher | accepted=
+written= dropped= …` every 10 s. Analytics prints `analytics lag | … behind scan_log now= max=
+mean= scans | read lag mean= max= ms | gapStalls=`. `dropped` and `gapStalls` must stay 0.
+
+---
+
 ## Table of contents
 
+0. [Week 4: four services, one database](#week-4-four-services-one-database)
 1. [What the system does](#1-what-the-system-does)
 2. [Tech stack, and why each piece](#2-tech-stack-and-why-each-piece)
 3. [Architecture](#3-architecture)
@@ -473,7 +591,7 @@ simply makes the *next* write bigger, so falling behind is self-correcting.
 ```mermaid
 erDiagram
     ITEMS ||--o{ TRANSACTION_ITEMS : "appears in"
-    ITEMS ||--o{ SCAN_LOG : "is scanned as"
+    ITEMS ||--o{ SCAN_LOG : "is scanned as (no FK since Week 4)"
     ITEMS ||--o| LOW_STOCK_ALERTS : "may trigger"
     TRANSACTIONS ||--o{ TRANSACTION_ITEMS : "contains"
 
@@ -499,8 +617,8 @@ erDiagram
         integer applied_quantity "actually subtracted"
     }
     SCAN_LOG {
-        bigserial seq PK
-        varchar sku FK
+        bigint seq PK "assigned by checkout-service"
+        varchar sku
         timestamptz scanned_at
     }
     LOW_STOCK_ALERTS {
@@ -552,12 +670,13 @@ subtle part of the whole project.**
 | `quantity` | `INTEGER` | Units **scanned**. This is what the receipt prints — what the customer is physically holding. |
 | `applied_quantity` | `INTEGER` | Units **actually subtracted** from stock. Usually the same as `quantity`, but smaller if the product sold out. **The stock invariant is checked against this column.** See §8.4. |
 
-**`scan_log`** — one row per beep, across all stations.
+**`scan_log`** — one row per beep, across all stations. Since Week 4 it is the hand-off
+from checkout-service to analytics-service, and it is always written.
 
 | Column | Type | What it is |
 |---|---|---|
-| `seq` | `BIGINT` PK | The global scan counter, **assigned by the pipeline's ingest filter** (not a `BIGSERIAL` since Week 3). Only committed scans are numbered, one at a time by one thread, so it is gapless. The counter restarts at 1 each boot, which is safe only because the schema is recreated on every start. |
-| `sku` | `VARCHAR(32)` FK | What was scanned. |
+| `seq` | `BIGINT` PK | The global scan counter, **assigned by checkout-service's scan-log writer thread** (Week 3: the pipeline's ingest filter; not a `BIGSERIAL` since then). Numbered by one thread at batch time and committed strictly in order, so it is gapless. After a restart it continues from `MAX(seq)`. |
+| `sku` | `VARCHAR(32)` | What was scanned. **No foreign key since Week 4**: the FK check's `FOR KEY SHARE` lock on hot `items` rows cost 22 % of stress throughput, and checkout only logs SKUs it has already resolved in the catalog. |
 | `scanned_at` | `TIMESTAMPTZ` | When. |
 
 **`low_stock_alerts`** — recorded threshold crossings.
@@ -1011,7 +1130,9 @@ The bulk lock says `FOR NO KEY UPDATE`. Changing it to the more obvious
 deadlocks, against 742 tx/s and zero errors.
 
 The reason is a Postgres detail that is easy to miss. `scan_log`,
-`transaction_items` and `low_stock_alerts` all carry a foreign key to `items`.
+`transaction_items` and `low_stock_alerts` all carried a foreign key to `items`
+(Week 4 dropped the `scan_log` one; the same lock was costing 22 % of stress
+throughput, see ARCHITECTURE.md W4.4).
 Whenever Postgres validates one of those foreign keys it takes a
 **`FOR KEY SHARE`** lock on the parent `items` row. And:
 

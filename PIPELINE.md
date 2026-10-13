@@ -1,5 +1,21 @@
 # Pipeline Architecture — Windowed Analytics
 
+> **Week 4 update (service-based architecture, see [SERVICES.md](SERVICES.md)).**
+> This file describes the Week 3 pipeline as it was submitted. In Week 4 the
+> pipeline still runs window → rank → sink, unchanged, but it now lives in
+> **analytics-service**, and its input is no longer an in-process pipe:
+>
+> - **Ingest moved to checkout-service** as the scan-log publisher. It numbers each
+>   scan with the same gapless sequence and writes it to `scan_log` (≤ 1,000 rows or
+>   50 ms per INSERT).
+> - **analytics-service polls `scan_log`** (`WHERE seq > :last ORDER BY seq`) and feeds
+>   the window filter.
+> - **`scan_log` is therefore always written**, because it is the hand-off between the
+>   two services. The `persist-raw-scans` flag described below **no longer exists**,
+>   and neither does the optional fifth filter.
+>
+> Details are in [ARCHITECTURE.md § Week 4](ARCHITECTURE.md#week-4-service-based-architecture).
+
 The **windowed analytics** of the self-checkout system are built as **filters
 connected by pipes**. Checkout itself (start / scan / complete, row locking,
 stock decrement) is not pipelined — it is a synchronous request/response path,
@@ -98,6 +114,9 @@ The asymmetry is the design, not an accident:
   `droppedRawScans`, because they mean something different.
 
 ## The `persist-raw-scans` flag
+
+> **Week 3 only.** Removed in Week 4: `scan_log` is now always written, because it
+> is how analytics-service receives scans (see the note at the top).
 
 `selfcheckout.analytics.persist-raw-scans` — **default `false`**.
 

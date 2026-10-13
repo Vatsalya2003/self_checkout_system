@@ -1,9 +1,11 @@
-# Architecture — Self-Checkout: Layered, with a Pipelined Analytics Stage
+# Architecture — Self-Checkout: Layered, Pipelined, then Service-Based
 
 Weeks 2 to 4 of the semester project. Same API contract, same database, same
 externally visible checkout behaviour as Week 1's monolith throughout — what
 changed is how the code is structured (Week 2), how the windowed analytics are
-executed (Week 3, part 1), and how much work a request actually does (Week 3, part 2 — the performance work, §7).
+executed (Week 3, part 1), how much work a request actually does (Week 3, part 2 — the performance work, §7),
+and finally how it is deployed: four services over one shared database (Week 4,
+[§ Week 4](#week-4-service-based-architecture)).
 
 Week 1 organized classes by technical type (`controller/`, `service/`,
 `repository/`). That reads like layers but nothing enforced it: HTTP types had
@@ -766,6 +768,328 @@ confirmed to fail against the old code.
 
 ---
 
+## Week 4: service-based architecture
+
+The single application is split into **four domain services**: catalog, checkout,
+inventory and analytics. Each is its own Maven module, Spring Boot jar, JVM process and
+port. All four share **one PostgreSQL database**. An nginx gateway on `:8080` keeps the
+single base URL. The OpenAPI contract, the load client and every response body are
+unchanged: the 29-response golden diff through the gateway is identical to the
+pre-split application. [SERVICES.md](SERVICES.md) is the one-page service list.
+
+### W4.1 Why these four
+
+The four services follow the four business capabilities the contract already exposes,
+one URL prefix each: what is sold (`/items`), selling it (`/transactions`), watching
+stock (`/inventory`) and measuring popularity (`/analytics`). Each one maps to tables it
+can own:
+
+- **Checkout** owns everything that must change together in one ACID transaction at
+  payment: the stock decrement, the transaction and its lines, and the low-stock alert.
+  Splitting any of those across services would have turned one local commit into a
+  distributed one.
+- **Catalog and inventory** only read.
+- **Analytics** only writes its own windows.
+
+Splitting finer (a separate "stock" service, say) would have put a network call inside
+the lock-late, commit-early critical section that bounds throughput (§7.4). That is the
+one place this system cannot afford one.
+
+### W4.2 The design
+
+```mermaid
+flowchart LR
+    LC["load client<br/>one base URL"] --> GW["nginx gateway :8080<br/>path routing, keep-alive"]
+    GW -->|"/items"| CA["catalog-service :8081"]
+    GW -->|"/transactions/**"| CO["checkout-service :8082"]
+    GW -->|"/inventory/**"| IN["inventory-service :8083"]
+    GW -->|"/analytics/**"| AN["analytics-service :8084"]
+    subgraph DB["PostgreSQL: self_checkout (shared)"]
+        items[(items)]
+        tx[(transactions<br/>transaction_items)]
+        alerts[(low_stock_alerts)]
+        log[(scan_log)]
+        snaps[(popular_snapshots)]
+    end
+    CA -. read .-> items
+    CO -- "write stock" --> items
+    CO -- write --> tx
+    CO -- write --> alerts
+    CO -- "append, gapless seq" --> log
+    IN -. read .-> alerts
+    IN -. read .-> items
+    AN -. "poll seq > last" .-> log
+    AN -- write --> snaps
+    AN -. "read names" .-> items
+```
+
+No arrow goes from one service to another. The services share two **library** modules
+(`shared-data`: the read-only catalog cache and configuration; `shared-web`: the error
+JSON and domain exceptions), which are compiled into each jar and never run on their
+own.
+
+### W4.3 Ownership matrix
+
+| Table | catalog | checkout | inventory | analytics |
+|---|---|---|---|---|
+| `items` | R | **W** (stock only) + R | R | R (names) |
+| `transactions` | | **W** + R | | |
+| `transaction_items` | | **W** | | |
+| `low_stock_alerts` | | **W** | R | |
+| `scan_log` | | **W** (append) + R (`MAX(seq)` at startup) | | R |
+| `popular_snapshots` | | | | **W** + R |
+
+Every table has exactly one writer. This is enforced at three levels:
+
+1. **The module graph.** No service module depends on another service module, so a
+   service *cannot* call another service's classes. The compiler refuses.
+2. **ArchUnit, per service.** catalog-service and inventory-service contain no database
+   write calls at all. The test matches every JDBC `update`/`batchUpdate`/`execute`,
+   `executeUpdate`/`executeBatch`, JPA `persist`/`merge`/`remove` and Spring Data
+   `save*`/`delete*`/`flush*`. In analytics-service, only `JdbcSnapshotWriter` writes.
+   The predicate was checked to be non-vacuous: removing the exception makes the rule
+   fail on `JdbcSnapshotWriter.executeUpdate`.
+3. **PostgreSQL roles.** Each service connects as its own role (`catalog_svc`,
+   `checkout_svc`, `inventory_svc`, `analytics_svc`). `db/roles.sql` grants each one
+   exactly its column of the matrix above, and `db/reset.sh` re-applies the grants after
+   every reset. The database itself now refuses a write from the wrong service. For
+   example, `UPDATE items SET price = …` as `checkout_svc` fails with `permission denied`,
+   because its UPDATE grant covers the `stock` column only
+   (`reports/service-based/roles/permission-check.txt`). Homebrew PostgreSQL uses trust
+   authentication, so the roles have no passwords: they separate privileges, not
+   identities.
+
+### W4.4 The scan hand-off
+
+This is the one live data flow between services. In Week 3 it was an in-process pipe
+from `TransactionService.scan()` into the ingest filter. A pipe cannot cross a process
+boundary, and the plan rules out service-to-service calls, so **the table is the pipe**:
+
+- **checkout-service** does exactly what Week 3's ingest did, and then persists the
+  result. A scan offers its SKU to a bounded in-memory queue (65,536 entries, at most a
+  10 ms wait; if full it is dropped and counted, and the scan still succeeds). A single
+  writer thread then numbers the events with a gapless `seq` and writes them as one
+  multi-row INSERT of up to 1,000 rows, collecting for at most 50 ms.
+- **analytics-service** polls `SELECT seq, sku, scanned_at FROM scan_log WHERE seq > :last
+  ORDER BY seq LIMIT 5000` every 50 ms and feeds the unchanged window → rank → sink
+  filters.
+
+**`scan_log` is therefore always written.** The Week 3 `persist-raw-scans` flag is gone.
+In Week 3 it defaulted to off, so the Week 3 numbers below did **not** pay for these
+inserts; Week 4 writes about one row per scan.
+
+The windows must stay *exactly* what Week 3 computed. That depends on `seq` having no
+holes and being seen in order, which three rules guarantee:
+
+1. **One numbering thread, numbering at batch time.** A dropped event never takes a
+   number.
+2. **Strictly ordered commits.** Batch N+1 is built only after batch N has committed. A
+   failed INSERT is retried with the *same* seqs, so the committed rows are always
+   exactly `1..K`. A reader using `seq > last` can never see seq 7 before seq 6 is
+   visible.
+3. **The poller refuses to skip.** It hands rows on only while `seq = last + 1`, and
+   otherwise stops and re-reads (`gapStalls`, which stays 0 in every run).
+
+`scripts/check-windows.sql` verifies the outcome after every load run. It checks that
+`scan_log` holds exactly `1..max`, and that **every** stored window equals a brute-force
+SQL recount of `scan_log` over the same `(start, end]`.
+
+**Batching was measured, not assumed.** The first version wrote whatever was queued the
+moment the writer woke up. Under load that averaged **2 rows per INSERT**: about 3,200
+commits a second, each a WAL flush competing with the payments' own commits. Collecting
+for up to 50 ms raised the average to **540–590 rows per INSERT** in the official runs.
+An unofficial 20 s smoke run went from 710.3 to 791.1 tx/s; both of those started at
+load ≈ 4–5, so they show the direction, not the size. The cost is up to 50 ms more
+analytics lag, and it changes no window.
+
+**The `scan_log → items` foreign key was measured and dropped.** Every FK check takes a
+`FOR KEY SHARE` lock on the item row, and an UPDATE of a row that is share-locked has to
+record both lockers in a MultiXact. Those are exactly the hot rows that every checkout
+queues for (§7.4). At 100 stations, with about a million scan rows per run, the cost
+was large:
+
+| 100 stations × 120 s | run 1 | run 2 | mean |
+|---|---|---|---|
+| with the FK | 707.2 | 665.2 | 686.2 tx/s |
+| FK dropped (measurement runs) | 800.6 | 877.8 | 839.2 tx/s |
+| Week 3 jar, same afternoon | 1000.4 | 1033.1 | 1016.8 tx/s |
+
+At 10 stations the difference was within noise (963.8 with vs 986.9 without). The FK
+guarded nothing: checkout logs a scan only after resolving its SKU in the catalog, and
+the catalog never changes. So it was dropped (with approval), and the final runs below
+were taken without it. The Week 3 rows show the machine was not the problem: the
+Week 3 jar reproduced its submitted 1,007.8 tx/s between the Week 4 runs.
+
+**Restarts.** Analytics resumes from the newest stored window: it reloads the 1,000
+scans before that window's end and carries on polling from there. A checkout restart
+carries on numbering from `MAX(seq)`.
+
+### W4.5 The gateway
+
+nginx, configured in `gateway/nginx.conf` (Homebrew nginx 1.31). It routes by path and
+holds no logic:
+
+| Path | Service |
+|---|---|
+| `/items` | catalog |
+| `/transactions/**` | checkout |
+| `/inventory/**` | inventory |
+| `/analytics/**` | analytics |
+| anything else | catalog |
+
+Unmatched paths go to catalog so that an unknown route still gets the same Spring 404
+body as before; the golden diff includes one. HTTP/1.1 keep-alive is used to every
+upstream (`proxy_http_version 1.1`, an empty `Connection` header and a keep-alive pool
+per upstream). Without that, every request would open a new TCP connection to the
+service. Access logging is off, because at ~12,000 requests/s it would be pure overhead.
+
+**What the hop costs, measured.** `scripts/measure-gateway-hop.py` sends the same scan
+request 5,000 times straight to checkout on :8082 and 5,000 times through :8080,
+alternating in blocks over keep-alive connections. Median: 0.124 ms direct vs 0.155 ms
+through the gateway, so **+0.031 ms per request**. (The p99 came out *lower* through the
+gateway, 0.389 vs 0.588 ms. That is noise at this sample size, and is not claimed as a
+gain.) At about 12.5 requests per transaction (a start, ~10.5 scans, a complete) that is
+~0.39 ms on a 9.8 ms cycle at 10 stations, about 4 % of closed-loop throughput. nginx itself used 30–37 % of one core under load.
+
+### W4.6 The shared-data decision
+
+**One database, shared, rather than a database per service.** This was deliberate:
+
+- **The payment is one ACID transaction.** The stock decrement, the transaction row and
+  its lines, and the low-stock alert commit together today. That is how the stock
+  invariant (`10000 − stock = Σ applied_quantity`) holds under 100 concurrent stations.
+  With separate databases, a payment would need a saga or two-phase commit, and the
+  invariant would become eventually true.
+- **The readers need the writer's data, fresh.** Inventory reports alerts written by
+  checkout. With a database each, those would have to be copied, which means a broker
+  or a service call. Both are ruled out.
+- **One table is a perfectly good queue at this scale.** `scan_log` with a gapless key
+  gives ordered, durable, replayable hand-off with no new infrastructure.
+
+What keeps the sharing from becoming a free-for-all is that each table has **one
+writer** (W4.3), checked by tests rather than by convention. DB access logic is shared
+only where it is read-only and identical: the catalog cache in `shared-data`. Everything
+that writes lives in the one service that owns the table.
+
+### W4.7 Trade-offs
+
+| Gained | Paid |
+|---|---|
+| **Failure isolation.** Stopping any one service takes down only its own routes (502). While analytics was stopped for 10 s, checkout ran 860.7 tx/s with 0 errors, and analytics then caught up from `scan_log` (`scripts/test-service-restart.sh`). | **More moving parts.** Five processes instead of one. `start-all.sh` has to start them in order and health-check each one. |
+| **Independent deployability.** Each service is its own jar; one can be rebuilt and restarted while the others keep serving. | **The hop.** Every request crosses nginx: one more loopback round trip and two more socket copies (W4.5). |
+| **Smaller blast radius per change.** A service only compiles against the shared libraries, so changes cannot leak between services through code. | **More database work.** `scan_log` is now always written: one row per scan, about 1.2 M rows per stress run. Week 3's default runs did not write it. |
+| **Analytics can no longer slow a scan**, even in theory. The offer is bounded, and the writer runs in a different process from the windowing. | **Analytics lag.** Windows appear a little later: up to the 50 ms linger, plus the 50 ms poll interval, plus the window compute (W4.8). |
+| | **Checkout is pinned to one instance.** Open baskets live in that process's memory (Week 3, §7.5), and the `scan_log` seq has one writer. Two checkout instances would need sticky routing by transaction id *and* a shared sequence. Today the gateway has exactly one checkout upstream, and that is a known scaling limit. |
+| | **An open basket does not survive a checkout restart.** After a restart, `GET` and scan on an open basket return 404 `TRANSACTION_NOT_FOUND`. Stock is untouched, because it is decremented only at payment. Paid transactions are in the database and unaffected. |
+| | **Memory.** Four JVMs: 1 GB checkout and 512 MB for each of the others, instead of one 1 GB JVM. |
+
+### W4.8 Results
+
+All runs go through the gateway with the packaged jars, after `db/reset.sh` and a
+restart of every service. Each one is followed by `check-invariant.sql` and
+`check-windows.sql`. Every run started below load 3 (1-minute average). Load rose to
+4–5 between runs because of macOS background work; it is recorded in each
+`*-summary.txt` under `reports/service-based/`.
+
+**The submitted pair** (`reports/report-default-10stations-60s.json`,
+`reports/report-stress-100stations-120s.json`) is the better of two runs for each
+configuration. Both runs are listed:
+
+| Run | tx/s | errors | dropped scans | scan_log gapless | windows matching brute force | invariant |
+|---|---|---|---|---|---|---|
+| default 10 st × 60 s, run 1 | 950.7 | 0 | 0 | yes (601,419) | 1,202 / 1,202 | PASS |
+| **default 10 st × 60 s, run 2 (submitted)** | **1015.8** | **0** | 0 | yes (639,819) | 1,279 / 1,279 | PASS |
+| **stress 100 st × 120 s, run 1 (submitted)** | **960.1** | **0** | 0 | yes (1,207,935) | 2,415 / 2,415 | PASS |
+| stress 100 st × 120 s, run 2 | 954.7 | 0 | 0 | yes (1,203,076) | 2,406 / 2,406 | PASS |
+| default, after adding the per-service roles | 1012.1 | 0 | 0 | yes (639,097) | 1,278 / 1,278 | PASS |
+
+**Week 3 vs Week 4** (the submitted reports):
+
+| | Week 3 (`pipeline-v2`) | Week 4 | change |
+|---|---|---|---|
+| tx/s, 10 stations | 1031.8 | **1015.8** | −1.6 % |
+| tx/s, 100 stations | 1007.8 | **960.1** | −4.7 % |
+| `SCAN` p50, 10 st | 0.094 ms | 0.122 ms | +0.028 ms (the hop) |
+| `SCAN` p50, 100 st | 0.101 ms | 0.129 ms | +0.028 ms |
+| `COMPLETE` p50, 10 st | 4.437 ms | 4.207 ms | ≈ |
+| `COMPLETE` p50, 100 st | 76.510 ms | 81.447 ms | +6 % |
+| `COMPLETE` p99, 100 st | 305.22 ms | 303.57 ms | ≈ |
+| `scan_log` rows written | 0 (flag off) | every scan (1.2 M per stress run) | the hand-off |
+| errors | 0 | **0** | |
+| stock invariant | PASS | **PASS** | |
+
+Week 4 does strictly more work than Week 3: one more network hop per request, and a
+`scan_log` row per scan. It is within 1.6–4.7 % of Week 3. The `SCAN` p50 difference is the
+measured gateway hop almost exactly. The stress `COMPLETE` difference is the `scan_log`
+inserts competing with payments for WAL and CPU in the one shared PostgreSQL, which ran
+at 120–130 % of a core under stress.
+
+**Analytics lag** (from analytics-service's log, sampled every second as `MAX(seq)` in
+`scan_log` minus the last seq the poller handed on):
+
+| Run | behind `scan_log`, mean | max | read lag mean / max | gapStalls |
+|---|---|---|---|---|
+| default run 1 | 161 scans | 689 scans | 59 / 649 ms | 0 |
+| default run 2 | 54 scans | 688 scans | 58 / 160 ms | 0 |
+| stress run 1 | 127 scans | 667 scans | 57 / 288 ms | 0 |
+| stress run 2 | 140 scans | 646 scans | 58 / 296 ms | 0 |
+
+At ~10,000 scans a second, a few hundred scans behind is a few tens of milliseconds.
+"Read lag" is the time from a scan to the poller reading it back; it is dominated by
+the 50 ms linger plus the 50 ms poll. A window therefore appears on
+`/analytics/popular-items` about 0.1 s after its 500th scan, against effectively
+immediately in Week 3. Every run ended with `behind scan_log now=0` and every window
+correct.
+
+**Per-service CPU** (process CPU time over the run, as % of one core; mean of the two
+final runs of each kind):
+
+| | default | stress |
+|---|---|---|
+| checkout-service | 100 % | 100 % |
+| PostgreSQL (all backends) | 84 % | 124 % |
+| nginx | 31 % | 36 % |
+| analytics-service | 4.5 % | 3.6 % |
+| catalog-service | 0.1 % | 0.1 % |
+| inventory-service | 0.2 % | 0.1 % |
+
+Checkout and the database do the work. Catalog and inventory are almost idle, because
+the load client calls their endpoints only a few times per run. That is the honest
+answer to "would splitting them out let them scale independently": for this workload
+there is nothing there to scale.
+
+**Restarts** (`scripts/test-service-restart.sh`, output in
+`reports/service-based/roles/restart-test/`):
+- Stopping catalog or inventory makes only their own route return 502; each was back
+  within about 3 s.
+- While analytics was stopped for 10 s of load, checkout ran 860.7 tx/s with 0 errors
+  (856.0 in the run before the roles).
+  The restarted analytics restored its window and caught up.
+- A checkout restart lost the open basket (404) and continued `scan_log` at
+  `MAX(seq) + 1`.
+- Afterwards: gapless `scan_log`, every window matching, invariant PASS.
+
+**Behaviour.** The 29-response golden diff through the gateway is identical to the
+single application, before and after the roles. All five behavioural scripts pass
+through the gateway (`reports/service-based/verification/`, and again under the roles
+in `reports/service-based/roles/`).
+
+### W4.9 Removed in the split
+
+Dead code, or code replaced by `scan_log`:
+- the Week 3 `IngestFilter`, `IngestTee` and `ScanLogWriterFilter` (with their tests);
+- the `ScanLog` entity and `ScanLogRepository`;
+- `TransactionItem`/`TransactionItemId` and `TransactionItemRepository`;
+- `ItemRepository` (the catalog cache now uses plain JDBC);
+- `ScanCount`;
+- the old single-application test and its root `src/`;
+- the `selfcheckout.analytics.persist-raw-scans` flag.
+
+`Item.setStock` is gone too: inventory's `Item` entity is read-only, and only checkout's
+`JdbcStockUpdater` changes stock.
+
+---
+
 ## 8. Known limitations
 
 1. **Layering changed nothing operational.** One process, one database, one
@@ -783,12 +1107,17 @@ confirmed to fail against the old code.
 8. **Analytics are eventually consistent** by design (§5.7).
 9. **The basket upsert assumes sequential scans per transaction** (§5.9).
 10. **`scan_log` is written asynchronously** — a hard kill can lose up to one
-    unflushed batch of analytics rows (§6.8).
-11. **The scan sequence restarts at 1 on every boot**, which is safe only
-    because the schema is recreated on every start (§6.3).
+    unflushed batch of analytics rows (§6.8). *(Still true in Week 4, where
+    `scan_log` is the hand-off: a hard kill of checkout-service loses whatever
+    sat in its publisher queue, and analytics never sees those scans. A graceful
+    stop drains the queue first.)*
+11. ~~**The scan sequence restarts at 1 on every boot**~~ — fixed in Week 4:
+    checkout-service continues from `MAX(seq)` in `scan_log`, because a restart
+    no longer recreates the schema.
 12. **The throughput gain is within run-to-run noise** (§6.7); only the
-    low-load scan latency improvement is outside it. *(Week 3 statement. Week
-    4's gain is ×2.4–2.5 and far outside noise — see §7.)*
+    low-load scan latency improvement is outside it. *(Week 3, part 1
+    statement. The performance work's gain is ×2.4–2.5 and far outside noise —
+    see §7.)*
 13. **An unpaid basket is lost on restart**, and the in-memory basket store
     makes the single-process assumption explicit rather than incidental
     (§7.5).
