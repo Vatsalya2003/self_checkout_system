@@ -1,0 +1,218 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Self-Checkout: Four Services, One Database",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1290,
+      660
+    ]
+  },
+  "components": [
+    {
+      "id": "client",
+      "type": "external",
+      "label": "Load client",
+      "sublabel": "one base URL",
+      "pos": [
+        30,
+        300
+      ],
+      "size": [
+        140,
+        64
+      ]
+    },
+    {
+      "id": "gateway",
+      "type": "cloud",
+      "label": "nginx gateway",
+      "sublabel": ":8080 \u00b7 path routing",
+      "pos": [
+        220,
+        300
+      ],
+      "size": [
+        160,
+        64
+      ]
+    },
+    {
+      "id": "catalog",
+      "type": "backend",
+      "label": "catalog-service",
+      "sublabel": ":8081 \u00b7 GET /items",
+      "pos": [
+        470,
+        90
+      ],
+      "size": [
+        200,
+        64
+      ]
+    },
+    {
+      "id": "checkout",
+      "type": "backend",
+      "label": "checkout-service",
+      "sublabel": ":8082 \u00b7 /transactions/**",
+      "pos": [
+        470,
+        230
+      ],
+      "size": [
+        200,
+        64
+      ],
+      "tag": "in-memory baskets"
+    },
+    {
+      "id": "inventory",
+      "type": "backend",
+      "label": "inventory-service",
+      "sublabel": ":8083 \u00b7 /inventory/low-stock",
+      "pos": [
+        470,
+        370
+      ],
+      "size": [
+        200,
+        64
+      ]
+    },
+    {
+      "id": "analytics",
+      "type": "backend",
+      "label": "analytics-service",
+      "sublabel": ":8084 \u00b7 /analytics/popular-items",
+      "pos": [
+        470,
+        510
+      ],
+      "size": [
+        200,
+        64
+      ]
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "self_checkout",
+      "pos": [
+        1080,
+        280
+      ],
+      "size": [
+        180,
+        104
+      ],
+      "tag": "one role per service"
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "No service-to-service calls",
+      "wraps": [
+        "catalog",
+        "checkout",
+        "inventory",
+        "analytics"
+      ],
+      "pad": 24
+    }
+  ],
+  "connections": [
+    {
+      "id": "client-gw",
+      "from": "client",
+      "to": "gateway",
+      "label": "HTTP",
+      "variant": "emphasis"
+    },
+    {
+      "id": "gw-catalog",
+      "from": "gateway",
+      "to": "catalog"
+    },
+    {
+      "id": "gw-checkout",
+      "from": "gateway",
+      "to": "checkout",
+      "variant": "emphasis"
+    },
+    {
+      "id": "gw-inventory",
+      "from": "gateway",
+      "to": "inventory"
+    },
+    {
+      "id": "gw-analytics",
+      "from": "gateway",
+      "to": "analytics"
+    },
+    {
+      "id": "catalog-db",
+      "from": "catalog",
+      "to": "db",
+      "label": "R items",
+      "variant": "dashed",
+      "labelSegment": 0
+    },
+    {
+      "id": "checkout-db",
+      "from": "checkout",
+      "to": "db",
+      "label": "W stock, tx, lines, alerts, scan_log",
+      "variant": "emphasis",
+      "labelSegment": 0
+    },
+    {
+      "id": "inventory-db",
+      "from": "inventory",
+      "to": "db",
+      "label": "R alerts, items",
+      "variant": "dashed",
+      "labelSegment": 0
+    },
+    {
+      "id": "analytics-db",
+      "from": "analytics",
+      "to": "db",
+      "label": "R scan_log \u00b7 W popular_snapshots",
+      "labelSegment": 0
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "One writer per table",
+      "items": [
+        "checkout writes items.stock, transactions, transaction_items, low_stock_alerts, scan_log",
+        "analytics writes popular_snapshots",
+        "catalog and inventory only read"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Hand-off, not calls",
+      "items": [
+        "checkout appends every scan to scan_log",
+        "analytics polls scan_log by seq",
+        "the database is the only coupling"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Enforced three ways",
+      "items": [
+        "no service module depends on another",
+        "ArchUnit ownership tests",
+        "per-service PostgreSQL roles and grants"
+      ]
+    }
+  ]
+}
