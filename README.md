@@ -40,9 +40,9 @@ flowchart LR
     GW --> AN
     DB[("PostgreSQL<br/>self_checkout<br/>one role per service")]
     CA -.->|"R items"| DB
-    CO ==>|"W stock, transactions, lines, alerts, scan_log"| DB
+    CO ==>|"R items · W stock, transactions, lines, alerts, scan_log"| DB
     IN -.->|"R alerts, items"| DB
-    AN -->|"R scan_log · W popular_snapshots"| DB
+    AN -->|"R scan_log, items · W popular_snapshots"| DB
 ```
 
 </details>
@@ -103,10 +103,13 @@ database is the only coupling, and these rules keep that coupling under control.
 
 An unpaid basket never touches the database. Starting a transaction and every scan only
 update an in-memory basket inside checkout-service, with prices taken from the cached
-catalog. Paying opens one database transaction, takes one locking `SELECT … ORDER BY sku
-FOR NO KEY UPDATE` for the whole basket, and writes stock, receipt lines and any low-stock
-alerts. All of it commits together. Locking in ascending SKU order means two checkouts can
-never deadlock. Stock is clamped at zero, so it can never go negative.
+catalog. Paying first claims the basket in memory (OPEN -> COMPLETING), so a scan or a
+second payment arriving at the same moment gets a 409 instead of changing a basket that is
+being paid. It then opens one database transaction, takes one locking `SELECT … ORDER BY
+sku FOR NO KEY UPDATE` for the whole basket, and writes stock, receipt lines and any
+low-stock alerts. All of it commits together, and only then is the basket removed from
+memory. Locking in ascending SKU order means two checkouts can never deadlock. Stock is
+clamped at zero, so it can never go negative.
 
 <details>
 <summary>Text version (Mermaid)</summary>
@@ -182,7 +185,9 @@ laptop:
 **The cost of the split.** Week 4 is within 1.6 % (default) and 4.7 % (stress) of Week 3
 while doing strictly more work:
 - every request crosses the gateway, measured at **+0.031 ms** median per request
-  ([`gateway-hop.txt`](reports/service-based/gateway-hop.txt));
+  ([`gateway-hop.txt`](reports/service-based/gateway-hop.txt): 5,000 scans direct vs 5,000
+  through nginx, started at 1-minute load 2.94, so below the idle threshold of 3, though the
+  5-minute average was still 4.41);
 - every scan is written to `scan_log`, about 1.2 million rows per stress run. Week 3 wrote
   none, because its flag defaulted to off.
 

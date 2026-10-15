@@ -6,7 +6,7 @@
     "locale": "en",
     "quality_profile": "showcase",
     "viewBox": [
-      1290,
+      1390,
       660
     ]
   },
@@ -29,7 +29,7 @@
       "id": "gateway",
       "type": "cloud",
       "label": "nginx gateway",
-      "sublabel": ":8080 \u00b7 path routing",
+      "sublabel": ":8080 · path routing",
       "pos": [
         220,
         300
@@ -43,7 +43,7 @@
       "id": "catalog",
       "type": "backend",
       "label": "catalog-service",
-      "sublabel": ":8081 \u00b7 GET /items",
+      "sublabel": ":8081 · GET /items",
       "pos": [
         470,
         90
@@ -57,7 +57,7 @@
       "id": "checkout",
       "type": "backend",
       "label": "checkout-service",
-      "sublabel": ":8082 \u00b7 /transactions/**",
+      "sublabel": ":8082 · /transactions/**",
       "pos": [
         470,
         230
@@ -72,7 +72,7 @@
       "id": "inventory",
       "type": "backend",
       "label": "inventory-service",
-      "sublabel": ":8083 \u00b7 /inventory/low-stock",
+      "sublabel": ":8083 · /inventory/low-stock",
       "pos": [
         470,
         370
@@ -86,7 +86,7 @@
       "id": "analytics",
       "type": "backend",
       "label": "analytics-service",
-      "sublabel": ":8084 \u00b7 /analytics/popular-items",
+      "sublabel": ":8084 · /analytics/popular-items",
       "pos": [
         470,
         510
@@ -102,7 +102,7 @@
       "label": "PostgreSQL",
       "sublabel": "self_checkout",
       "pos": [
-        1080,
+        1180,
         280
       ],
       "size": [
@@ -166,7 +166,7 @@
       "id": "checkout-db",
       "from": "checkout",
       "to": "db",
-      "label": "W stock, tx, lines, alerts, scan_log",
+      "label": "R items · W stock, tx, lines, alerts, scan_log",
       "variant": "emphasis",
       "labelSegment": 0
     },
@@ -182,7 +182,7 @@
       "id": "analytics-db",
       "from": "analytics",
       "to": "db",
-      "label": "R scan_log \u00b7 W popular_snapshots",
+      "label": "R scan_log, items · W popular_snapshots",
       "labelSegment": 0
     }
   ],
