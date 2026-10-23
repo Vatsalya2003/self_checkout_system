@@ -1,0 +1,15 @@
+label=default-run2 stations=10 duration=60
+load before: { 2.99 3.63 3.30 }
+load after:  { 4.37 4.04 3.49 }
+cpu analytics-service     4.4 %  (of one core, avg over 61 s)
+cpu catalog-service       0.1 %  (of one core, avg over 61 s)
+cpu checkout-service    102.1 %  (of one core, avg over 61 s)
+cpu inventory-service     0.1 %  (of one core, avg over 61 s)
+cpu postgres             88.9 %  (of one core, avg over 61 s)
+cpu nginx                31.7 %  (of one core, avg over 61 s)
+2026-10-23T16:33:47.051-07:00  INFO 11468 --- [checkout-service] [scanlog-metrics] c.s.s.scanlog.ScanLogPublisher           : scan-log publisher | accepted=640534 written=640534 dropped=0 lost=0 | batches=1099 avgBatch=582 | queue depth=0 max=127 cap=65536 | lastSeq=640534 | writeErrors=0
+2026-10-23T16:33:48.014-07:00  INFO 11474 --- [analytics-service] [ipeline-metrics] c.s.s.a.pipeline.AnalyticsPipeline       : analytics lag | lastSeq=640534 | behind scan_log now=0 max=695 mean=112 scans | read lag mean=58 max=133 ms | gapStalls=0
+  tx/s=1018.0 tx=61097 items=640534 wall=60.0s
+  START_TRANSACTION      ok=61097 err=0 mean=0.167 p50=0.130 p95=0.267 p99=0.512 max=67.1 ms
+  SCAN_ITEM              ok=640534 err=0 mean=0.145 p50=0.121 p95=0.237 p99=0.427 max=22.5 ms
+  COMPLETE_TRANSACTION   ok=61097 err=0 mean=8.133 p50=4.238 p95=29.408 p99=45.619 max=124.6 ms

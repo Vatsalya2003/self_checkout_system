@@ -1,0 +1,89 @@
+Timing is off.
+Pager usage is off.
+
+==============================================================
+ CHECK 1  no SKU may ever have negative stock
+          expected: 0 rows
+==============================================================
+ sku | stock 
+-----+-------
+(0 rows)
+
+
+==============================================================
+ CHECK 2  for every SKU:
+            starting_stock - current_stock
+              = SUM(applied_quantity) over COMPLETED transactions
+          expected: 0 rows
+
+          A row here means units left the shelf without being
+          accounted for (a lost update) or were subtracted twice.
+          This is the property concurrent implementations break.
+==============================================================
+ sku | current_stock | removed_from_shelf | sum_applied_quantity | discrepancy 
+-----+---------------+--------------------+----------------------+-------------
+(0 rows)
+
+
+==============================================================
+ CHECK 3  sold-out SKUs: scanned units the shelf could not cover
+          informational, not a failure
+
+          Scans are never gated by stock (a customer already holds
+          the item), so a hot SKU can be scanned more times than it
+          has units. The decrement is clamped at zero and the
+          shortfall shows up here instead of corrupting CHECK 2.
+==============================================================
+    sku     | final_stock | units_scanned | units_applied | units_short 
+------------+-------------+---------------+---------------+-------------
+ SKU-000001 |           0 |         78002 |         10000 |       68002
+ SKU-000002 |           0 |         38861 |         10000 |       28861
+ SKU-000003 |           0 |         25905 |         10000 |       15905
+ SKU-000004 |           0 |         19454 |         10000 |        9454
+ SKU-000005 |           0 |         15532 |         10000 |        5532
+ SKU-000006 |           0 |         12806 |         10000 |        2806
+ SKU-000007 |           0 |         11096 |         10000 |        1096
+(7 rows)
+
+
+==============================================================
+ SUMMARY
+==============================================================
+ negative_stock_skus | invariant_violations | completed_transactions | abandoned_open_transactions | total_scans | popular_windows_written | low_stock_alerts_recorded 
+---------------------+----------------------+------------------------+-----------------------------+-------------+-------------------------+---------------------------
+                   0 |                    0 |                  60608 |                           0 |      635833 |                    1271 |                         7
+(1 row)
+
+Timing is off.
+Pager usage is off.
+
+==============================================================
+ CHECK 1  scan_log is gapless: seqs are exactly 1..max
+          expected: rows = max_seq, min_seq = 1, gaps = 0
+==============================================================
+  rows  | min_seq | max_seq | gaps 
+--------+---------+---------+------
+ 635833 |       1 |  635833 |    0
+(1 row)
+
+
+==============================================================
+ CHECK 2  every stored window equals a brute-force recount of
+          scan_log over the same (window_start, window_end]
+          expected: mismatched_entries = 0
+==============================================================
+ windows_checked | mismatched_entries 
+-----------------+--------------------
+            1271 |                  0
+(1 row)
+
+
+==============================================================
+ CHECK 3  one window per slide interval (informational)
+          expected: windows = floor(max_seq / 500)
+==============================================================
+ windows | expected_windows | last_window_end 
+---------+------------------+-----------------
+    1271 |             1271 |          635500
+(1 row)
+
