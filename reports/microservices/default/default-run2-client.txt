@@ -1,0 +1,42 @@
+Self-Checkout Load Client starting...
+  baseUrl=http://localhost:8080 stations=10 duration=60s basket=[1..20]
+Fetching catalog...
+Catalog loaded: 2000 items.
+Starting 10 simulated station(s) for 60s...
+Duration elapsed, waiting for in-flight transactions to finish...
+Fetching low-stock alerts and popular items...
+
+================ LOAD TEST REPORT ================
+Base URL:        http://localhost:8080
+Stations:        10
+Duration:        60.0s (requested 60s)
+Transactions:    49621 (826.9/sec)
+Items scanned:   519137 (8650.8/sec)
+
+Operation                    OK   Errors   Mean(ms)    P50(ms)    P95(ms)    P99(ms)    Max(ms)     Err%
+START_TRANSACTION         49621        0       0.21       0.17       0.37       0.76      36.86    0.00%
+SCAN_ITEM                519137        0       0.18       0.15       0.31       0.59      13.40    0.00%
+COMPLETE_TRANSACTION      49621        0      10.00       7.77      23.68      36.46     169.86    0.00%
+
+Low-stock alerts (6):
+  SKU-000001   Item 1                         stock=0      threshold=50
+  SKU-000002   Item 2                         stock=0      threshold=50
+  SKU-000003   Item 3                         stock=0      threshold=50
+  SKU-000004   Item 4                         stock=0      threshold=50
+  SKU-000005   Item 5                         stock=0      threshold=50
+  SKU-000006   Item 6                         stock=0      threshold=50
+
+Most popular items (top 10):
+  #1   SKU-000001   Item 1                         scans=128
+  #2   SKU-000002   Item 2                         scans=68
+  #3   SKU-000003   Item 3                         scans=38
+  #4   SKU-000004   Item 4                         scans=34
+  #5   SKU-000005   Item 5                         scans=31
+  #6   SKU-000006   Item 6                         scans=26
+  #7   SKU-000011   Item 11                        scans=19
+  #8   SKU-000007   Item 7                         scans=12
+  #9   SKU-000015   Item 15                        scans=12
+  #10  SKU-000008   Item 8                         scans=10
+===================================================
+
+JSON report written to: /Users/rohitdabhi/Desktop/ADV_SOFT_DEV/self-checkout/reports/microservices/default/report-20261023-174311.json
