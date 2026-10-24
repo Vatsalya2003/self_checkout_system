@@ -1,0 +1,62 @@
+== A  inventory down during a payment
+  ok    complete while inventory is down: 503
+  ok    error code: SERVICE_UNAVAILABLE
+  ok    Retry-After header: 1
+     (answered after 1.6s: retried for up to 3 s first)
+  ok    basket reopened (GET status): OPEN
+  ok    a further scan is accepted: 200
+  ok    stock untouched (inventory_db): 10000
+  ok    no sale row left behind (checkout_db): 0
+  ok    same payment after inventory is back: 200
+  ok    receipt itemCount (2 before + 1 after the outage): 3
+  ok    GET status: COMPLETED
+  ok    stock taken once (inventory_db): 9997
+  ok    cross-database invariant: PASS
+== B  inventory frozen: no answer (the ambiguous case)
+  ok    complete while inventory does not answer: 503
+     (answered after 5.1s) message: Inventory did not answer; the payment for transaction 536c61a3-dc5e-434c-b78f-17b031c689eb will complete shortly, check GET /transactions/536c61a3-dc5e-434c-b78f-17b031c689eb
+  ok    sale saved as PENDING (checkout_db): PENDING
+  ok    a retry of complete meanwhile: 409
+  ok    basket NOT reopened: a scan is refused: 409
+  ok    after inventory wakes up, GET shows the real outcome: COMPLETED
+     (resolved about 1s after inventory woke up)
+  ok    stock commits for this transaction (inventory_db): 1
+  ok    SKU-000020 taken exactly once: 9999
+  ok    a retry now: 409
+  saga | payments=0 stockRetries=1 replayed=1 rolledBack=0 ambiguous=1 resolved=1 recovered=0 finishRetries=0 | stock call mean=159732us max=159ms | haltHook=off
+  ok    cross-database invariant: PASS
+== C  checkout crashes after the stock commit, before its own write
+  log: TEST HOOK halt-after-stock-commit is ON: this process will halt after the first stock commit
+     complete answered 502 (the process halted mid-request; nginx reports the lost upstream)
+  ok    checkout-service halted
+  ok    inventory committed the stock: 1
+  ok    checkout_db still says PENDING: PENDING
+  ok    invariant BEFORE recovery (databases disagree): FAIL
+  ok    after restart, recovery finished the sale: COMPLETED
+  ok    GET status: COMPLETED
+  ok    applied quantities recorded: SKU-000030=2,SKU-000031=1
+  ok    still exactly one stock commit: 1
+  log: recovery: 1 payment(s) were in progress when the previous process stopped: [e41ca700-84e3-4083-9282-5df911af6552]
+  saga | payments=0 stockRetries=0 replayed=1 rolledBack=0 ambiguous=0 resolved=1 recovered=1 finishRetries=0 | stock call mean=22587us max=22ms | haltHook=off
+  ok    cross-database invariant: PASS
+== D  analytics down under load (10 stations, 15 s)
+  load without analytics: 431.1 tx/s, 0 errors on start/scan/complete
+  publisher | accepted=65629 written=0 dropped=3115 lost=0 | batches=0 avgBatch=0 | queue depth=65536 max=65536 cap=65536 | lastSeq=0 | writeErrors=13 resyncs=0 synced=true
+  publisher | accepted=65629 written=65629 dropped=3115 lost=0 | batches=67 avgBatch=979 | queue depth=0 max=65536 cap=65536 | lastSeq=65629 | writeErrors=19 resyncs=0 synced=true
+  ok    every accepted scan reached analytics (dropped=3115 counted, not numbered): 65629
+  ok    cross-database invariant: PASS
+== E  checkout starts while analytics is down
+  ok    checkout healthy without analytics: 404
+  ok    customer can pay: 200
+  publisher | accepted=3 written=0 dropped=0 lost=0 | batches=0 avgBatch=0 | queue depth=3 max=3 cap=65536 | lastSeq=0 | writeErrors=0 resyncs=0 synced=false
+  ok    nothing reached analytics yet: 0
+  ok    buffered scans delivered once analytics answered: 1:SKU-000040,2:SKU-000041,3:SKU-000042
+  log: analytics has seq 1..0, numbering continues at 1
+  ok    cross-database invariant: PASS
+== F  internal endpoints through the gateway
+  ok    POST /internal/stock/commit via :8080: 404
+  ok    POST /internal/scans via :8080: 404
+  ok    GET /internal/scans/max-seq via :8080: 404
+  ok    ...but reachable directly on analytics' own port: 200
+
+RESULT: PASS

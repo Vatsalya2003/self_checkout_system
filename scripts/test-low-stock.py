@@ -21,7 +21,7 @@ Requires a freshly restarted server.
 import sys
 
 sys.path.insert(0, __file__.rsplit("/", 1)[0])
-from _client import check, req, sql  # noqa: E402
+from _client import check, req, sql, INVENTORY_DB, CHECKOUT_DB, ANALYTICS_DB  # noqa: E402
 
 SKU = "SKU-000900"
 
@@ -41,16 +41,16 @@ def main():
     ok = check("no alerts before anything sells", len(req("GET", "/inventory/low-stock")[1]["alerts"]), 0)
 
     print(f"\n=== land exactly ON the threshold ({threshold}) -- must NOT alert ===")
-    sql(f"UPDATE items SET stock = {threshold + 2} WHERE sku = '{SKU}'")
+    sql(f"UPDATE stock SET qty = {threshold + 2} WHERE sku = '{SKU}'", db=INVENTORY_DB)
     buy(2)
-    ok &= check(f"stock is exactly {threshold}", sql(f"SELECT stock FROM items WHERE sku='{SKU}'"), str(threshold))
-    ok &= check("no alert recorded (strict '<')", sql(f"SELECT count(*) FROM low_stock_alerts WHERE sku='{SKU}'"), "0")
+    ok &= check(f"stock is exactly {threshold}", sql(f"SELECT qty FROM stock WHERE sku='{SKU}'", db=INVENTORY_DB), str(threshold))
+    ok &= check("no alert recorded (strict '<')", sql(f"SELECT count(*) FROM low_stock_alerts WHERE sku='{SKU}'", db=INVENTORY_DB), "0")
 
     print("\n=== one more unit -- now strictly below ===")
     buy(1)
-    ok &= check(f"stock is {threshold - 1}", sql(f"SELECT stock FROM items WHERE sku='{SKU}'"), str(threshold - 1))
-    ok &= check("alert recorded", sql(f"SELECT count(*) FROM low_stock_alerts WHERE sku='{SKU}'"), "1")
-    first_trigger = sql(f"SELECT triggered_at FROM low_stock_alerts WHERE sku='{SKU}'")
+    ok &= check(f"stock is {threshold - 1}", sql(f"SELECT qty FROM stock WHERE sku='{SKU}'", db=INVENTORY_DB), str(threshold - 1))
+    ok &= check("alert recorded", sql(f"SELECT count(*) FROM low_stock_alerts WHERE sku='{SKU}'", db=INVENTORY_DB), "1")
+    first_trigger = sql(f"SELECT triggered_at FROM low_stock_alerts WHERE sku='{SKU}'", db=INVENTORY_DB)
 
     alerts = req("GET", "/inventory/low-stock")[1]["alerts"]
     ok &= check("endpoint reports exactly one alert", len(alerts), 1)
@@ -59,8 +59,8 @@ def main():
 
     print("\n=== stock keeps falling -- alert must not duplicate or move ===")
     buy(5)
-    ok &= check("still exactly one alert row", sql(f"SELECT count(*) FROM low_stock_alerts WHERE sku='{SKU}'"), "1")
-    ok &= check("triggeredAt unchanged", sql(f"SELECT triggered_at FROM low_stock_alerts WHERE sku='{SKU}'"), first_trigger)
+    ok &= check("still exactly one alert row", sql(f"SELECT count(*) FROM low_stock_alerts WHERE sku='{SKU}'", db=INVENTORY_DB), "1")
+    ok &= check("triggeredAt unchanged", sql(f"SELECT triggered_at FROM low_stock_alerts WHERE sku='{SKU}'", db=INVENTORY_DB), first_trigger)
 
     print("\n=== ad-hoc ?threshold applies to the query only ===")
     body = req("GET", "/inventory/low-stock?threshold=10001")[1]
@@ -75,7 +75,7 @@ def main():
                 crossed["triggeredAt"] != body["generatedAt"], True)
     ok &= check("a SKU with no recorded crossing falls back to generatedAt",
                 untouched["triggeredAt"], body["generatedAt"])
-    ok &= check("ad-hoc query persisted nothing", sql("SELECT count(*) FROM low_stock_alerts"), "1")
+    ok &= check("ad-hoc query persisted nothing", sql("SELECT count(*) FROM low_stock_alerts", db=INVENTORY_DB), "1")
 
     print("\nRESULT:", "PASS" if ok else "FAIL")
     return 0 if ok else 1

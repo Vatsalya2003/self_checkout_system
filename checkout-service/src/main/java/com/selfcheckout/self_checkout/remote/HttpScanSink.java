@@ -8,6 +8,9 @@ import org.springframework.web.client.RestClient;
 
 import java.net.http.HttpClient;
 import java.time.Duration;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.time.Instant;
 import java.util.List;
 
@@ -27,7 +30,12 @@ public class HttpScanSink implements ScanSink {
     private final RestClient http;
 
     public HttpScanSink(String analyticsUrl) {
+        // A reusable executor, on purpose. Without one, Spring's
+        // JdkClientHttpRequestFactory falls back to a SimpleAsyncTaskExecutor,
+        // which starts a brand-new thread to write every request body --
+        // measured with JFR as the busiest threads in checkout-service.
         HttpClient client = HttpClient.newBuilder()
+                .executor(Executors.newCachedThreadPool(daemonThreads("HttpScanSink")))
                 .version(HttpClient.Version.HTTP_1_1)      // no h2c upgrade round trip
                 .connectTimeout(Duration.ofSeconds(1))
                 .build();
@@ -60,5 +68,15 @@ public class HttpScanSink implements ScanSink {
             throw new IllegalStateException("analytics returned no max-seq");
         }
         return r.maxSeq();
+    }
+
+    /** Named daemon threads, so they never keep the JVM alive at shutdown. */
+    static ThreadFactory daemonThreads(String prefix) {
+        AtomicInteger n = new AtomicInteger();
+        return r -> {
+            Thread t = new Thread(r, prefix + "-" + n.incrementAndGet());
+            t.setDaemon(true);
+            return t;
+        };
     }
 }

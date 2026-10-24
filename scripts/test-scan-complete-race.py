@@ -26,7 +26,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 sys.path.insert(0, __file__.rsplit("/", 1)[0])
-from _client import req, sql  # noqa: E402
+from _client import req, sql, INVENTORY_DB, CHECKOUT_DB, ANALYTICS_DB  # noqa: E402
 
 SKU = "SKU-001900"
 PRESCAN = 2          # units scanned normally before the race starts
@@ -64,7 +64,7 @@ def main():
     rounds = int(sys.argv[1]) if len(sys.argv) > 1 else 200
     racing_scans = int(sys.argv[2]) if len(sys.argv) > 2 else 3
 
-    start_stock = int(sql(f"SELECT stock FROM items WHERE sku='{SKU}'"))
+    start_stock = int(sql(f"SELECT qty FROM stock WHERE sku='{SKU}'", db=INVENTORY_DB))
     print(f"racing {rounds} baskets, {racing_scans} scans against each complete")
     print(f"  {SKU} starting stock: {start_stock}")
 
@@ -75,29 +75,29 @@ def main():
         tid, completed_ok, scans_won, receipt = one_round(i, racing_scans)
 
         # 1. the basket must end COMPLETED
-        status = sql(f"SELECT status FROM transactions WHERE id='{tid}'")
+        status = sql(f"SELECT status FROM transactions WHERE id='{tid}'", db=CHECKOUT_DB)
         if status != "COMPLETED":
             bad_status.append((tid, status, scans_won))
 
         # 2 + 3. a scan that returned 200 must be on the receipt
         stored_qty = int(sql(f"SELECT COALESCE(SUM(quantity),0) FROM transaction_items "
-                             f"WHERE transaction_id='{tid}'") or 0)
+                             f"WHERE transaction_id='{tid}'", db=CHECKOUT_DB) or 0)
         if completed_ok and receipt is not None:
             receipt_qty = sum(l["quantity"] for l in receipt.get("lines", []))
             if receipt_qty != stored_qty:
                 bad_receipt.append((tid, receipt_qty, stored_qty))
 
         # 4. header counter must agree with the stored lines
-        header = int(sql(f"SELECT item_count FROM transactions WHERE id='{tid}'") or -1)
+        header = int(sql(f"SELECT item_count FROM transactions WHERE id='{tid}'", db=CHECKOUT_DB) or -1)
         if header != stored_qty:
             bad_header.append((tid, header, stored_qty))
 
         expected_units += stored_qty
 
-    end_stock = int(sql(f"SELECT stock FROM items WHERE sku='{SKU}'"))
+    end_stock = int(sql(f"SELECT qty FROM stock WHERE sku='{SKU}'", db=INVENTORY_DB))
     applied = int(sql(f"SELECT COALESCE(SUM(ti.applied_quantity),0) FROM transaction_items ti "
                       f"JOIN transactions t ON t.id=ti.transaction_id "
-                      f"WHERE t.status='COMPLETED' AND ti.sku='{SKU}'") or 0)
+                      f"WHERE t.status='COMPLETED' AND ti.sku='{SKU}'", db=CHECKOUT_DB) or 0)
     removed = start_stock - end_stock
 
     print()

@@ -36,8 +36,15 @@ def req(method, path, body=None):
         conn.close()
 
 
-def sql(query, db="self_checkout"):
-    """Single scalar/row query straight through psql.
+# Week 5: every service has its own database, so a test has to say which one
+# it is looking at (connecting as the local superuser, as a test harness may).
+INVENTORY_DB = "inventory_db"    # stock, low_stock_alerts, stock commits
+CHECKOUT_DB = "checkout_db"      # transactions, transaction_items
+ANALYTICS_DB = "analytics_db"    # scan_log, popular_snapshots
+
+
+def sql(query, db):
+    """Single scalar/row query straight through psql, against one service's database.
 
     We check the DATABASE directly rather than trusting the API, because the
     whole point of these tests is to catch the case where the API happily
@@ -45,7 +52,7 @@ def sql(query, db="self_checkout"):
     """
     # -t = no header row, -A = unaligned, so the output is easy to compare
     # against an expected string.
-    out = subprocess.run(["psql", db, "-tAc", query], capture_output=True, text=True)
+    out = subprocess.run(["psql", "-X", db, "-tAc", query], capture_output=True, text=True)
     return out.stdout.strip()
 
 

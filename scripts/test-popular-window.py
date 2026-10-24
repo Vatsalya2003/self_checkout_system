@@ -26,7 +26,7 @@ import sys
 import time
 
 sys.path.insert(0, __file__.rsplit("/", 1)[0])
-from _client import call, check, new_conn, req, sql  # noqa: E402
+from _client import call, check, new_conn, req, sql, INVENTORY_DB, CHECKOUT_DB, ANALYTICS_DB  # noqa: E402
 
 TOTAL = 1500
 FIRST_HALF_SKU = "SKU-000001"
@@ -69,20 +69,20 @@ def main():
     expected_windows = TOTAL // slide
     deadline = time.time() + 30
     while time.time() < deadline:
-        flushed = int(sql("SELECT count(*) FROM scan_log") or 0)
-        windows = int(sql("SELECT count(*) FROM popular_snapshots") or 0)
+        flushed = int(sql("SELECT count(*) FROM scan_log", db=ANALYTICS_DB) or 0)
+        windows = int(sql("SELECT count(*) FROM popular_snapshots", db=ANALYTICS_DB) or 0)
         if flushed >= TOTAL and windows >= expected_windows:
             break
         time.sleep(0.2)
     print(f"pipeline drained: scan_log={flushed} snapshots={windows}")
 
-    rows = sql("SELECT window_start || ',' || window_end FROM popular_snapshots ORDER BY id;").splitlines()
+    rows = sql("SELECT window_start || ',' || window_end FROM popular_snapshots ORDER BY id;", db=ANALYTICS_DB).splitlines()
     print(f"snapshots written: {rows}")
     ok &= check("one snapshot per slide interval", len(rows), expected_windows)
     ok &= check("scan_log received every scan exactly once", 
-                sql("SELECT count(*) FROM scan_log"), str(TOTAL))
+                sql("SELECT count(*) FROM scan_log", db=ANALYTICS_DB), str(TOTAL))
     ok &= check("the scan sequence has no gaps", 
-                sql("SELECT max(seq) FROM scan_log"), str(TOTAL))
+                sql("SELECT max(seq) FROM scan_log", db=ANALYTICS_DB), str(TOTAL))
 
     body = req("GET", "/analytics/popular-items")[1]
     ws, we = body["windowStart"], body["windowEnd"]
@@ -98,7 +98,7 @@ def main():
     # The stored counts must match a plain SQL aggregate over the same window.
     expected = sql(f"SELECT sku || '=' || count(*) FROM scan_log "
                    f"WHERE seq > {ws} AND seq <= {we} "
-                   f"GROUP BY sku ORDER BY count(*) DESC, sku ASC LIMIT 3;").splitlines()
+                   f"GROUP BY sku ORDER BY count(*) DESC, sku ASC LIMIT 3;", db=ANALYTICS_DB).splitlines()
     actual = [f"{i['sku']}={i['scanCount']}" for i in body["items"][:3]]
     ok &= check("stored counts match a raw SQL aggregate over the same window", actual, expected)
 

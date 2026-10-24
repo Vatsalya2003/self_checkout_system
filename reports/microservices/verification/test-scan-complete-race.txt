@@ -1,0 +1,9 @@
+racing 200 baskets, 3 scans against each complete
+  SKU-001900 starting stock: 10000
+
+  [PASS] every raced basket ends COMPLETED: got 0, expected 0
+  [PASS] header item_count matches the stored lines: got 0, expected 0
+  [PASS] the receipt matches what was stored: got 0, expected 0
+  [PASS] stock removed equals units applied: got 550, expected 550
+
+RESULT: PASS

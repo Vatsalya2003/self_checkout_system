@@ -21,7 +21,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 sys.path.insert(0, __file__.rsplit("/", 1)[0])
-from _client import call, check, new_conn, req, sql  # noqa: E402
+from _client import call, check, new_conn, req, sql, INVENTORY_DB, CHECKOUT_DB, ANALYTICS_DB  # noqa: E402
 
 BASKET = {"SKU-000001": 3, "SKU-000002": 2, "SKU-000003": 1}
 
@@ -47,7 +47,7 @@ def build(i):
 
 def main():
     n = int(sys.argv[1]) if len(sys.argv) > 1 else 60
-    before = {sku: int(sql(f"SELECT stock FROM items WHERE sku='{sku}'")) for sku in BASKET}
+    before = {sku: int(sql(f"SELECT qty FROM stock WHERE sku='{sku}'", db=INVENTORY_DB)) for sku in BASKET}
     print(f"stock before: {before}")
 
     with ThreadPoolExecutor(max_workers=20) as pool:
@@ -73,7 +73,7 @@ def main():
     print(f"completion statuses: {counts}")
 
     ok = check("all completions returned 200", counts, {200: n})
-    after = {sku: int(sql(f"SELECT stock FROM items WHERE sku='{sku}'")) for sku in BASKET}
+    after = {sku: int(sql(f"SELECT qty FROM stock WHERE sku='{sku}'", db=INVENTORY_DB)) for sku in BASKET}
     print(f"stock after: {after}")
     for sku, per_basket in BASKET.items():
         ok &= check(f"{sku} decremented by exactly {per_basket * n}",

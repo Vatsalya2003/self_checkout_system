@@ -1,0 +1,37 @@
+Self-Checkout Load Client starting...
+  baseUrl=http://localhost:8080 stations=10 duration=10s basket=[1..20]
+Fetching catalog...
+Catalog loaded: 2000 items.
+Starting 10 simulated station(s) for 10s...
+Duration elapsed, waiting for in-flight transactions to finish...
+Fetching low-stock alerts and popular items...
+
+================ LOAD TEST REPORT ================
+Base URL:        http://localhost:8080
+Stations:        10
+Duration:        10.0s (requested 10s)
+Transactions:    4364 (435.7/sec)
+Items scanned:   45602 (4552.4/sec)
+
+Operation                    OK   Errors   Mean(ms)    P50(ms)    P95(ms)    P99(ms)    Max(ms)     Err%
+START_TRANSACTION          4364        0       0.48       0.31       1.08       3.58      15.98    0.00%
+SCAN_ITEM                 45602        0       0.33       0.22       0.76       2.58      15.66    0.00%
+COMPLETE_TRANSACTION       4364        0      18.98      14.63      48.96      78.95     191.53    0.00%
+
+Low-stock alerts (0):
+  (none)
+
+Most popular items (top 10):
+  #1   SKU-000001   Item 1                         scans=124
+  #2   SKU-000002   Item 2                         scans=77
+  #3   SKU-000004   Item 4                         scans=38
+  #4   SKU-000003   Item 3                         scans=33
+  #5   SKU-000005   Item 5                         scans=23
+  #6   SKU-000008   Item 8                         scans=22
+  #7   SKU-000007   Item 7                         scans=21
+  #8   SKU-000006   Item 6                         scans=19
+  #9   SKU-000011   Item 11                        scans=13
+  #10  SKU-000016   Item 16                        scans=13
+===================================================
+
+JSON report written to: /Users/rohitdabhi/Desktop/ADV_SOFT_DEV/self-checkout/reports/microservices/restart-test/report-20261023-172751.json

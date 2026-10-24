@@ -3,7 +3,7 @@
 -- Run AFTER a load run, once analytics-service has caught up (its log line
 -- "analytics lag | ... behind scan_log now=0"), and BEFORE db/reset.sh:
 --
---     psql self_checkout -f scripts/check-windows.sql
+--     psql analytics_db -f scripts/check-windows.sql
 --
 -- CHECK 1 and CHECK 2 must both report 0. Read-only.
 

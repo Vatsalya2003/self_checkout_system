@@ -23,7 +23,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 sys.path.insert(0, __file__.rsplit("/", 1)[0])
-from _client import check, req, sql  # noqa: E402
+from _client import check, req, sql, INVENTORY_DB, CHECKOUT_DB, ANALYTICS_DB  # noqa: E402
 
 SOLD_OUT_SKU = "SKU-001500"
 DOUBLE_SKU = "SKU-000500"
@@ -33,7 +33,7 @@ def sold_out_clamp():
     print("=== 1. sold-out clamp ===")
     # Force the shelf almost empty so we can reach the sold-out path in a
     # second, instead of scanning 10,000 units to get there naturally.
-    sql(f"UPDATE items SET stock = 5 WHERE sku = '{SOLD_OUT_SKU}'")
+    sql(f"UPDATE stock SET qty = 5 WHERE sku = '{SOLD_OUT_SKU}'", db=INVENTORY_DB)
     print(f"  forced {SOLD_OUT_SKU} stock to 5; 4 baskets will scan 3 units each (12 total)")
 
     ids = []
@@ -56,11 +56,11 @@ def sold_out_clamp():
     ok &= check("receipt still reports the scanned quantity",
                 [r["lines"][0]["quantity"] for _, r in results], [3] * 4)
     ok &= check("stock clamped at zero, never negative",
-                sql(f"SELECT stock FROM items WHERE sku='{SOLD_OUT_SKU}'"), "0")
+                sql(f"SELECT qty FROM stock WHERE sku='{SOLD_OUT_SKU}'", db=INVENTORY_DB), "0")
     ok &= check("SUM(applied_quantity) equals what was actually on the shelf",
-                sql(f"SELECT SUM(applied_quantity) FROM transaction_items WHERE sku='{SOLD_OUT_SKU}'"), "5")
+                sql(f"SELECT SUM(applied_quantity) FROM transaction_items WHERE sku='{SOLD_OUT_SKU}'", db=CHECKOUT_DB), "5")
     ok &= check("SUM(quantity) still records everything scanned",
-                sql(f"SELECT SUM(quantity) FROM transaction_items WHERE sku='{SOLD_OUT_SKU}'"), "12")
+                sql(f"SELECT SUM(quantity) FROM transaction_items WHERE sku='{SOLD_OUT_SKU}'", db=CHECKOUT_DB), "12")
     return ok
 
 
@@ -71,7 +71,7 @@ def double_complete(threads=20):
         req("POST", f"/transactions/{tid}/items", {"sku": DOUBLE_SKU})
     # Record stock first: the real assertion is that it drops by 4 (one
     # basket) and not by 80 (once per calling thread).
-    before = int(sql(f"SELECT stock FROM items WHERE sku='{DOUBLE_SKU}'"))
+    before = int(sql(f"SELECT qty FROM stock WHERE sku='{DOUBLE_SKU}'", db=INVENTORY_DB))
 
     barrier = threading.Barrier(threads)
 
@@ -86,7 +86,7 @@ def double_complete(threads=20):
     for c in codes:
         counts[c] = counts.get(c, 0) + 1
     print(f"  statuses: {counts}")
-    after = int(sql(f"SELECT stock FROM items WHERE sku='{DOUBLE_SKU}'"))
+    after = int(sql(f"SELECT qty FROM stock WHERE sku='{DOUBLE_SKU}'", db=INVENTORY_DB))
 
     ok = check("exactly one winner", counts.get(200, 0), 1)
     ok &= check("everyone else rejected with 409", counts.get(409, 0), threads - 1)

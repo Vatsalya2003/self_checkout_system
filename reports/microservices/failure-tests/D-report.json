@@ -1,0 +1,57 @@
+{
+  "generatedAt": "2026-10-24T00:26:07.854725Z",
+  "config": {
+    "baseUrl": "http://localhost:8080",
+    "stations": 10,
+    "durationSecondsRequested": 15,
+    "minItems": 1,
+    "maxItems": 20
+  },
+  "wallClockSeconds": 15.150807958,
+  "totalTransactions": 6531,
+  "totalItemsScanned": 68744,
+  "transactionsPerSecond": 431.0661199128639,
+  "itemsPerSecond": 4537.315778179439,
+  "operations": [
+    {
+      "operation": "START_TRANSACTION",
+      "successCount": 6531,
+      "errorCount": 0,
+      "errorRate": 0.0,
+      "meanMs": 0.35980495176848876,
+      "p50Ms": 0.265625,
+      "p95Ms": 0.697417,
+      "p99Ms": 1.821667,
+      "minMs": 0.10375,
+      "maxMs": 14.293542
+    },
+    {
+      "operation": "SCAN_ITEM",
+      "successCount": 68744,
+      "errorCount": 0,
+      "errorRate": 0.0,
+      "meanMs": 0.8245444330123357,
+      "p50Ms": 0.219958,
+      "p95Ms": 2.266625,
+      "p99Ms": 12.861667,
+      "minMs": 0.079916,
+      "maxMs": 15.548
+    },
+    {
+      "operation": "COMPLETE_TRANSACTION",
+      "successCount": 6531,
+      "errorCount": 0,
+      "errorRate": 0.0,
+      "meanMs": 14.00775695544327,
+      "p50Ms": 10.98675,
+      "p95Ms": 34.587542,
+      "p99Ms": 58.092667,
+      "minMs": 1.360083,
+      "maxMs": 178.862584
+    }
+  ],
+  "lowStockAlerts": [
+  ],
+  "popularItems": [
+  ]
+}

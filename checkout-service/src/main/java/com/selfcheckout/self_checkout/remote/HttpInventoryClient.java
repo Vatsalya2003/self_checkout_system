@@ -10,6 +10,9 @@ import java.net.ConnectException;
 import java.net.http.HttpClient;
 import java.net.http.HttpConnectTimeoutException;
 import java.time.Duration;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +39,12 @@ public class HttpInventoryClient implements InventoryClient {
     private final RestClient http;
 
     public HttpInventoryClient(String inventoryUrl, Duration readTimeout) {
+        // A reusable executor, on purpose. Without one, Spring's
+        // JdkClientHttpRequestFactory falls back to a SimpleAsyncTaskExecutor,
+        // which starts a brand-new thread to write every request body --
+        // measured with JFR as the busiest threads in checkout-service.
         HttpClient client = HttpClient.newBuilder()
+                .executor(Executors.newCachedThreadPool(daemonThreads("HttpInventoryClient")))
                 .version(HttpClient.Version.HTTP_1_1)      // no h2c upgrade round trip
                 .connectTimeout(Duration.ofSeconds(1))
                 .build();
@@ -88,5 +96,15 @@ public class HttpInventoryClient implements InventoryClient {
             t = t.getCause();
         }
         return t.getClass().getSimpleName() + (t.getMessage() == null ? "" : ": " + t.getMessage());
+    }
+
+    /** Named daemon threads, so they never keep the JVM alive at shutdown. */
+    static ThreadFactory daemonThreads(String prefix) {
+        AtomicInteger n = new AtomicInteger();
+        return r -> {
+            Thread t = new Thread(r, prefix + "-" + n.incrementAndGet());
+            t.setDaemon(true);
+            return t;
+        };
     }
 }

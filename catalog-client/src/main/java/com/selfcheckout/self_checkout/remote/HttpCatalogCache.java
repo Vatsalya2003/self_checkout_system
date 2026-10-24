@@ -12,6 +12,9 @@ import org.springframework.web.client.RestClientException;
 import java.math.BigDecimal;
 import java.net.http.HttpClient;
 import java.time.Duration;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,7 +56,12 @@ public class HttpCatalogCache implements CatalogCache {
 
     public HttpCatalogCache(String baseUrl) {
         this.baseUrl = baseUrl;
+        // A reusable executor, on purpose. Without one, Spring's
+        // JdkClientHttpRequestFactory falls back to a SimpleAsyncTaskExecutor,
+        // which starts a brand-new thread to write every request body --
+        // measured with JFR as the busiest threads in checkout-service.
         HttpClient client = HttpClient.newBuilder()
+                .executor(Executors.newCachedThreadPool(daemonThreads("HttpCatalogCache")))
                 .connectTimeout(Duration.ofSeconds(2))
                 .build();
         JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(client);
@@ -133,5 +141,15 @@ public class HttpCatalogCache implements CatalogCache {
         bySku = Map.copyOf(m);
         log.info("catalog loaded from {}: {} items", baseUrl, list.size());
         return bySku;
+    }
+
+    /** Named daemon threads, so they never keep the JVM alive at shutdown. */
+    static ThreadFactory daemonThreads(String prefix) {
+        AtomicInteger n = new AtomicInteger();
+        return r -> {
+            Thread t = new Thread(r, prefix + "-" + n.incrementAndGet());
+            t.setDaemon(true);
+            return t;
+        };
     }
 }
