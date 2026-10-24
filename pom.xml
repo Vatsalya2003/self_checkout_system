@@ -1,14 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Week 4: service-based architecture.
+  Week 5: microservices (was Week 4: service-based architecture).
 
   This is now a PARENT pom (packaging "pom"): it builds nothing itself, it just
   lists the modules and fixes the versions they all share. Each service is its
   own Spring Boot jar (its own deployable unit, started as its own process),
-  and the two shared-* modules are plain libraries the services depend on.
+  and the two library modules (catalog-client, shared-web) are plain jars
+  compiled into the services that need them.
 
-    shared-data        read-only catalog access + shared configuration
-    shared-web         the error JSON shape and the domain errors it maps
+    catalog-client     the catalog interface + an HTTP client for catalog-service
+    shared-web         the error JSON shape and the domain errors it maps (incl. 503)
     catalog-service    GET /items                                  :8081
     checkout-service   POST /transactions/**, GET /transactions/** :8082
     inventory-service  GET /inventory/low-stock                    :8083
@@ -31,7 +32,7 @@
 	<packaging>pom</packaging>
 
 	<modules>
-		<module>shared-data</module>
+		<module>catalog-client</module>
 		<module>shared-web</module>
 		<module>catalog-service</module>
 		<module>checkout-service</module>
@@ -50,7 +51,7 @@
 		<dependencies>
 			<dependency>
 				<groupId>com.selfcheckout</groupId>
-				<artifactId>shared-data</artifactId>
+				<artifactId>catalog-client</artifactId>
 				<version>${project.version}</version>
 			</dependency>
 			<dependency>

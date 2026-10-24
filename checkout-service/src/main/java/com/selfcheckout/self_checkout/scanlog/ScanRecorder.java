@@ -10,10 +10,10 @@ package com.selfcheckout.self_checkout.scanlog;
  *
  * Week 4 change: in the single application this interface was implemented by
  * the analytics layer, which put the scan straight onto its in-process
- * pipeline. Analytics is now a separate service that checkout must not call,
- * so the implementation (ScanLogPublisher) appends the scan to the scan_log
- * table in the shared database instead, and analytics-service reads it from
- * there. The checkout code calling this did not change at all.
+ * pipeline. Analytics is now a separate service with its own database, so
+ * the implementation (ScanLogPublisher) numbers the scan and pushes it to
+ * analytics-service in a batch (Week 4 wrote it to a shared table instead).
+ * The checkout code calling this did not change at all.
  */
 public interface ScanRecorder {
 

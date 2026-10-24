@@ -1,7 +1,8 @@
 package com.selfcheckout.self_checkout.scanlog;
 
-import com.selfcheckout.self_checkout.persistence.repository.ScanLogBatchWriter;
-import com.selfcheckout.self_checkout.persistence.repository.ScanLogRow;
+import com.selfcheckout.self_checkout.remote.ScanGapRejectedException;
+import com.selfcheckout.self_checkout.remote.ScanLogRow;
+import com.selfcheckout.self_checkout.remote.ScanSink;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -10,26 +11,37 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-// The publisher is checkout-service's half of the scan hand-off. Its one job
-// is to keep scan_log.seq gapless and in order, because analytics-service's
+// The publisher is checkout-service's half of the scan hand-off (since Week 5
+// an HTTP push to analytics-service). Its one job is to keep seq gapless and
+// in order, because analytics-service's
 // window boundaries ("seq % 500 == 0") depend on it. These tests drive the
 // write logic directly (writeOnce) instead of through the background thread,
 // so they are exact rather than timing-dependent.
 class ScanLogPublisherTest {
 
-    /** Records every committed batch; can be told to fail the next N inserts. */
-    static final class FakeWriter implements ScanLogBatchWriter {
+    /**
+     * Stands in for analytics-service: records every accepted batch; can be
+     * told to fail the next N pushes, to refuse the next push as a gap, or to
+     * be unreachable for max-seq.
+     */
+    static final class FakeWriter implements ScanSink {
         final List<List<ScanLogRow>> committed = new ArrayList<>();
         final List<Long> attemptedFirstSeqs = new ArrayList<>();
         int failNext = 0;
         long maxSeq = 0;
+        boolean down = false;
+        Long gapOnce = null;         // refuse the next push, reporting this stored max
 
-        @Override public void insertBatch(List<ScanLogRow> rows) {
+        @Override public void push(List<ScanLogRow> rows) {
             attemptedFirstSeqs.add(rows.get(0).seq());
-            if (failNext > 0) { failNext--; throw new IllegalStateException("database unavailable"); }
+            if (failNext > 0) { failNext--; throw new IllegalStateException("analytics unavailable"); }
+            if (gapOnce != null) { long m = gapOnce; gapOnce = null; throw new ScanGapRejectedException(m); }
             committed.add(List.copyOf(rows));
         }
-        @Override public long maxSeq() { return maxSeq; }
+        @Override public long maxSeq() {
+            if (down) throw new IllegalStateException("analytics unavailable");
+            return maxSeq;
+        }
 
         List<Long> allSeqs() {
             List<Long> out = new ArrayList<>();
@@ -58,7 +70,7 @@ class ScanLogPublisherTest {
     }
 
     @Test
-    @DisplayName("a failed insert is retried with the SAME seqs, so no hole opens")
+    @DisplayName("a failed push is retried with the SAME seqs, so no hole opens")
     void retriesWithSameSeqs() throws Exception {
         FakeWriter w = new FakeWriter();
         w.failNext = 2;
@@ -108,7 +120,7 @@ class ScanLogPublisherTest {
     }
 
     @Test
-    @DisplayName("collects for up to the linger time, so a burst becomes one INSERT")
+    @DisplayName("collects for up to the linger time, so a burst becomes one push")
     void lingerCollectsABatch() throws Exception {
         FakeWriter w = new FakeWriter();
         ScanLogPublisher p = new ScanLogPublisher(w, 100, 10, 200);
@@ -127,7 +139,7 @@ class ScanLogPublisherTest {
     }
 
     @Test
-    @DisplayName("after a restart, numbering continues from MAX(seq) in scan_log")
+    @DisplayName("after a restart, numbering continues from analytics' stored maximum")
     void resumesAfterRestart() throws Exception {
         FakeWriter w = new FakeWriter();
         w.maxSeq = 41_500;
@@ -136,5 +148,40 @@ class ScanLogPublisherTest {
         p.recordScan("SKU-1");
         assertTrue(p.writeOnce(10));
         assertEquals(List.of(41_501L), w.allSeqs());
+    }
+
+    @Test
+    @DisplayName("analytics down at startup: no seq yet, scans wait in the queue, then numbering starts at its max")
+    void startsWithoutAnalytics() throws Exception {
+        FakeWriter w = new FakeWriter();
+        w.down = true;
+        ScanLogPublisher p = new ScanLogPublisher(w, 100, 10, 0);
+        assertFalse(p.trySync(), "analytics did not answer");
+        p.recordScan("SKU-1");                 // the customer is not held up
+        p.recordScan("SKU-2");
+        assertEquals(2, p.accepted());
+        assertEquals(2, p.queueDepth(), "buffered, not sent: the starting seq is not known yet");
+
+        w.down = false;
+        w.maxSeq = 9_000;
+        assertTrue(p.trySync());
+        assertTrue(p.writeOnce(10));
+        assertEquals(List.of(9_001L, 9_002L), w.allSeqs());
+    }
+
+    @Test
+    @DisplayName("a batch refused as a gap is renumbered from analytics' maximum, never left with a hole")
+    void gapRefusalRenumbers() throws Exception {
+        FakeWriter w = new FakeWriter();
+        ScanLogPublisher p = new ScanLogPublisher(w, 100, 10, 0);
+        p.resumeFrom(500);                     // we think analytics has 1..500
+        w.gapOnce = 120L;                      // but it only has 1..120
+        p.recordScan("SKU-1");
+        p.recordScan("SKU-2");
+        assertTrue(p.writeOnce(10));
+        assertEquals(List.of(121L, 122L), w.allSeqs());
+        p.recordScan("SKU-3");
+        assertTrue(p.writeOnce(10));
+        assertEquals(List.of(121L, 122L, 123L), w.allSeqs());
     }
 }

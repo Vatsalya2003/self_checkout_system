@@ -1,7 +1,8 @@
 package com.selfcheckout.self_checkout.scanlog;
 
-import com.selfcheckout.self_checkout.persistence.repository.ScanLogBatchWriter;
-import com.selfcheckout.self_checkout.persistence.repository.ScanLogRow;
+import com.selfcheckout.self_checkout.remote.ScanGapRejectedException;
+import com.selfcheckout.self_checkout.remote.ScanLogRow;
+import com.selfcheckout.self_checkout.remote.ScanSink;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
@@ -19,12 +20,16 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * CHECKOUT-SERVICE, scan-log layer. Publishes every scan to scan_log, which is
- * how analytics-service hears about scans without the two services calling
- * each other.
+ * CHECKOUT-SERVICE, scan-log layer. Hands every scan to analytics-service.
  *
  *   request thread --offer (<= 10 ms)--> [bounded queue] --> writer thread
- *       --> numbers each scan, then one multi-row INSERT per batch --> scan_log
+ *       --> numbers each scan, then one HTTP push per batch
+ *       --> analytics POST /internal/scans --> analytics' own scan_log
+ *
+ * Week 5: until Week 4 the writer INSERTed into a scan_log table in the shared
+ * database. Each service now has its own database, so the same batches are
+ * pushed to analytics over HTTP instead; analytics stores them itself. Every
+ * rule below is unchanged -- only the last hop is different.
  *
  * The rules, and why each one exists:
  *
@@ -52,8 +57,17 @@ import java.util.concurrent.atomic.AtomicLong;
  *     database hiccup cannot open a hole. The counter only moves on after a
  *     batch has committed.
  *
- *  6. After a restart the counter carries on from MAX(seq) in scan_log, so a
- *     restarted checkout-service keeps the sequence gapless.
+ *  6. After a restart the counter carries on from analytics' stored maximum
+ *     (GET /internal/scans/max-seq), so a restarted checkout-service keeps the
+ *     sequence gapless. If analytics is down at that moment, checkout starts
+ *     and serves customers anyway: the writer thread asks again until
+ *     analytics answers, and scans wait in the bounded queue meanwhile
+ *     (dropped and counted if it fills).
+ *
+ *  7. If analytics ever refuses a batch as a gap (409 -- only possible if its
+ *     data was reset while checkout kept running), the not-yet-delivered batch
+ *     is renumbered from analytics' maximum. Those scans were never stored
+ *     anywhere, so renumbering them cannot duplicate anything.
  *
  * The write logic lives in writeOnce(), apart from the thread, so the tests
  * can drive it directly without timing.
@@ -70,12 +84,13 @@ public class ScanLogPublisher implements ScanRecorder {
     private static final long METRICS_INTERVAL_MILLIS = 10_000;
     private static final long SHUTDOWN_RETRY_MILLIS = 30_000;
 
-    private final ScanLogBatchWriter writer;
+    private final ScanSink sink;
     private final BlockingQueue<ScanEvent> queue;
     private final long offerMillis;
     private final long lingerMillis;
 
     private long nextSeq;                         // owned by the writer thread only
+    private volatile boolean synced = false;      // nextSeq known (analytics answered max-seq)
     private volatile boolean stopping = false;
     private volatile Thread writerThread;
     private volatile Thread metricsThread;
@@ -86,18 +101,19 @@ public class ScanLogPublisher implements ScanRecorder {
     private final AtomicLong batches = new AtomicLong();
     private final AtomicLong writeErrors = new AtomicLong();
     private final AtomicLong lost = new AtomicLong();
+    private final AtomicLong resyncs = new AtomicLong();
     private volatile int maxDepth = 0;
     private volatile long lastSeq = 0;
 
     @Autowired
-    public ScanLogPublisher(ScanLogBatchWriter writer,
+    public ScanLogPublisher(ScanSink sink,
                             @Value("${selfcheckout.scan-log.max-linger-ms:50}") long lingerMillis) {
-        this(writer, QUEUE_CAPACITY, OFFER_MILLIS, lingerMillis);
+        this(sink, QUEUE_CAPACITY, OFFER_MILLIS, lingerMillis);
     }
 
     /** For tests: a small queue, a short offer wait, and usually no linger. */
-    ScanLogPublisher(ScanLogBatchWriter writer, int capacity, long offerMillis, long lingerMillis) {
-        this.writer = writer;
+    ScanLogPublisher(ScanSink sink, int capacity, long offerMillis, long lingerMillis) {
+        this.sink = sink;
         this.queue = new ArrayBlockingQueue<>(capacity);
         this.offerMillis = offerMillis;
         this.lingerMillis = lingerMillis;
@@ -105,7 +121,9 @@ public class ScanLogPublisher implements ScanRecorder {
 
     @PostConstruct
     public void start() {
-        resumeFrom(writer.maxSeq());
+        // No resumeFrom() here: asking analytics for max-seq at startup would
+        // make checkout's startup depend on analytics. The writer thread does
+        // it instead (syncSeq), and keeps asking until analytics answers.
         Thread w = new Thread(this::writerLoop, "scanlog-writer");
         w.setDaemon(true);
         w.start();
@@ -114,14 +132,27 @@ public class ScanLogPublisher implements ScanRecorder {
         m.setDaemon(true);
         m.start();
         metricsThread = m;
-        log.info("scan-log publisher started: next seq {}, batches of up to {} rows or {} ms",
-                nextSeq, MAX_BATCH, lingerMillis);
+        log.info("scan-log publisher started: batches of up to {} rows or {} ms; seq continues from analytics' max",
+                MAX_BATCH, lingerMillis);
     }
 
-    /** Continue numbering after the highest seq already in scan_log. */
-    void resumeFrom(long maxSeqInTable) {
-        nextSeq = maxSeqInTable + 1;
-        lastSeq = maxSeqInTable;
+    /** Continue numbering after the highest seq analytics has stored. */
+    void resumeFrom(long storedMax) {
+        nextSeq = storedMax + 1;
+        lastSeq = storedMax;
+        synced = true;
+    }
+
+    /** One attempt to learn where numbering continues. True once analytics has answered. */
+    boolean trySync() {
+        try {
+            long max = sink.maxSeq();
+            resumeFrom(max);
+            log.info("scan-log publisher: analytics has seq 1..{}, numbering continues at {}", max, nextSeq);
+            return true;
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 
     // ---- request thread side ---------------------------------------------
@@ -152,6 +183,23 @@ public class ScanLogPublisher implements ScanRecorder {
 
     private void writerLoop() {
         try {
+            long backoff = 100;
+            boolean warned = false;
+            while (!synced) {
+                if (trySync()) {
+                    break;
+                }
+                if (stopping && queue.isEmpty()) {
+                    log.info("scan-log writer stopped before analytics answered: {}", summary());
+                    return;
+                }
+                if (!warned) {
+                    log.warn("scan-log publisher: analytics is not answering; buffering scans until it does");
+                    warned = true;
+                }
+                Thread.sleep(backoff);
+                backoff = Math.min(backoff * 2, 2_000);
+            }
             while (true) {
                 boolean wrote = writeOnce(POLL_MILLIS);
                 if (!wrote && stopping && queue.isEmpty()) {
@@ -206,16 +254,29 @@ public class ScanLogPublisher implements ScanRecorder {
         long gaveUpAt = Long.MAX_VALUE;
         while (true) {
             try {
-                writer.insertBatch(rows);
+                sink.push(rows);
                 nextSeq = rows.get(rows.size() - 1).seq() + 1;
                 lastSeq = nextSeq - 1;
                 written.addAndGet(rows.size());
                 batches.incrementAndGet();
                 return;
+            } catch (ScanGapRejectedException gap) {
+                // Analytics has less than we thought. These rows were never
+                // stored, so give them the next numbers analytics expects.
+                resyncs.incrementAndGet();
+                log.warn("analytics refused seq {}.. as a gap (it has 1..{}); renumbering the batch",
+                        rows.get(0).seq(), gap.storedMax());
+                long seq = gap.storedMax() + 1;
+                List<ScanLogRow> renumbered = new ArrayList<>(rows.size());
+                for (ScanLogRow r : rows) {
+                    renumbered.add(new ScanLogRow(seq++, r.sku(), r.scannedAt()));
+                }
+                rows = renumbered;
+                continue;
             } catch (RuntimeException e) {
                 writeErrors.incrementAndGet();
-                log.warn("scan_log insert of seq {}..{} failed; retrying with the same seqs",
-                        rows.get(0).seq(), rows.get(rows.size() - 1).seq(), e);
+                log.warn("scan push of seq {}..{} failed; retrying with the same seqs: {}",
+                        rows.get(0).seq(), rows.get(rows.size() - 1).seq(), e.toString());
                 if (stopping && gaveUpAt == Long.MAX_VALUE) {
                     gaveUpAt = System.currentTimeMillis() + SHUTDOWN_RETRY_MILLIS;
                 }
@@ -223,7 +284,7 @@ public class ScanLogPublisher implements ScanRecorder {
                     // Only while shutting down with the database gone. The
                     // counter does not move, so the table still has no gap.
                     lost.addAndGet(rows.size());
-                    log.error("giving up on {} scan_log rows at shutdown", rows.size());
+                    log.error("giving up on {} scans at shutdown (analytics unreachable)", rows.size());
                     return;
                 }
                 Thread.sleep(backoff);
@@ -247,9 +308,10 @@ public class ScanLogPublisher implements ScanRecorder {
     public String summary() {
         long b = batches.get();
         return String.format("scan-log publisher | accepted=%d written=%d dropped=%d lost=%d | batches=%d avgBatch=%d "
-                        + "| queue depth=%d max=%d cap=%d | lastSeq=%d | writeErrors=%d",
+                        + "| queue depth=%d max=%d cap=%d | lastSeq=%d | writeErrors=%d resyncs=%d synced=%s",
                 accepted.get(), written.get(), dropped.get(), lost.get(), b, b == 0 ? 0 : written.get() / b,
-                queue.size(), maxDepth, queue.size() + queue.remainingCapacity(), lastSeq, writeErrors.get());
+                queue.size(), maxDepth, queue.size() + queue.remainingCapacity(), lastSeq, writeErrors.get(),
+                resyncs.get(), synced);
     }
 
     /**

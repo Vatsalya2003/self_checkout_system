@@ -14,15 +14,15 @@ import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
 /**
  * analytics-service's table ownership, as an executable test.
  *
- * All four services share one database, so "which service may change which
- * table" is the coupling that matters (SERVICES.md has the full matrix).
- * analytics-service writes ONE table, popular_snapshots, through ONE class,
- * JdbcSnapshotWriter. It reads scan_log and items.
+ * Week 5: analytics-service has its own database (analytics_db) with two
+ * tables, and each has exactly one writing class: JdbcScanStore (the scans
+ * checkout pushes to POST /internal/scans) and JdbcSnapshotWriter (the sink's
+ * windows). Item names come from catalog-service over HTTP.
  *
  * ArchUnit cannot read SQL strings, so this checks the next best thing: which
- * classes are allowed to make a call that can write at all. The table-level
- * rule is also enforced by the database itself (per-service roles and GRANTs,
- * db/roles.sql).
+ * classes are allowed to make a call that can write at all. The database also
+ * refuses anything else (db/analytics/grants.sql), and no other service can
+ * even connect to analytics_db.
  */
 class OwnershipTest {
 
@@ -61,11 +61,12 @@ class OwnershipTest {
             };
 
     @Test
-    @DisplayName("only JdbcSnapshotWriter writes, so popular_snapshots is the only table written")
-    void onlyTheSnapshotWriterWrites() {
+    @DisplayName("only the scan store and the snapshot writer write to the database")
+    void onlyTheTwoWritersWrite() {
         noClasses().that().doNotHaveSimpleName("JdbcSnapshotWriter")
+                .and().doNotHaveSimpleName("JdbcScanStore")
                 .should().callMethodWhere(A_DATABASE_WRITE)
-                .because("analytics-service may only write popular_snapshots, and only the sink does that")
+                .because("analytics-service writes scan_log (pushed scans) and popular_snapshots (the sink), nothing else")
                 .check(classes);
     }
 
@@ -86,7 +87,9 @@ class OwnershipTest {
     @Test
     @DisplayName("HTTP and web types stay inside the API layer")
     void httpTypesDoNotLeakOutOfApi() {
-        noClasses().that().resideOutsideOfPackage("..api..")
+        // ..remote.. is the catalog client (catalog-client library): an
+        // outbound HTTP adapter, so it is allowed to know about HTTP too.
+        noClasses().that().resideOutsideOfPackages("..api..", "..remote..")
                 .should().dependOnClassesThat()
                 .resideInAnyPackage("org.springframework.http..", "org.springframework.web..")
                 .because("only the API layer may know about HTTP; business layers throw domain exceptions instead")

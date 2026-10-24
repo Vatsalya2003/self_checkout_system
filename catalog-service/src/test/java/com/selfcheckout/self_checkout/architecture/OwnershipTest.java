@@ -14,14 +14,12 @@ import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
 /**
  * catalog-service's table ownership, as an executable test.
  *
- * All four services share one database, so "which service may change which
- * table" is the coupling that matters (SERVICES.md has the full matrix).
- * catalog-service writes NO table: it only reads items.
+ * Week 5: catalog-service has its own database (catalog_db) and writes NO
+ * table in it: the catalog is seeded by db/reset.sh and only ever read.
  *
- * ArchUnit cannot read SQL strings, so this checks the next best thing: which
- * classes are allowed to make a call that can write at all. The table-level
- * rule is also enforced by the database itself (per-service roles and GRANTs,
- * db/roles.sql).
+ * ArchUnit cannot read SQL strings, so this checks the next best thing: no
+ * class may make a call that can write at all. The database also refuses it
+ * (db/catalog/grants.sql gives catalog_svc SELECT only).
  */
 class OwnershipTest {
 
@@ -84,7 +82,11 @@ class OwnershipTest {
     @Test
     @DisplayName("HTTP and web types stay inside the API layer")
     void httpTypesDoNotLeakOutOfApi() {
-        noClasses().that().resideOutsideOfPackage("..api..")
+        // ..remote.. is the catalog-client library's HttpCatalogCache: on this
+        // service's classpath for the shared CatalogCache interface, never used
+        // here (catalog-service reads its own database), and allowed to know
+        // about HTTP because it is an outbound client.
+        noClasses().that().resideOutsideOfPackages("..api..", "..remote..")
                 .should().dependOnClassesThat()
                 .resideInAnyPackage("org.springframework.http..", "org.springframework.web..")
                 .because("only the API layer may know about HTTP; business layers throw domain exceptions instead")

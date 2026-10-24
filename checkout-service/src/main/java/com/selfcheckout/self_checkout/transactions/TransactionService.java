@@ -1,86 +1,86 @@
 package com.selfcheckout.self_checkout.transactions;
 
-import com.selfcheckout.self_checkout.scanlog.ScanRecorder;
-import com.selfcheckout.self_checkout.config.SelfCheckoutProperties;
 import com.selfcheckout.self_checkout.persistence.entity.Transaction;
+import com.selfcheckout.self_checkout.persistence.entity.TransactionStatus;
 import com.selfcheckout.self_checkout.persistence.repository.CatalogCache;
 import com.selfcheckout.self_checkout.persistence.repository.CatalogEntry;
-import com.selfcheckout.self_checkout.persistence.repository.CompletedTransactionWriter;
-import com.selfcheckout.self_checkout.persistence.repository.LowStockAlertWriter;
-import com.selfcheckout.self_checkout.persistence.repository.StockUpdater;
+import com.selfcheckout.self_checkout.persistence.repository.SaleWriter;
+import com.selfcheckout.self_checkout.persistence.repository.SaleWriter.PendingSale;
 import com.selfcheckout.self_checkout.persistence.repository.TransactionRepository;
+import com.selfcheckout.self_checkout.scanlog.ScanRecorder;
+import com.selfcheckout.self_checkout.transactions.PaymentSaga.StockNotCommittedException;
+import com.selfcheckout.self_checkout.transactions.PaymentSaga.StockOutcomeUnknownException;
 import com.selfcheckout.self_checkout.transactions.exception.EmptyTransactionException;
 import com.selfcheckout.self_checkout.transactions.exception.InvalidRequestException;
 import com.selfcheckout.self_checkout.transactions.exception.ItemNotFoundException;
+import com.selfcheckout.self_checkout.transactions.exception.ServiceUnavailableException;
 import com.selfcheckout.self_checkout.transactions.exception.TransactionNotFoundException;
 import com.selfcheckout.self_checkout.transactions.exception.TransactionNotOpenException;
 import com.selfcheckout.self_checkout.transactions.result.ReceiptLineView;
 import com.selfcheckout.self_checkout.transactions.result.ReceiptView;
 import com.selfcheckout.self_checkout.transactions.result.ScanOutcome;
 import com.selfcheckout.self_checkout.transactions.result.TransactionView;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 // CHECKOUT-SERVICE, TRANSACTIONS layer -- the heart of the project.
 //
-// Where the data lives, after the performance work:
-//   OPEN basket   -> memory only (OpenTransactionStore). Nobody has paid.
-//   PAID basket   -> the database, in one transaction, fully durable.
-//   stock         -> the database, always, under row locks.
+// Where the data lives, since Week 5 (microservices, a database per service):
+//   OPEN basket   -> this process's memory only (OpenTransactionStore)
+//   PAID basket   -> checkout_db, this service's own database
+//   stock         -> inventory_db, owned by inventory-service -- NOT reachable
+//                    from here; changed only through its stock-commit call
 //
-// So start and scan do NO database work at all on the request thread, and
-// complete is the only endpoint that talks to Postgres on the checkout path.
-// (Since Week 4 every scan is also appended to scan_log for analytics-service,
-// but by a background writer thread with its own pool -- see ScanLogPublisher.)
+// So paying is no longer one database transaction: it changes two databases
+// owned by two services. It is a SAGA, and this class is its orchestrator
+// (see complete() and MICROSERVICES.md). Start and scan are unchanged: pure
+// memory, no SQL, no network.
 @Service
 public class TransactionService {
+
+    private static final Logger log = LoggerFactory.getLogger(TransactionService.class);
+
+    // How long a payment keeps retrying the stock commit before it answers
+    // 503. Well inside the load client's 10 s request timeout.
+    private static final Duration STOCK_COMMIT_BUDGET = Duration.ofSeconds(3);
+    // tx B is a local write; it gets its own short budget before the resolver
+    // takes over.
+    private static final Duration FINISH_BUDGET = Duration.ofSeconds(3);
 
     private final OpenTransactionStore openTransactions;
     private final CatalogCache catalog;
     private final TransactionRepository transactionRepository;
-    private final CompletedTransactionWriter completedWriter;
-    private final StockUpdater stockUpdater;
-    private final LowStockAlertWriter lowStockAlertWriter;
-    private final SelfCheckoutProperties properties;
+    private final SaleWriter sales;
+    private final PaymentSaga saga;
+    private final SagaResolver resolver;
+    private final SagaCounters counters;
     private final ScanRecorder scanRecorder;
-
-    // An explicit transaction boundary instead of @Transactional on a private
-    // helper. complete() calls that helper from inside this same class, which
-    // means Spring's proxy is never involved and the annotation would be
-    // silently ignored -- every statement would autocommit and the item row
-    // locks would be released the instant they were taken.
-    private final TransactionTemplate transactionTemplate;
-    private final CheckoutTimings timings;
 
     public TransactionService(OpenTransactionStore openTransactions,
                               CatalogCache catalog,
                               TransactionRepository transactionRepository,
-                              CompletedTransactionWriter completedWriter,
-                              StockUpdater stockUpdater,
-                              LowStockAlertWriter lowStockAlertWriter,
-                              SelfCheckoutProperties properties,
-                              ScanRecorder scanRecorder,
-                              PlatformTransactionManager transactionManager,
-                              CheckoutTimings timings) {
+                              SaleWriter sales,
+                              PaymentSaga saga,
+                              SagaResolver resolver,
+                              SagaCounters counters,
+                              ScanRecorder scanRecorder) {
         this.openTransactions = openTransactions;
         this.catalog = catalog;
         this.transactionRepository = transactionRepository;
-        this.completedWriter = completedWriter;
-        this.stockUpdater = stockUpdater;
-        this.lowStockAlertWriter = lowStockAlertWriter;
-        this.properties = properties;
+        this.sales = sales;
+        this.saga = saga;
+        this.resolver = resolver;
+        this.counters = counters;
         this.scanRecorder = scanRecorder;
-        this.transactionTemplate = new TransactionTemplate(transactionManager);
-        this.timings = timings;
     }
 
     /**
@@ -140,10 +140,10 @@ public class TransactionService {
         }
 
         // The scan is now "committed" as far as the basket is concerned, so
-        // analytics can hear about it. Week 4: this hands the scan to the
-        // scan-log writer (a bounded offer that gives up after 10 ms, exactly
-        // as before), which appends it to scan_log for analytics-service to
-        // read. Still never blocks checkout on analytics.
+        // analytics can hear about it. This hands the scan to the scan-log
+        // writer (a bounded offer that gives up after 10 ms), which pushes it
+        // to analytics-service in a numbered batch (Week 5; Week 4 inserted
+        // it into a shared table). Never blocks checkout on analytics.
         scanRecorder.recordScan(item.sku());
 
         return new ScanOutcome(transactionId, item.sku(), item.name(),
@@ -151,19 +151,26 @@ public class TransactionService {
     }
 
     /**
-     * Take payment and move stock. The only checkout endpoint that touches the
-     * database.
+     * Take payment and move stock -- the payment SAGA, orchestrated from here.
      *
-     * Order of events:
-     *   1. claim the basket in memory (OPEN -> COMPLETING) so a second
-     *      complete gets 409 and a late scan gets 409
-     *   2. one database transaction: lock the item rows in ascending SKU
-     *      order, clamp, decrement, write the header + lines + any low-stock
-     *      crossings
-     *   3. drop the basket from memory
+     *   1. claim the basket in memory (OPEN -> COMPLETING). A second complete,
+     *      or a scan arriving at the same moment, now gets 409.
+     *   2. tx A (checkout_db): save the sale as PENDING, lines included.
+     *      This is the saga log, written BEFORE anything irreversible.
+     *   3. call inventory: POST /internal/stock/commit. THE PIVOT. Inventory
+     *      locks, clamps, decrements and records the commit in one local
+     *      transaction of its own, keyed on this transaction id.
+     *   4. tx B (checkout_db): store the applied quantities, status COMPLETED.
+     *   5. drop the basket from memory and return the receipt.
      *
-     * If step 2 fails the claim is released, so the basket goes back to OPEN
-     * and can be retried rather than being stranded.
+     * When step 3 fails, what happens depends on what we KNOW:
+     *   inventory certainly did not commit  -> undo tx A, basket back to
+     *       OPEN, 503 SERVICE_UNAVAILABLE. Nothing moved; the client retries.
+     *   no answer, so it may have committed -> 503, but the basket stays
+     *       COMPLETING (reopening it could sell the same units twice) and the
+     *       resolver keeps retrying the same commit until inventory answers,
+     *       then finishes the sale. A retry of complete meanwhile gets 409;
+     *       GET /transactions/{id} shows COMPLETED once it is resolved.
      */
     public ReceiptView complete(String transactionId) {
         OpenBasket basket = openTransactions.find(transactionId);
@@ -171,104 +178,67 @@ public class TransactionService {
             throw notFoundOrNotOpen(transactionId);
         }
 
+        // ---- 1. claim
         OpenBasket.Snapshot claimed = basket.claimForCompletion();
         if (claimed == null) {
             throw new TransactionNotOpenException("Transaction " + transactionId + " is COMPLETED");
         }
         if (claimed.lines().isEmpty()) {
             // Deliberately NOT claimed: an empty basket stays OPEN and can
-            // still be scanned into and completed later, exactly as it did
-            // when this was a rolled-back database transaction.
+            // still be scanned into and completed later.
             throw new EmptyTransactionException(
                     "Transaction " + transactionId + " has no scanned items");
         }
 
-        // lockGrantedAt is written inside the transaction and read after it
-        // commits, which is why it is a holder rather than a local.
-        long[] lockGrantedAt = new long[1];
-        long startedAt = System.nanoTime();
+        // ---- 2. tx A: the saga log
+        Instant completedAt = Instant.now();
+        PendingSale sale = new PendingSale(basket.id(), basket.stationId(), claimed.itemCount(),
+                claimed.runningTotal(), basket.startedAt(), completedAt, claimed.lines());
         try {
-            ReceiptView receipt = transactionTemplate.execute(
-                    status -> writePaidTransaction(basket, claimed, lockGrantedAt));
-            // Measured AFTER execute() returns, so the commit itself is inside
-            // the critical section -- which it is: the item rows stay locked
-            // until the commit completes.
-            long committedAt = System.nanoTime();
-            timings.record(lockGrantedAt[0] - startedAt, committedAt - lockGrantedAt[0]);
-            openTransactions.remove(transactionId);
-            return receipt;
+            sales.insertPending(sale);
         } catch (RuntimeException e) {
-            basket.releaseClaim();      // let the customer try again
+            basket.releaseClaim();          // nothing happened anywhere yet
             throw e;
         }
-    }
 
-    /**
-     * Everything that touches the database, inside one transaction opened by
-     * the TransactionTemplate above. Every item lock taken here is held until
-     * that transaction commits.
-     */
-    private ReceiptView writePaidTransaction(OpenBasket basket, OpenBasket.Snapshot claimed,
-                                             long[] lockGrantedAt) {
-        // Ascending SKU order. Every checkout takes its item locks in this one
-        // global order, which is what makes a deadlock impossible: a cycle
-        // would need some transaction to hold a higher SKU while waiting for a
-        // lower one, and sorted acquisition never does that.
-        List<String> skus = new ArrayList<>(claimed.lines().keySet());
-        skus.sort(String::compareTo);
-
-        Instant completedAt = Instant.now();
-        int threshold = properties.lowStockThreshold();
-
-        // ---- written BEFORE the lock, on purpose.
-        // Nothing in the header depends on stock, and every statement issued
-        // after the lock is granted is a statement the hottest row in the
-        // system spends queued behind us. Measured: the critical section was
-        // 1127us for four statements; this moves one of them out of it.
-        // Same database transaction either way, so a failure still rolls the
-        // header back.
-        completedWriter.insertHeader(basket.id(), basket.stationId(), claimed.itemCount(),
-                claimed.runningTotal(), basket.startedAt(), completedAt);
-
-        // ---- the only statement that takes locks: one, for the whole basket
-        Map<String, Integer> stockBefore = stockUpdater.lockAndReadStock(skus);
-        lockGrantedAt[0] = System.nanoTime();        // every item row is now held
-        if (stockBefore.size() != skus.size()) {
-            for (String sku : skus) {
-                if (!stockBefore.containsKey(sku)) {
-                    throw new ItemNotFoundException("Item " + sku + " not found");
-                }
+        // ---- 3. the pivot
+        Map<String, Integer> applied;
+        try {
+            applied = saga.commitStock(sale, STOCK_COMMIT_BUDGET);
+        } catch (StockNotCommittedException e) {
+            counters.rolledBack.incrementAndGet();
+            log.warn("payment {}: inventory did not commit ({}), basket reopened", transactionId, e.getMessage());
+            try {
+                sales.deletePending(transactionId);
+                basket.releaseClaim();
+            } catch (RuntimeException undoFailed) {
+                // Could not undo tx A, so the PENDING row stays. Finish it
+                // forward instead of reopening a basket with a sale on record.
+                resolver.handOff(transactionId);
             }
+            throw new ServiceUnavailableException(
+                    "Inventory is unavailable; the basket is still open, please try again");
+        } catch (StockOutcomeUnknownException e) {
+            counters.ambiguous.incrementAndGet();
+            log.warn("payment {}: no answer from inventory ({}), handed to the resolver", transactionId, e.getMessage());
+            resolver.handOff(transactionId);
+            throw new ServiceUnavailableException("Inventory did not answer; the payment for transaction "
+                    + transactionId + " will complete shortly, check GET /transactions/" + transactionId);
         }
 
-        // ---- everything else is arithmetic in Java, holding no new locks
-        Map<String, Integer> newStock = new LinkedHashMap<>();
-        List<String> crossings = new ArrayList<>();
-        List<CompletedTransactionWriter.Line> lines = new ArrayList<>(skus.size());
-        for (String sku : skus) {
-            int quantity = claimed.lines().get(sku);
-            int before = stockBefore.get(sku);
-
-            // Clamp: scans are never gated by stock, so a hot SKU can be
-            // scanned more often than it has units. Take what is really there
-            // so stock can never go negative, and record it separately so the
-            // shortfall stays visible instead of corrupting the invariant.
-            int applied = Math.min(before, quantity);
-            int after = before - applied;
-
-            newStock.put(sku, after);
-            // strict "<" on both sides: landing exactly ON the threshold is
-            // not below it
-            if (before >= threshold && after < threshold) {
-                crossings.add(sku);
-            }
-            lines.add(new CompletedTransactionWriter.Line(sku, quantity, applied));
+        // ---- 4. tx B, forward only
+        try {
+            saga.finishSale(transactionId, applied, FINISH_BUDGET);
+        } catch (StockOutcomeUnknownException e) {
+            counters.ambiguous.incrementAndGet();
+            resolver.handOff(transactionId);
+            throw new ServiceUnavailableException("The payment for transaction " + transactionId
+                    + " will complete shortly, check GET /transactions/" + transactionId);
         }
 
-        // ---- the writes that genuinely need the lock, then commit
-        stockUpdater.applyStock(newStock);
-        completedWriter.insertLines(basket.id(), lines);
-        lowStockAlertWriter.insertCrossings(crossings, completedAt);
+        // ---- 5. done
+        openTransactions.remove(transactionId);
+        counters.payments.incrementAndGet();
 
         // The receipt lists lines in the order they were first scanned, and
         // shows the SCANNED quantity -- that is what the customer is holding,
@@ -294,7 +264,11 @@ public class TransactionService {
         Transaction tx = transactionRepository.findById(transactionId)
                 .orElseThrow(() -> new TransactionNotFoundException(
                         "Transaction " + transactionId + " not found"));
-        return new TransactionView(tx.getId(), tx.getStationId(), tx.getStatus().name(),
+        // PENDING (a payment in progress, only visible here between a crash
+        // and its recovery) is not a status the contract knows; it has not
+        // been paid yet, so it is reported as OPEN.
+        String status = tx.getStatus() == TransactionStatus.PENDING ? "OPEN" : tx.getStatus().name();
+        return new TransactionView(tx.getId(), tx.getStationId(), status,
                 tx.getItemCount(), tx.getRunningTotal(), tx.getStartedAt());
     }
 

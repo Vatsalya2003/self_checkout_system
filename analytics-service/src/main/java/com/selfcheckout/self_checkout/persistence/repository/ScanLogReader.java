@@ -4,9 +4,9 @@ import java.util.List;
 
 // ANALYTICS-SERVICE, persistence layer. Reads the scan hand-off table.
 //
-// scan_log is written by checkout-service and only READ here. That table is
-// the whole connection between the two services: checkout appends every scan
-// with a gapless sequence number, and analytics reads them back in that order.
+// Week 5: scan_log is analytics' own table in analytics_db. JdbcScanStore
+// fills it with the batches checkout-service pushes (gapless seq, in order);
+// this reader hands them to the pipeline in exactly that order.
 public interface ScanLogReader {
 
     /** Up to limit rows with seq > afterSeq, in seq order. */

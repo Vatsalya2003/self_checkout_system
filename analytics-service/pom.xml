@@ -13,7 +13,7 @@
 	<dependencies>
 		<dependency>
 			<groupId>com.selfcheckout</groupId>
-			<artifactId>shared-data</artifactId>
+			<artifactId>catalog-client</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>com.selfcheckout</groupId>

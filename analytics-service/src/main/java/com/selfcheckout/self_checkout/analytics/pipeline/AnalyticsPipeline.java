@@ -20,9 +20,9 @@ import java.util.List;
 /**
  * ANALYTICS-SERVICE. Builds the pipeline and owns its threads.
  *
- * Shape (see PIPELINE.md and SERVICES.md):
+ * Shape (see PIPELINE.md and MICROSERVICES.md):
  *
- *   scan_log (written by checkout-service)
+ *   scan_log (analytics' own; filled from checkout's pushes, POST /internal/scans)
  *      --poll--> [poller] --put--> [window] --put--> [rank] --put--> [sink] --> popular_snapshots
  *
  * One thread per filter, a bounded queue between each pair, and every pipe a

@@ -5,6 +5,7 @@ import com.selfcheckout.self_checkout.transactions.exception.InvalidRequestExcep
 import com.selfcheckout.self_checkout.transactions.exception.ItemNotFoundException;
 import com.selfcheckout.self_checkout.transactions.exception.TransactionNotFoundException;
 import com.selfcheckout.self_checkout.transactions.exception.TransactionNotOpenException;
+import com.selfcheckout.self_checkout.transactions.exception.ServiceUnavailableException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -46,6 +47,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(EmptyTransactionException.class)
     public ResponseEntity<ApiError> handleEmpty(EmptyTransactionException e) {
         return build(HttpStatus.CONFLICT, "TRANSACTION_EMPTY", e.getMessage());
+    }
+
+    // ---- 503 (Week 5) ----
+    // A service this request depends on is down. Retry-After: 1 tells a
+    // well-behaved client to try again in a second, not hammer us.
+    @ExceptionHandler(ServiceUnavailableException.class)
+    public ResponseEntity<ApiError> handleUnavailable(ServiceUnavailableException e) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .header("Retry-After", "1")
+                .body(new ApiError("SERVICE_UNAVAILABLE", e.getMessage()));
     }
 
     // ---- 400s ----

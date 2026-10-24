@@ -5,13 +5,15 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 
-// INVENTORY-SERVICE entry point. Its own jar, its own process, port 8083.
+// INVENTORY-SERVICE entry point. Its own jar, its own process, port 8083, and
+// since Week 5 its own database, inventory_db.
 //
-// Business function: stock reporting. One endpoint, GET /inventory/low-stock.
-// It only READS: current stock from items and recorded crossings from
-// low_stock_alerts. Both are written by checkout-service, in the payment's own
-// database transaction -- the shared database is the only thing the two
-// services have in common.
+// Business function: stock. It owns every unit on the shelf and every
+// low-stock alert, and it is the only service that changes them:
+//   GET  /inventory/low-stock        public, through the gateway
+//   POST /internal/stock/commit      internal: the stock half of a payment,
+//                                    called by checkout-service (the saga's
+//                                    orchestrator), never through the gateway
 @SpringBootApplication
 @EnableConfigurationProperties(SelfCheckoutProperties.class)
 public class InventoryServiceApplication {

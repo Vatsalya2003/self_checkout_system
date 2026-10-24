@@ -8,8 +8,9 @@
 #   scripts/stop-all.sh && db/reset.sh && scripts/start-all.sh
 #
 # Each service is its own deployable unit: its own jar, its own JVM, its own
-# port and its own log file (logs/<service>.log). The gateway (nginx) starts
-# last, once every service answers, so the load client never sees a 502.
+# port, its own database (Week 5) and its own log file (logs/<service>.log).
+# The gateway (nginx) starts last, once every service answers, so the load
+# client never sees a 502.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -36,18 +37,15 @@ if [ $need_build = 1 ]; then
   ./mvnw -B -q -DskipTests package
 fi
 
-for s in "${SERVICES[@]}"; do
-  set -- $s
+launch() {   # name port heap
   if lsof -tiTCP:"$2" -sTCP:LISTEN >/dev/null; then
     echo "port $2 is already in use -- run scripts/stop-all.sh first" >&2; exit 1
   fi
   nohup "$JAVA" -Xmx"$3" -jar "$1/target/$1-0.0.1-SNAPSHOT.jar" > "logs/$1.log" 2>&1 &
   echo $! > "logs/$1.pid"
   echo "started $1 (pid $!) on :$2"
-done
-
-for s in "${SERVICES[@]}"; do
-  set -- $s
+}
+healthy() {  # name port heap path status
   for i in $(seq 120); do
     code=$(curl -s -o /dev/null -w '%{http_code}' "localhost:$2$4" || true)
     [ "$code" = "$5" ] && break
@@ -58,7 +56,13 @@ for s in "${SERVICES[@]}"; do
   done
   [ "$code" = "$5" ] || { echo "$1 did not become healthy" >&2; exit 1; }
   echo "  $1 healthy"
-done
+}
+
+# Week 5: catalog first. The other three load the catalog from its GET /items
+# at startup (they may not read catalog_db), so it should already answer.
+set -- ${SERVICES[0]}; launch "$@"; healthy "$@"
+for s in "${SERVICES[@]:1}"; do set -- $s; launch "$@"; done
+for s in "${SERVICES[@]:1}"; do set -- $s; healthy "$@"; done
 
 if lsof -tiTCP:8080 -sTCP:LISTEN >/dev/null; then
   echo "port 8080 is already in use -- run scripts/stop-all.sh first" >&2; exit 1

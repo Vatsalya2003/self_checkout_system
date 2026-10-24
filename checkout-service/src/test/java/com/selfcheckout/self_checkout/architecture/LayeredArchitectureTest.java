@@ -9,21 +9,25 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage;
 import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
 
 /**
  * checkout-service's layer rules, as an executable test.
  *
  * Week 2 introduced these rules for the whole application; in Week 4 each
- * service checks its own. checkout-service has four layers:
+ * service checks its own. Since Week 5 checkout-service has five layers:
  *
- *   api -> transactions -> scanlog -> persistence
- *                     \-----------------^   (transactions may also use persistence directly)
+ *   api -> transactions -> scanlog -> remote
+ *               |  \________________________^
+ *               v
+ *          persistence
  *
- * scanlog replaces the old "analytics" layer here: the transactions layer
- * reaches it through exactly one interface, ScanRecorder, and it appends scans
- * to scan_log for analytics-service. Analytics itself is no longer in this
- * process at all.
+ * scanlog: the transactions layer reaches it through exactly one interface,
+ * ScanRecorder; it numbers scans and pushes them to analytics-service.
+ * remote: the outbound HTTP clients (inventory, analytics, and the catalog
+ * client from the catalog-client library). It is the only layer besides the
+ * API allowed to know about HTTP, and it depends on nothing above it.
  *
  * The test reads compiled .class files; it never starts Spring.
  */
@@ -44,20 +48,29 @@ class LayeredArchitectureTest {
                 .layer("Transactions").definedBy("..transactions..")
                 .layer("ScanLog").definedBy("..scanlog..")
                 .layer("Persistence").definedBy("..persistence..")
+                .layer("Remote").definedBy("..remote..")
                 .whereLayer("API").mayNotBeAccessedByAnyLayer()
                 .whereLayer("Transactions").mayOnlyBeAccessedByLayers("API")
                 .whereLayer("ScanLog").mayOnlyBeAccessedByLayers("Transactions")
-                .whereLayer("Persistence").mayOnlyBeAccessedByLayers("Transactions", "ScanLog")
+                // Remote may see persistence's CatalogCache interface: the
+                // HTTP catalog client implements it.
+                .whereLayer("Persistence").mayOnlyBeAccessedByLayers("Transactions", "ScanLog", "Remote")
+                .whereLayer("Remote").mayOnlyBeAccessedByLayers("Transactions", "ScanLog")
+                // The domain exceptions (transactions.exception, from the
+                // shared-web library) are the shared error vocabulary: any
+                // layer may throw them. The catalog client throws
+                // ServiceUnavailableException when catalog-service is down.
+                .ignoreDependency(resideInAPackage("..remote.."), resideInAPackage("..transactions.exception.."))
                 .check(classes);
     }
 
     @Test
     @DisplayName("HTTP and web types stay inside the API layer")
     void httpTypesDoNotLeakOutOfApi() {
-        noClasses().that().resideOutsideOfPackage("..api..")
+        noClasses().that().resideOutsideOfPackages("..api..", "..remote..")
                 .should().dependOnClassesThat()
                 .resideInAnyPackage("org.springframework.http..", "org.springframework.web..")
-                .because("only the API layer may know about HTTP; business layers throw domain exceptions instead")
+                .because("only the API layer (inbound) and the remote layer (outbound) may know about HTTP")
                 .check(classes);
     }
 
@@ -74,7 +87,7 @@ class LayeredArchitectureTest {
     @DisplayName("persistence does not depend on any layer above it")
     void persistenceDependsOnNothingAbove() {
         noClasses().that().resideInAPackage("..persistence..")
-                .should().dependOnClassesThat().resideInAnyPackage("..api..", "..transactions..", "..scanlog..")
+                .should().dependOnClassesThat().resideInAnyPackage("..api..", "..transactions..", "..scanlog..", "..remote..")
                 .because("the database access layer is the bottom of the stack")
                 .check(classes);
     }
@@ -89,12 +102,23 @@ class LayeredArchitectureTest {
     }
 
     @Test
-    @DisplayName("config is a shared kernel and depends on no layer")
+    @DisplayName("remote depends on nothing above it")
+    void remoteDependsOnNothingAbove() {
+        // (the domain exceptions in transactions.exception are allowed, see above)
+        noClasses().that().resideInAPackage("..remote..")
+                .should().dependOnClassesThat().resideInAnyPackage("..api..", "..scanlog..",
+                        "com.selfcheckout.self_checkout.transactions", "..transactions.result..")
+                .because("outbound clients report outcomes; the saga above decides what they mean")
+                .check(classes);
+    }
+
+    @Test
+    @DisplayName("config wires beans and depends on no business layer")
     void configDependsOnNoLayer() {
         noClasses().that().resideInAPackage("..config..")
                 .should().dependOnClassesThat()
                 .resideInAnyPackage("..api..", "..transactions..", "..scanlog..", "..persistence..")
-                .because("shared configuration must not depend on the layers that read it")
+                .because("configuration only wires the remote clients; it must not depend on business code")
                 .check(classes);
     }
 }

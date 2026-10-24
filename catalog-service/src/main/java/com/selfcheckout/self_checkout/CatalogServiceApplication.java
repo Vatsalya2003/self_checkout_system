@@ -1,21 +1,18 @@
 package com.selfcheckout.self_checkout;
 
-import com.selfcheckout.self_checkout.config.SelfCheckoutProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 
-// CATALOG-SERVICE entry point. Its own jar, its own process, port 8081.
+// CATALOG-SERVICE entry point. Its own jar, its own process, port 8081, and
+// since Week 5 its own database, catalog_db.
 //
 // Business function: the product catalog. One endpoint, GET /items, answered
-// from the shared catalog cache (shared-data) -- the service reads the items
-// table and never writes anything.
+// from memory (JdbcCatalogCache). It reads catalog_db once and never writes.
 //
-// Starting it does NOT touch the database schema any more: db/reset.sh is the
-// one thing allowed to run schema.sql and data.sql, and every service runs
-// with spring.sql.init.mode=never.
+// The other services get the catalog from this endpoint too -- they can no
+// longer read the items table themselves, because it is in a database only
+// catalog_svc may connect to.
 @SpringBootApplication
-@EnableConfigurationProperties(SelfCheckoutProperties.class)
 public class CatalogServiceApplication {
 
 	public static void main(String[] args) {

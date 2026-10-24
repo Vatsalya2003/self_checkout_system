@@ -14,15 +14,15 @@ import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
 /**
  * inventory-service's table ownership, as an executable test.
  *
- * All four services share one database, so "which service may change which
- * table" is the coupling that matters (SERVICES.md has the full matrix).
- * inventory-service writes NO table: it only reads items and low_stock_alerts
- * (both written by checkout-service, inside the payment's transaction).
+ * Week 5: inventory-service has its own database (inventory_db) and is the
+ * only writer of stock, low_stock_alerts and the stock commits. Within the
+ * service, exactly one class may write: JdbcStockLedger. Everything else goes
+ * through it.
  *
  * ArchUnit cannot read SQL strings, so this checks the next best thing: which
- * classes are allowed to make a call that can write at all. The table-level
- * rule is also enforced by the database itself (per-service roles and GRANTs,
- * db/roles.sql).
+ * classes are allowed to make a call that can write at all. The database
+ * itself also refuses anything else (db/inventory/grants.sql), and no other
+ * service can even connect to inventory_db.
  */
 class OwnershipTest {
 
@@ -61,10 +61,11 @@ class OwnershipTest {
             };
 
     @Test
-    @DisplayName("inventory-service makes no database write of any kind")
-    void writesNothing() {
-        noClasses().should().callMethodWhere(A_DATABASE_WRITE)
-                .because("inventory-service only reports stock; checkout-service changes it")
+    @DisplayName("only the stock ledger writes to the database")
+    void onlyTheLedgerWrites() {
+        noClasses().that().doNotHaveSimpleName("JdbcStockLedger")
+                .should().callMethodWhere(A_DATABASE_WRITE)
+                .because("every change to stock goes through one class, inside the stock commit's transaction")
                 .check(classes);
     }
 
@@ -85,7 +86,9 @@ class OwnershipTest {
     @Test
     @DisplayName("HTTP and web types stay inside the API layer")
     void httpTypesDoNotLeakOutOfApi() {
-        noClasses().that().resideOutsideOfPackage("..api..")
+        // ..remote.. is the catalog client (catalog-client library): an
+        // outbound HTTP adapter, so it is allowed to know about HTTP too.
+        noClasses().that().resideOutsideOfPackages("..api..", "..remote..")
                 .should().dependOnClassesThat()
                 .resideInAnyPackage("org.springframework.http..", "org.springframework.web..")
                 .because("only the API layer may know about HTTP; business layers throw domain exceptions instead")
