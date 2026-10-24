@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Scan Hand-off: checkout → HTTP push → analytics",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "viewBox": [1300, 540]
+  },
+  "components": [
+    { "id": "scan", "type": "external", "label": "Scan", "sublabel": "POST …/items", "pos": [30, 110], "size": [150, 64] },
+    { "id": "writer", "type": "backend", "label": "Batching writer", "sublabel": "numbers seq, one thread", "pos": [250, 110], "size": [200, 64], "tag": "queue 65,536" },
+    { "id": "ingest", "type": "backend", "label": "Scan ingest", "sublabel": "no gaps, no doubles", "pos": [560, 110], "size": [180, 64] },
+    { "id": "scanlog", "type": "database", "label": "scan_log", "sublabel": "analytics_db · seq 1..K", "pos": [800, 110], "size": [180, 64] },
+    { "id": "poller", "type": "backend", "label": "ScanLogPoller", "sublabel": "stalls on a gap", "pos": [1050, 110], "size": [180, 64] },
+    { "id": "window", "type": "backend", "label": "Window", "sublabel": "last 1,000 scans", "pos": [1050, 360], "size": [180, 64] },
+    { "id": "rank", "type": "backend", "label": "Rank", "sublabel": "top 10, ties by SKU", "pos": [800, 360], "size": [180, 64] },
+    { "id": "sink", "type": "backend", "label": "Sink", "sublabel": "batched writes", "pos": [560, 360], "size": [180, 64] },
+    { "id": "snapshots", "type": "database", "label": "popular_snapshots", "sublabel": "analytics_db", "pos": [280, 360], "size": [180, 64] },
+    { "id": "reader", "type": "external", "label": "GET /analytics/popular-items", "sublabel": "via the gateway", "pos": [10, 470], "size": [230, 56] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "checkout-service :8082", "wraps": ["writer"], "pad": 22 },
+    { "kind": "region", "label": "analytics-service :8084", "wraps": ["ingest", "scanlog", "poller", "window", "rank", "sink"], "pad": 22 }
+  ],
+  "connections": [
+    { "id": "scan-writer", "from": "scan", "to": "writer", "label": "offer ≤10 ms", "variant": "emphasis" },
+    { "id": "writer-ingest", "from": "writer", "to": "ingest", "label": "POST /internal/scans", "variant": "emphasis" },
+    { "id": "ingest-log", "from": "ingest", "to": "scanlog", "label": "INSERT", "variant": "emphasis" },
+    { "id": "log-poller", "from": "scanlog", "to": "poller", "label": "seq > last" },
+    { "id": "poller-window", "from": "poller", "to": "window", "label": "in seq order", "labelAt": [1140, 267] },
+    { "id": "window-rank", "from": "window", "to": "rank", "label": "every 500th" },
+    { "id": "rank-sink", "from": "rank", "to": "sink", "label": "top 10" },
+    { "id": "sink-snap", "from": "sink", "to": "snapshots", "label": "INSERT" },
+    { "id": "snap-reader", "from": "snapshots", "to": "reader", "label": "latest", "variant": "dashed", "fromSide": "bottom", "toSide": "right" }
+  ],
+  "cards": [
+    { "dot": "emerald", "title": "Gapless, no duplicates", "items": ["one thread numbers seq, at batch time", "batch N+1 only after N is acknowledged", "retried batches absorbed by the seq primary key"] },
+    { "dot": "cyan", "title": "Never blocks a customer", "items": ["the scan only offers to a bounded queue", "full queue: dropped and counted", "analytics down: checkout keeps serving"] },
+    { "dot": "amber", "title": "Restart-safe", "items": ["checkout resumes at analytics' max-seq + 1", "starts fine while analytics is down", "analytics reloads its window from scan_log"] }
+  ]
+}

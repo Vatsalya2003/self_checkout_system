@@ -2,12 +2,12 @@
   "schema_version": 1,
   "diagram_type": "architecture",
   "meta": {
-    "title": "Self-Checkout: Four Services, One Database",
+    "title": "Self-Checkout Microservices",
     "locale": "en",
     "quality_profile": "showcase",
     "viewBox": [
-      1390,
-      660
+      1300,
+      700
     ]
   },
   "components": [
@@ -18,7 +18,7 @@
       "sublabel": "one base URL",
       "pos": [
         30,
-        300
+        330
       ],
       "size": [
         140,
@@ -29,13 +29,13 @@
       "id": "gateway",
       "type": "cloud",
       "label": "nginx gateway",
-      "sublabel": ":8080 · path routing",
+      "sublabel": ":8080 · /internal/** = 404",
       "pos": [
         220,
-        300
+        330
       ],
       "size": [
-        160,
+        180,
         64
       ]
     },
@@ -45,11 +45,25 @@
       "label": "catalog-service",
       "sublabel": ":8081 · GET /items",
       "pos": [
-        470,
-        90
+        500,
+        100
       ],
       "size": [
-        200,
+        210,
+        64
+      ]
+    },
+    {
+      "id": "inventory",
+      "type": "backend",
+      "label": "inventory-service",
+      "sublabel": ":8083 · /inventory/low-stock",
+      "pos": [
+        500,
+        250
+      ],
+      "size": [
+        210,
         64
       ]
     },
@@ -59,28 +73,14 @@
       "label": "checkout-service",
       "sublabel": ":8082 · /transactions/**",
       "pos": [
-        470,
-        230
+        500,
+        400
       ],
       "size": [
-        200,
+        210,
         64
       ],
-      "tag": "in-memory baskets"
-    },
-    {
-      "id": "inventory",
-      "type": "backend",
-      "label": "inventory-service",
-      "sublabel": ":8083 · /inventory/low-stock",
-      "pos": [
-        470,
-        370
-      ],
-      "size": [
-        200,
-        64
-      ]
+      "tag": "saga orchestrator"
     },
     {
       "id": "analytics",
@@ -88,41 +88,82 @@
       "label": "analytics-service",
       "sublabel": ":8084 · /analytics/popular-items",
       "pos": [
-        470,
-        510
+        500,
+        550
       ],
       "size": [
-        200,
+        210,
         64
       ]
     },
     {
-      "id": "db",
+      "id": "catdb",
       "type": "database",
-      "label": "PostgreSQL",
-      "sublabel": "self_checkout",
+      "label": "catalog_db",
+      "sublabel": "items",
       "pos": [
-        1180,
-        280
+        1060,
+        100
       ],
       "size": [
-        180,
-        104
+        190,
+        64
+      ]
+    },
+    {
+      "id": "invdb",
+      "type": "database",
+      "label": "inventory_db",
+      "sublabel": "stock · alerts · commits",
+      "pos": [
+        1060,
+        250
       ],
-      "tag": "one role per service"
+      "size": [
+        190,
+        64
+      ]
+    },
+    {
+      "id": "codb",
+      "type": "database",
+      "label": "checkout_db",
+      "sublabel": "transactions · lines",
+      "pos": [
+        1060,
+        400
+      ],
+      "size": [
+        190,
+        64
+      ]
+    },
+    {
+      "id": "andb",
+      "type": "database",
+      "label": "analytics_db",
+      "sublabel": "scan_log · snapshots",
+      "pos": [
+        1060,
+        550
+      ],
+      "size": [
+        190,
+        64
+      ]
     }
   ],
   "boundaries": [
     {
       "kind": "region",
-      "label": "No service-to-service calls",
+      "label": "one PostgreSQL server, four databases",
       "wraps": [
-        "catalog",
-        "checkout",
-        "inventory",
-        "analytics"
+        "catdb",
+        "invdb",
+        "codb",
+        "andb"
       ],
-      "pad": 24
+      "pad": 22
     }
   ],
   "connections": [
@@ -139,15 +180,15 @@
       "to": "catalog"
     },
     {
+      "id": "gw-inventory",
+      "from": "gateway",
+      "to": "inventory"
+    },
+    {
       "id": "gw-checkout",
       "from": "gateway",
       "to": "checkout",
       "variant": "emphasis"
-    },
-    {
-      "id": "gw-inventory",
-      "from": "gateway",
-      "to": "inventory"
     },
     {
       "id": "gw-analytics",
@@ -157,61 +198,83 @@
     {
       "id": "catalog-db",
       "from": "catalog",
-      "to": "db",
-      "label": "R items",
-      "variant": "dashed",
-      "labelSegment": 0
-    },
-    {
-      "id": "checkout-db",
-      "from": "checkout",
-      "to": "db",
-      "label": "R items · W stock, tx, lines, alerts, scan_log",
-      "variant": "emphasis",
-      "labelSegment": 0
+      "to": "catdb",
+      "label": "own DB only",
+      "variant": "dashed"
     },
     {
       "id": "inventory-db",
       "from": "inventory",
-      "to": "db",
-      "label": "R alerts, items",
-      "variant": "dashed",
-      "labelSegment": 0
+      "to": "invdb",
+      "label": "own DB only",
+      "variant": "dashed"
+    },
+    {
+      "id": "checkout-db",
+      "from": "checkout",
+      "to": "codb",
+      "label": "own DB only",
+      "variant": "dashed"
     },
     {
       "id": "analytics-db",
       "from": "analytics",
-      "to": "db",
-      "label": "R scan_log, items · W popular_snapshots",
-      "labelSegment": 0
+      "to": "andb",
+      "label": "own DB only",
+      "variant": "dashed"
+    },
+    {
+      "id": "saga",
+      "from": "checkout",
+      "to": "inventory",
+      "label": "stock commit (saga pivot)",
+      "variant": "emphasis",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "labelAt": [
+        605,
+        357
+      ]
+    },
+    {
+      "id": "scans",
+      "from": "checkout",
+      "to": "analytics",
+      "label": "scan batches (async)",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        605,
+        507
+      ]
     }
   ],
   "cards": [
     {
       "dot": "emerald",
-      "title": "One writer per table",
+      "title": "Own data store each",
       "items": [
-        "checkout writes items.stock, transactions, transaction_items, low_stock_alerts, scan_log",
-        "analytics writes popular_snapshots",
-        "catalog and inventory only read"
+        "catalog_db, inventory_db, checkout_db, analytics_db",
+        "a role can open its own database only",
+        "no cross-service joins are possible"
       ]
     },
     {
       "dot": "cyan",
-      "title": "Hand-off, not calls",
+      "title": "Talking over HTTP",
       "items": [
-        "checkout appends every scan to scan_log",
-        "analytics polls scan_log by seq",
-        "the database is the only coupling"
+        "checkout → inventory: POST /internal/stock/commit",
+        "checkout → analytics: POST /internal/scans",
+        "all three others load GET /items from catalog once"
       ]
     },
     {
       "dot": "rose",
-      "title": "Enforced three ways",
+      "title": "Payment = saga",
       "items": [
-        "no service module depends on another",
-        "ArchUnit ownership tests",
-        "per-service PostgreSQL roles and grants"
+        "checkout orchestrates; inventory's commit is the pivot",
+        "idempotent on transaction id; forward recovery",
+        "inventory down: 503, basket reopens, stock untouched"
       ]
     }
   ]

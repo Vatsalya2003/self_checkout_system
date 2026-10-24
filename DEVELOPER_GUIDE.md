@@ -1,4 +1,4 @@
-# Developer Guide — Self-Checkout: Services over a Shared Database
+# Developer Guide — Self-Checkout: Microservices, Each With Its Own Database
 
 A walkthrough of the whole project: what it does, how it is built, why each
 decision was made, and how to run and explain it.
@@ -17,126 +17,131 @@ numbers — it explains the *machinery* that produced them.
 
 ---
 
-## Week 4: four services, one database
+## Week 5: four microservices, four databases
 
-**Read this first.** Since Week 4 the system is **four services** (catalog, checkout,
-inventory, analytics). Each is its own Maven module, jar, process and port, and all four
-share one PostgreSQL database. An nginx gateway on `:8080` gives clients one base URL.
-[SERVICES.md](SERVICES.md) is the one-page summary.
+**Read this first.** Since Week 5 the system is **four microservices**. Each has its own
+Maven module, jar, process, port and **its own database**, which only its own PostgreSQL role
+can open. An nginx gateway on `:8080` gives clients one base URL.
+[MICROSERVICES.md](MICROSERVICES.md) is the one-page summary.
 
-The rest of this guide (§1–§12) was written for the single application. Its explanations
-still hold *inside* each service: the request flows, locking, sold-out handling, the
-in-memory baskets and the window/rank/sink filters. The code just moved to the module
-that owns it. Where something changed, this section says so.
+§1–§12 below were written for the single application and the Week 4 services. Their
+explanations still hold *inside* each service: the locking, the clamp, the in-memory
+baskets, and the window/rank/sink filters. What changed is **where each piece of data
+lives** and **how the services reach each other**, and this section covers both.
+
+### What moved where (Week 4 → Week 5)
+
+| Data / logic | Week 4 (shared database) | Week 5 |
+|---|---|---|
+| stock, low-stock alerts | checkout-service, shared `items.stock` | **inventory-service**, `inventory_db` |
+| the locking SELECT, clamp, decrement | checkout's `JdbcStockUpdater` | inventory's `JdbcStockLedger` + `StockCommitService` |
+| sales (`transactions`, `transaction_items`) | shared database | `checkout_db`, written in two steps (the saga) |
+| scan hand-off | checkout INSERTs into shared `scan_log` | checkout **pushes** batches to analytics, which stores them in `analytics_db.scan_log` |
+| catalog for prices and names | every service read `items` | catalog-service only; the others load `GET /items` once (`HttpCatalogCache`) |
+| lock timings log | `checkout timings` | `stock commit timings` (inventory) |
 
 ### Repository layout
 
 ```
-pom.xml                  parent pom: lists the modules, fixes shared versions
-shared-data/             library: read-only catalog cache, shared config properties
-shared-web/              library: error JSON shape, exception handler, domain exceptions
-catalog-service/         GET /items                                   :8081
-checkout-service/        POST/GET /transactions/**                    :8082
-inventory-service/       GET /inventory/low-stock                     :8083
-analytics-service/       GET /analytics/popular-items                 :8084
-gateway/nginx.conf       path routing on :8080, keep-alive to every service
-db/schema.sql, data.sql  the one shared schema and seed data
-db/roles.sql             one role per service, granted only what it uses
-db/reset.sh              recreate the tables, reseed, re-grant (services never touch the schema)
-scripts/start-all.sh     start the 4 jars, then the gateway (--build to rebuild)
-scripts/stop-all.sh      stop everything
-scripts/*.py, *.sql      behavioural tests, golden diff, invariant and window checks
+pom.xml                    parent pom: lists the modules, fixes shared versions
+catalog-client/            library: the CatalogCache interface + HttpCatalogCache (GET /items)
+shared-web/                library: error JSON, exception handler, domain exceptions (incl. 503)
+catalog-service/           GET /items                                 :8081  catalog_db
+checkout-service/          POST/GET /transactions/**                  :8082  checkout_db
+inventory-service/         GET /inventory/low-stock                   :8083  inventory_db
+                           POST /internal/stock/commit (internal)
+analytics-service/         GET /analytics/popular-items               :8084  analytics_db
+                           POST /internal/scans, GET /internal/scans/max-seq (internal)
+gateway/nginx.conf         path routing on :8080; /internal/** answered 404 by nginx
+db/<service>/              schema.sql, data.sql, grants.sql for each database
+db/roles.sql, db/reset.sh  one role per service; drop/create/seed/grant all four
+scripts/                   start/stop, invariant (check-invariant-micro.sh), failure tests,
+                           behavioural tests, golden diff
 ```
-
-Every service keeps the Week 2 layering inside itself (`api → business → persistence`),
-checked by its own ArchUnit test in `src/test/java/…/architecture/`.
 
 ### File tour, by service
 
 | Module | Files worth opening first |
 |---|---|
-| **shared-data** | `LazyCatalogCache`: loads `items` once with plain JDBC. Every service that needs names or prices uses it. `SelfCheckoutProperties`: threshold, window size, slide. |
-| **shared-web** | `ApiError`, `GlobalExceptionHandler` and the six domain exceptions. These keep the error bodies byte-for-byte what the single app returned. |
-| **catalog-service** | `ItemController` → `CatalogService` → the cache. No SQL of its own. |
-| **checkout-service** | `TransactionService`, `OpenBasket` and `OpenTransactionStore`: the whole sale, unchanged from Week 3. `JdbcStockUpdater`: lock late, commit early. `scanlog/ScanLogPublisher`: the hand-off to analytics (below). `ScanLogWriterPool`: its own 2-connection pool. |
-| **inventory-service** | `InventoryController` → `InventoryService` → `LowStockAlertRepository` (one JPQL join). Read-only; `Item` has no setter for stock. |
-| **analytics-service** | `pipeline/ScanLogPoller`: new, it reads `scan_log`. `pipeline/AnalyticsPipeline`: the wiring, restore-on-restart and lag metrics. `WindowFilter`, `RankFilter` and `SinkFilter` are unchanged from Week 3. `JdbcSnapshotWriter` is the only class in the service that writes. |
+| **checkout-service** | `transactions/TransactionService.complete()`: the saga, step by step. `PaymentSaga`: retrying the stock commit, and the rule for 503. `SagaResolver`: forward recovery (PENDING rows at startup, ambiguous payments). `persistence/JdbcSaleWriter`: tx A, tx B, and the one rollback delete. `remote/HttpInventoryClient`: how a failure is sorted into *not delivered* or *uncertain*. `scanlog/ScanLogPublisher`: numbering and pushing scans. |
+| **inventory-service** | `inventory/StockCommitService`: the pivot. An idempotency claim, then the lock, clamp and writes in one transaction. `persistence/JdbcStockLedger`: every SQL statement. `api/InternalStockController`: the internal endpoint. |
+| **analytics-service** | `analytics/ScanIngestService`: accepts pushed batches (no gaps, no duplicates). `persistence/JdbcScanStore`: the `ON CONFLICT (seq) DO NOTHING` insert. Everything from `ScanLogPoller` on is unchanged. |
+| **catalog-service** | `persistence/JdbcCatalogCache`: reads `catalog_db` once. |
+| **catalog-client** | `remote/HttpCatalogCache`: the other services' copy of the catalog, with a background warm-up. |
 
-**Removed in the split** (dead code, or replaced by `scan_log`): the Week 3 `IngestFilter`
-and `IngestTee` (numbering moved into checkout's publisher), `ScanLogWriterFilter`, the
-`ScanLog` entity and repository, `TransactionItem`/`TransactionItemId`, `ItemRepository`,
-`ScanCount`, and the `selfcheckout.analytics.persist-raw-scans` flag. `scan_log` is now
-**always written**, because it is the hand-off.
-
-### One scan, crossing the services
+### One payment, crossing two databases
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant C as Load client
-    participant G as nginx :8080
-    participant K as checkout-service :8082
-    participant Q as publisher queue<br/>(65,536, in checkout)
-    participant W as scan-log writer thread<br/>(in checkout)
-    participant L as scan_log (PostgreSQL)
-    participant P as ScanLogPoller<br/>(in analytics :8084)
-    participant F as window → rank → sink
-
-    C->>G: POST /transactions/{id}/items
-    G->>K: same request (keep-alive)
-    K->>K: add to the in-memory basket (no SQL)
-    K->>Q: offer(sku), at most 10 ms; if full, drop + count
-    K-->>G: 200 ScanResult
-    G-->>C: 200 ScanResult
-    Note over W: collects ≤ 1,000 events or 50 ms
-    W->>W: numbers them seq N+1 … N+k (the only thread that numbers)
-    W->>L: one multi-row INSERT (retried with the same seqs on failure)
-    loop every 50 ms
-        P->>L: SELECT … WHERE seq > last ORDER BY seq LIMIT 5000
-        L-->>P: rows
-        P->>P: hand on only while seq = last + 1 (stall on a gap)
-    end
-    P->>F: SequencedScanEvent
-    F->>F: every 500th seq: top 10 of the last 1,000
-    F->>L: INSERT popular_snapshots (batched)
+    participant S as Station (via nginx)
+    participant C as checkout-service
+    participant CD as checkout_db
+    participant I as inventory-service
+    participant ID as inventory_db
+    S->>C: POST /transactions/{id}/complete
+    C->>C: claim basket OPEN -> COMPLETING (memory)
+    C->>CD: tx A: INSERT transactions (PENDING) + transaction_items
+    C->>I: POST /internal/stock/commit {transactionId, lines}
+    I->>ID: INSERT stock_commits ON CONFLICT DO NOTHING (idempotency)
+    I->>ID: SELECT ... ORDER BY sku FOR NO KEY UPDATE
+    I->>ID: clamp, UPDATE stock, INSERT stock_commit_lines (+ alerts), COMMIT
+    I-->>C: 200 {applied per SKU}
+    C->>CD: tx B: applied_quantity, status COMPLETED
+    C-->>S: 200 receipt
 ```
 
-The scan's response never waits for any of steps 7–14. The two services never call each
-other; the table is the only thing they share. Three rules keep the windows exact:
+What happens when step 4 fails is decided by **what checkout knows**, in
+`TransactionService.complete()`:
 
-1. **Gapless seq.** One thread numbers events, and only once they are in a batch, so a
-   dropped event never uses a number. Batch N+1 is built only after batch N commits, so
-   the committed rows are always exactly `1..K`.
-2. **The poller never skips.** If it ever saw `seq = last + 2` it would stop and wait
-   (counted as `gapStalls`, which stays 0 in every run).
-3. **Restarts resume.** Checkout continues from `MAX(seq)`. Analytics reloads the last
-   1,000 scans before the newest stored window, then carries on from there.
-   `scripts/test-service-restart.sh` exercises both.
+| Inventory... | Checkout does | Client sees |
+|---|---|---|
+| refused the connection, or answered with an error (it had rolled back) | deletes the PENDING rows, reopens the basket | **503** `SERVICE_UNAVAILABLE`, `Retry-After: 1`; can pay again |
+| took the request but never answered (timeout) | keeps the basket closed and hands the id to `SagaResolver`, which re-sends the same commit until inventory answers, then runs tx B | **503**, then **409** on a retry; `GET` shows **COMPLETED** once resolved |
+| answered 200, but checkout died before tx B | (on restart) `SagaResolver` finds the PENDING row and finishes it the same way | the sale appears as COMPLETED |
+
+**Test hook:** `selfcheckout.test.halt-after-stock-commit=true` makes checkout halt right after inventory's 200. It's used only by `scripts/test-failures.sh` (case C). It is off by default, and every `saga |` log line prints `haltHook=off`.
+
+### One scan, crossing two services
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant S as Station
+    participant C as checkout-service
+    participant Q as queue + writer thread (checkout)
+    participant A as analytics-service
+    participant L as analytics_db.scan_log
+    S->>C: POST /transactions/{id}/items
+    C->>Q: offer(sku), at most 10 ms (drop + count if full)
+    C-->>S: 200 (never waits for analytics)
+    Q->>Q: collect up to 1,000 or 50 ms; number seq N+1..N+k
+    Q->>A: POST /internal/scans {scans}
+    A->>L: INSERT ... ON CONFLICT (seq) DO NOTHING
+    A-->>Q: 200 (only after commit); then the next batch
+    Note over A,L: ScanLogPoller -> window -> rank -> sink, unchanged
+```
 
 ### Running it
 
 ```bash
-db/reset.sh                     # once, and before every load run
-scripts/start-all.sh --build    # build + start; logs in logs/<service>.log
+db/reset.sh                         # all four databases, roles and grants
+scripts/start-all.sh --build        # catalog first, then the others, then nginx
 # ... load client against http://localhost:8080 ...
-psql self_checkout -f scripts/check-invariant.sql
-psql self_checkout -f scripts/check-windows.sql   # gapless scan_log, every window matches
+scripts/check-invariant-micro.sh    # stock, both databases agree, gapless scans, windows
 scripts/stop-all.sh
 ```
 
-**Two Week 3 habits to unlearn.** First, restarting no longer resets anything: the
-services run with `spring.sql.init.mode=never`, so use `db/reset.sh`. Second, `./mvnw
-test` no longer wipes the database either, for the same reason.
-
-**What to watch in the logs during a run.** Checkout prints `scan-log publisher | accepted=
-written= dropped= …` every 10 s. Analytics prints `analytics lag | … behind scan_log now= max=
-mean= scans | read lag mean= max= ms | gapStalls=`. `dropped` and `gapStalls` must stay 0.
+**What to watch in the logs during a run:**
+- **checkout:** `saga | payments= stockRetries= replayed= rolledBack= ambiguous= resolved= recovered= … haltHook=off` and `scan-log publisher | accepted= written= dropped= …`;
+- **inventory:** `stock commit timings | … lockWait= criticalSection=`;
+- **analytics:** `analytics lag | …`.
 
 ---
 
 ## Table of contents
 
-0. [Week 4: four services, one database](#week-4-four-services-one-database)
+0. [Week 5: four microservices, four databases](#week-5-four-microservices-four-databases)
 1. [What the system does](#1-what-the-system-does)
 2. [Tech stack, and why each piece](#2-tech-stack-and-why-each-piece)
 3. [Architecture](#3-architecture)

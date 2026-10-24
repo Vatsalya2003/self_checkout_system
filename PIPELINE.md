@@ -15,6 +15,12 @@
 >   and neither does the optional fifth filter.
 >
 > Details are in [ARCHITECTURE.md § Week 4](ARCHITECTURE.md#week-4-service-based-architecture).
+>
+> **Week 5 update (microservices, see [MICROSERVICES.md](MICROSERVICES.md)).** Each service
+> now has its own database, so checkout can no longer write analytics' `scan_log`. Its writer
+> thread **pushes** the same numbered batches to analytics-service (`POST /internal/scans`).
+> Analytics stores them in its own `scan_log`, and the poller, window, rank and sink are
+> unchanged.
 
 The **windowed analytics** of the self-checkout system are built as **filters
 connected by pipes**. Checkout itself (start / scan / complete, row locking,

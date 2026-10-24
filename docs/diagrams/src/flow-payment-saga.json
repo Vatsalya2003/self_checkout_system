@@ -1,0 +1,176 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Paying: a Saga Across Two Databases",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "viewBox": [
+      1080,
+      640
+    ],
+    "legend": {
+      "mode": "hidden"
+    }
+  },
+  "participants": [
+    {
+      "id": "station",
+      "type": "external",
+      "label": "Station",
+      "sublabel": "via nginx :8080"
+    },
+    {
+      "id": "checkout",
+      "type": "backend",
+      "label": "checkout-service",
+      "sublabel": "orchestrator"
+    },
+    {
+      "id": "codb",
+      "type": "database",
+      "label": "checkout_db",
+      "sublabel": "sales"
+    },
+    {
+      "id": "inventory",
+      "type": "backend",
+      "label": "inventory-service",
+      "sublabel": ":8083"
+    },
+    {
+      "id": "invdb",
+      "type": "database",
+      "label": "inventory_db",
+      "sublabel": "stock"
+    }
+  ],
+  "segments": [
+    {
+      "from": 176,
+      "to": 252,
+      "label": "Before the pivot: nothing irreversible"
+    },
+    {
+      "from": 290,
+      "to": 438,
+      "label": "The pivot: inventory's own transaction"
+    },
+    {
+      "from": 476,
+      "to": 566,
+      "label": "After the pivot: forward only"
+    }
+  ],
+  "messages": [
+    {
+      "id": "pay",
+      "from": "station",
+      "to": "checkout",
+      "y": 196,
+      "label": "POST …/complete (basket claimed in memory)",
+      "variant": "emphasis"
+    },
+    {
+      "id": "txa",
+      "from": "checkout",
+      "to": "codb",
+      "y": 224,
+      "label": "tx A: INSERT sale PENDING + lines"
+    },
+    {
+      "id": "commit",
+      "from": "checkout",
+      "to": "inventory",
+      "y": 310,
+      "label": "POST /internal/stock/commit {transactionId, lines}",
+      "variant": "emphasis"
+    },
+    {
+      "id": "claim",
+      "from": "inventory",
+      "to": "invdb",
+      "y": 338,
+      "label": "claim transaction id"
+    },
+    {
+      "id": "lock",
+      "from": "inventory",
+      "to": "invdb",
+      "y": 366,
+      "label": "SELECT … FOR NO KEY UPDATE",
+      "variant": "security"
+    },
+    {
+      "id": "write",
+      "from": "inventory",
+      "to": "invdb",
+      "y": 394,
+      "label": "clamp, decrement, COMMIT"
+    },
+    {
+      "id": "applied",
+      "from": "inventory",
+      "to": "checkout",
+      "y": 422,
+      "label": "200 applied per SKU",
+      "variant": "return"
+    },
+    {
+      "id": "txb",
+      "from": "checkout",
+      "to": "codb",
+      "y": 496,
+      "label": "tx B: applied quantities, COMPLETED"
+    },
+    {
+      "id": "receipt",
+      "from": "checkout",
+      "to": "station",
+      "y": 524,
+      "label": "200 receipt",
+      "variant": "return"
+    },
+    {
+      "id": "unknown",
+      "from": "checkout",
+      "to": "station",
+      "y": 552,
+      "label": "or 503 if inventory is down / silent",
+      "variant": "dashed"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "checkout",
+      "from": 196,
+      "to": 558,
+      "type": "backend"
+    },
+    {
+      "participant": "codb",
+      "from": 219,
+      "to": 230,
+      "type": "database"
+    },
+    {
+      "participant": "inventory",
+      "from": 310,
+      "to": 428,
+      "type": "backend"
+    },
+    {
+      "participant": "invdb",
+      "from": 333,
+      "to": 400,
+      "type": "database"
+    },
+    {
+      "participant": "codb",
+      "from": 491,
+      "to": 502,
+      "type": "database"
+    }
+  ]
+}

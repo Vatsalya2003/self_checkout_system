@@ -1,11 +1,12 @@
-# Architecture — Self-Checkout: Layered, Pipelined, then Service-Based
+# Architecture — Self-Checkout: Layered, Pipelined, Service-Based, then Microservices
 
-Weeks 2 to 4 of the semester project. Same API contract, same database, same
+Weeks 2 to 5 of the semester project. Same API contract, same
 externally visible checkout behaviour as Week 1's monolith throughout — what
 changed is how the code is structured (Week 2), how the windowed analytics are
 executed (Week 3, part 1), how much work a request actually does (Week 3, part 2 — the performance work, §7),
-and finally how it is deployed: four services over one shared database (Week 4,
-[§ Week 4](#week-4-service-based-architecture)).
+how it is deployed as four services over one shared database (Week 4,
+[§ Week 4](#week-4-service-based-architecture)), and finally as four microservices with a
+database each, coordinated by a saga (Week 5, [§ Week 5](#week-5-microservices)).
 
 Week 1 organized classes by technical type (`controller/`, `service/`,
 `repository/`). That reads like layers but nothing enforced it: HTTP types had
@@ -1090,6 +1091,212 @@ Dead code, or code replaced by `scan_log`:
 
 ---
 
+## Week 5: microservices
+
+The four services are now **independently deployable microservices, each with its own data
+store**. They share one PostgreSQL server but have four databases (`catalog_db`,
+`inventory_db`, `checkout_db`, `analytics_db`), and each database can be opened by exactly
+one role. The contract, the load client and every response body are unchanged: the
+29-response golden diff through the gateway is identical.
+[MICROSERVICES.md](MICROSERVICES.md) is the one-page description.
+
+### W5.1 What had to change, and why
+
+In Week 4 the database was the only coupling: services never called each other, they shared
+tables. With a database per service that coupling is gone. Three things depended on it:
+
+| Week 4 relied on | Week 5 replacement |
+|---|---|
+| checkout locking and decrementing `items.stock` in the shared database | **stock moves to inventory-service**, the natural owner, and checkout calls `POST /internal/stock/commit` (the saga's pivot) |
+| checkout writing `scan_log`, analytics reading it | checkout **pushes** numbered batches to `POST /internal/scans`; analytics stores them in its own `scan_log` |
+| every service reading `items` for prices and names | catalog-service owns `items`; the others load `GET /items` once and cache it |
+
+The one update that now spans two databases is **paying**: units leave inventory's shelf, and
+the sale is recorded in checkout's database.
+
+### W5.2 The payment saga
+
+The full steps are in [MICROSERVICES.md](MICROSERVICES.md#how-the-multi-database-update-is-coordinated-the-payment-saga).
+The design decisions:
+
+- **Orchestration, with checkout as orchestrator.** The `complete` request must return a
+  receipt with the applied quantities, in the same HTTP response. One owner that calls, waits
+  and decides keeps the saga's state in one place. Choreography (PaymentRequested →
+  StockCommitted → …) would make a synchronous request wait on asynchronous events, and
+  spread the state across services. It fits next week's event-driven design better.
+- **A saga log before the pivot.** Tx A writes the sale as PENDING with its lines *before*
+  calling inventory. Without it, a crash after the stock commit would lose everything needed
+  to finish the sale: the station, scanned quantities, prices and start time all lived in the
+  in-memory basket. Reconciling from inventory's `stock_commits` alone cannot rebuild the
+  sale.
+- **The pivot is idempotent.** `stock_commits.transaction_id` is a primary key, claimed with
+  `INSERT … ON CONFLICT DO NOTHING` *before* any lock is taken. A retry, or a duplicate still
+  in flight, waits for the first commit and then gets its stored answer. Stock is never taken
+  twice.
+- **Forward recovery, not compensation.** After the pivot only tx B remains, a local write
+  that is retried until it succeeds. A crash between the pivot and tx B is repaired at
+  startup: the resolver re-sends the same commit (inventory answers from its record) and
+  runs tx B. Compensation (putting stock back) was rejected for two reasons. It is a second
+  distributed step that can itself fail halfway. And a release can overtake the original
+  commit while that commit is still in flight inside inventory.
+- **Failure handling follows what checkout knows.**
+  - *Certainly not committed* (connection refused, or an error answer, which inventory sends
+    only after rolling back): undo tx A, reopen the basket, return **503**.
+  - *Unknown* (sent, no answer): reopening the basket could sell the same units twice. So it
+    stays closed; the client gets 503 and a retry gets 409. The resolver finishes the sale
+    once inventory answers, and `GET /transactions/{id}` then shows COMPLETED.
+
+  503 was chosen because the spec has no 5xx response at all, and 409 would wrongly claim the
+  basket is in the wrong state.
+- **No connection held across the network call.** Tx A commits, *then* checkout calls
+  inventory, *then* tx B runs. Holding a checkout connection while inventory's row-lock queue
+  drains would tie up checkout's pool for as long as that queue is.
+
+### W5.3 Scans: batched HTTP push
+
+The publisher, its gapless numbering, its bounded queue (with drops counted), the batching
+and the retry-with-the-same-seqs rule are all unchanged from Week 4. Only the last hop
+differs: an HTTP POST instead of an INSERT. Analytics makes the guarantees on its side:
+- a batch that would leave a gap is refused with 409, and checkout renumbers from analytics'
+  maximum;
+- a retried batch is absorbed by the primary key;
+- the 200 answer is sent only after the commit.
+
+Two Week 4 behaviours had to be re-designed:
+- **Resuming the seq after a restart.** Checkout no longer has `MAX(seq)` in its own database,
+  so it asks analytics (`GET /internal/scans/max-seq`). It asks from the writer thread, not at
+  startup, so **checkout starts and serves customers even while analytics is down**, buffering
+  scans until analytics answers.
+- **A broker** (RabbitMQ or Kafka) would add durability across a checkout crash, but needs an
+  install. It is left for next week's event-driven design. Until then, scans still in the
+  queue are lost if checkout is killed, as in Week 4.
+
+### W5.4 Enforcement
+
+| Level | What stops a service using another's data |
+|---|---|
+| Database | `REVOKE CONNECT … FROM PUBLIC` and `GRANT CONNECT` to one role per database, so `psql -U checkout_svc inventory_db` is refused. Inside each database, `grants.sql` limits each role to the columns it changes (inventory may UPDATE only `stock.qty`). |
+| Gateway | `location ^~ /internal/ { return 404; }`: the service-to-service endpoints can't be reached from outside |
+| Code | ArchUnit, per service. One writing class per table. A new `remote` layer is the only one besides `api` allowed to touch HTTP types, and it depends on nothing above it. |
+
+### W5.5 Trade-offs
+
+| Gained | Paid |
+|---|---|
+| **Real data ownership.** No service can read or write another's tables. Each database can change its schema, size or engine without the others noticing. | **Paying costs three commits instead of one** (tx A, the stock commit, tx B), all fsynced, all on the same server's WAL. Inventory's commit happens while it holds the hot SKU's row lock, so busier WAL means a longer critical section. |
+| **Failure isolation with clear behaviour.** Inventory down → a clean 503 and a reopened basket. Analytics down → checkout serves and counts drops. A crash mid-payment → repaired on restart. | **An HTTP round trip and JSON on every payment**, plus a more complex code path: saga log, idempotency, a resolver and a test hook. |
+| **Inventory is the single owner of stock decisions.** The lock, the clamp and alerts live in one place. | **The ambiguous case is visible to the client**: a 503 whose sale may still complete moments later. It is documented, tested, and only possible while inventory is unreachable. |
+| | **Five JVMs plus Postgres plus the load client on 8 cores** (4 performance, 4 efficiency). Checkout's JIT alone used ~65% of a core in the first 20 s of a run. |
+| | **Still pinned**: checkout to one instance (in-memory baskets, one scan numberer), and stock to the hottest SKU's row lock |
+
+**Measured and not taken.** Turning off commit durability for checkout's two commits raised
+an unofficial 20 s run from 638.6 to 690.4 tx/s, and shortened inventory's critical section
+from 1.60 to 1.41 ms. That confirms the WAL cost. But tx A must be durable *before* the
+pivot, or a database crash could leave stock taken with no record of the sale. An
+asynchronous tx B *would* be safe, because a lost tx B leaves a PENDING row that recovery
+finishes. But it is only repaired at checkout's next restart, and until then a paid sale reads
+as OPEN. Correctness first, so both commits stay synchronous.
+
+**Fixed along the way.** JFR showed Spring's `JdkClientHttpRequestFactory` starting a new
+thread for every request body, because the JDK `HttpClient` had no executor. Each client now
+has a reusable executor. The measured throughput change was small (628.2 → 638.6 tx/s in
+unofficial runs), but the fix is free.
+
+### W5.6 Results
+
+All runs go through the gateway with the packaged jars, after `db/reset.sh` and a restart
+of every service, and are followed by `scripts/check-invariant-micro.sh`. Every run
+started below load 3 (1-minute average); load rose to about 4–5 between runs. Raw runs are
+in `reports/microservices/`. The submitted pair is the better of two runs for each
+configuration, and all four are listed:
+
+| Run | tx/s | errors | saga retries / rollbacks / ambiguous / recovered | scans dropped | cross-DB invariant |
+|---|---|---|---|---|---|
+| **default 10 st × 60 s, run 1 (submitted)** | **852.4** | **0** | 0 / 0 / 0 / 0 | 0 of 538,345 | PASS |
+| default 10 st × 60 s, run 2 | 826.9 | 0 | 0 / 0 / 0 / 0 | 0 of 519,137 | PASS |
+| **stress 100 st × 120 s, run 1 (submitted)** | **806.0** | **0** | 0 / 0 / 0 / 0 | 0 of 1,016,852 | PASS |
+| stress 100 st × 120 s, run 2 | 764.8 | 0 | 0 / 0 / 0 / 0 | 0 of 964,998 | PASS |
+
+The test hook was off in every run (`haltHook=off` in each `saga |` line). No stock-commit
+call came near the 2.5 s timeout: the slowest was 1.4 s, under stress.
+
+**Week 4 vs Week 5** (the submitted reports):
+
+| | Week 4 (`service-based-v1`) | Week 5 | change |
+|---|---|---|---|
+| tx/s, 10 stations | 1015.8 | **852.4** | −16.1 % |
+| tx/s, 100 stations | 960.1 | **806.0** | −16.0 % |
+| `START` p50, 10 st | 0.132 ms | 0.168 ms | |
+| `SCAN` p50, 10 st | 0.122 ms | 0.152 ms | |
+| `COMPLETE` p50, 10 st | 4.207 ms | 7.282 ms | +3.1 ms |
+| `COMPLETE` p50, 100 st | 81.447 ms | 96.994 ms | +19 % |
+| `COMPLETE` p99, 10 st | 47.51 ms | 37.34 ms | |
+| errors | 0 | **0** | |
+| stock invariant | PASS | **PASS** (across two databases) | |
+
+**Where the time goes.**
+- **Inventory's lock timings.** At 10 stations a payment's stock call takes 7.7 ms on
+  average. Of that, 6.2 ms is waiting for the hottest SKU's row lock and 1.15 ms is holding
+  it (`stock commit timings` in inventory's log). The rest is the HTTP round trip.
+- **Why the wait grew.** The critical section includes inventory's commit, which now shares
+  the server's WAL with checkout's tx A and tx B. Every millisecond added inside the lock is
+  paid by every basket containing the hottest SKU, about two thirds of them. That is why
+  COMPLETE grows more than the extra work alone would suggest.
+- **Stress.** At 100 stations the lock wait dominates: 117–124 ms of a 119–126 ms stock call.
+  CPU is also close to the machine's limit: Postgres used 173–182 % of a core, checkout about
+  125 %, and nginx about 35 %, alongside the load client's 100 threads on 8 cores.
+
+**Prediction vs measurement.** In Phase 1 I predicted ~870–970 tx/s default and ~860–960
+stress, counting one extra hop and one extra commit. After the go-ahead it was pointed out
+that a payment now has *three* fsynced commits instead of one. I did not write a revised
+figure down before the first smoke run, so I am not claiming one. Measured: default came in
+below even the original range, and stress at the bottom of it.
+
+**Analytics lag** (analytics-service's log; sampled every second as `MAX(seq)` in its
+`scan_log` minus the last seq the poller handed on):
+
+| Run | behind, mean | max | read lag mean / max | gapStalls |
+|---|---|---|---|---|
+| default run 1 | 25 scans | 706 scans | 67 / 221 ms | 0 |
+| default run 2 | 55 scans | 634 scans | 65 / 140 ms | 0 |
+| stress run 1 | 46 scans | 663 scans | 68 / 402 ms | 0 |
+| stress run 2 | 88 scans | 637 scans | 66 / 471 ms | 0 |
+
+The push adds no measurable lag compared with Week 4's shared table: a window still appears
+about 0.1 s after its 500th scan. Batches averaged 486–551 scans per push.
+
+**Per-service CPU** (process CPU over the run, % of one core; mean of the two runs of each kind):
+
+| | default | stress |
+|---|---|---|
+| checkout-service | 133 % | 125 % |
+| PostgreSQL (all four databases) | 152 % | 178 % |
+| inventory-service | 38 % | 35 % |
+| nginx | 35 % | 36 % |
+| analytics-service | 17 % | 13 % |
+| catalog-service | 0.1 % | 0.1 % |
+
+### W5.7 Correctness evidence
+
+- **Golden diff:** identical to the single application (29/29) through the gateway.
+- **Behavioural scripts:** all five pass (`reports/microservices/verification/`). Their database checks now say which service's database they read.
+- **Cross-database invariant:** `scripts/check-invariant-micro.sh` passes after every load run.
+  - inventory: no negative stock, and `10000 − stock = Σ applied`;
+  - checkout vs inventory: identical committed lines, and no PENDING sale left;
+  - analytics: a gapless `scan_log`, with every window equal to a brute-force recount.
+- **Failure tests:** `scripts/test-failures.sh`, all PASS (`reports/microservices/failure-tests.txt`).
+
+| Case | What happened |
+|---|---|
+| A. inventory stopped | 503 `SERVICE_UNAVAILABLE` + `Retry-After: 1` after 1.6 s. Basket reopened, a further scan accepted, stock untouched, no sale row left. The same payment succeeded after restart, and stock was taken once. |
+| B. inventory frozen (`SIGSTOP`) | 503 after 5.1 s, sale PENDING. A retry got 409, and a scan got 409 (basket stayed closed). About 1 s after `SIGCONT`, GET showed COMPLETED. Exactly one stock commit; the resolver's retry was a replay (`ambiguous=1 resolved=1 replayed=1`). |
+| C. checkout halted after the stock commit (test hook) | Before restart the databases disagreed (inventory committed, checkout PENDING), and the invariant failed as expected. After a normal restart: `recovery: 1 payment(s)…`, the sale COMPLETED with the right applied quantities, still one stock commit, and the invariant passed. |
+| D. analytics stopped under load | Checkout served 431.1 tx/s with 0 errors. 3,115 scans dropped and counted once the queue filled. Every accepted scan reached analytics after it restarted; gapless, windows correct. |
+| E. checkout started while analytics was down | Healthy and took a payment. Its 3 scans were buffered (`synced=false`), then delivered as seq 1..3 once analytics answered. |
+| F. `/internal/**` via :8080 | 404 for all three internal endpoints. Each is still reachable directly on its service's own port. |
+
+---
+
 ## 8. Known limitations
 
 1. **Layering changed nothing operational.** One process, one database, one
@@ -1127,3 +1334,17 @@ Dead code, or code replaced by `scan_log`:
     completion's database time is spent queueing for the hottest SKU. Going
     materially faster means sharding that row, not tuning the server (§7.4).
 16. **Measurements are sensitive to machine thermal state** (§7.7).
+17. **(Week 5) Paying costs three durable commits and an HTTP call** (W5.5). That is
+    16 % of throughput at both 10 and 100 stations compared with Week 4.
+18. **(Week 5) The ambiguous case reaches the client.** If inventory takes a stock-commit
+    request but never answers, the client gets 503, and the sale may still complete moments
+    later (a retry gets 409; `GET /transactions/{id}` then shows COMPLETED). This is only
+    possible while inventory is unreachable (W5.2).
+19. **(Week 5) A PENDING sale reads as OPEN.** Between a checkout crash and its recovery,
+    `GET /transactions/{id}` reports a payment in progress as OPEN. The contract has no
+    "being paid" status.
+20. **(Week 5) `scan_log` grows without pruning** in analytics_db: about a million rows per
+    stress run, cleared only by `db/reset.sh`.
+21. **(Week 5) Scans still in checkout's queue are lost if checkout is killed** (analytics
+    resumes from what it stored, so the sequence stays gapless). A durable broker would fix
+    that, and is next week's subject.
