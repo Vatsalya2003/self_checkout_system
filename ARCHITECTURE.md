@@ -1276,6 +1276,56 @@ about 0.1 s after its 500th scan. Batches averaged 486–551 scans per push.
 | analytics-service | 17 % | 13 % |
 | catalog-service | 0.1 % | 0.1 % |
 
+#### Re-run and explored settings (2026-10-24)
+
+The day after the submitted runs, the same version was run again with the same procedure,
+4 runs. A database setting, group commit, was then tried. Raw runs, the harness and per-run
+notes are in [`reports/microservices/experiments/`](reports/microservices/experiments/README.md).
+
+| | default, 10 st × 60 s | stress, 100 st × 120 s | errors | cross-DB invariant |
+|---|---|---|---|---|
+| submitted (2026-10-23), runs 1 / 2 | 852.4 / 826.9 | 806.0 / 764.8 | 0 | PASS ×4 |
+| **re-run (2026-10-24), runs 1 / 2** | **803.2 / 809.5** | **817.0 / 814.2** | **0** | **PASS ×4** |
+| `commit_delay` 10 µs | 808.8 / 841.3 | 732.6 / 800.0 | 0 | PASS ×4 |
+| `commit_delay` 50 µs | 839.2 / 823.9 | 761.8 / 637.0 † | 0 / 501 † | PASS ×4 |
+| `commit_delay` 100 µs (one run each) | 841.3 | 829.8 | 0 | PASS ×2 |
+
+All numbers are tx/s. `commit_siblings` was 5 and `synchronous_commit` was on throughout.
+
+**The result reproduces.** Today's runs are within the submitted runs' spread:
+- the re-run means are 806 tx/s default and 816 stress, against 840 and 785 for the
+  submitted pairs;
+- COMPLETE p50 was 7.9 ms default and 97 ms stress (submitted: 7.3 and 97 ms);
+- there were 0 errors, no saga retries or rollbacks, no dropped scans, and the invariant
+  passed every time.
+
+**Group commit**, in plain English:
+- **The setting.** A commit is durable once PostgreSQL has flushed its WAL to disk.
+  `commit_delay` lets a committing transaction wait a few microseconds so that others
+  committing at the same moment share that one flush. `commit_siblings = 5` means it only
+  waits when at least 5 other transactions are active.
+- **Durability.** No commit is acknowledged before it is on disk; the commits just share
+  flushes.
+- **Why it seemed worth trying.** Since Week 5 a payment makes three durable commits on one
+  server, and inventory's commit happens while it holds the hottest SKU's row lock (above).
+
+**The group-commit results are inconclusive:**
+- **The machine wasn't idle.** Those runs started on a busier laptop than the re-run: load
+  2.9–4.1 against 2.5–3.2, with a browser tab using a full core.
+- **The differences go both ways.** −6 % to +4 % against the re-run, which is within that
+  noise.
+- **Too few runs.** 100 µs has one run of each kind.
+- **† One run isn't a group-commit result.** The second 50 µs stress run took 1,105 s of real
+  time for a 120 s test, because the machine stalled. Its 501 errors are nginx 504s and
+  client timeouts from that stall; the invariant still passed.
+
+Group commit was therefore **not adopted**. The PostgreSQL defaults stay
+(`commit_delay = 0`).
+
+Two other changes were prototyped and not measured, and are not in this version:
+- `inventory_db` on a separate PostgreSQL instance (own data directory and WAL, port 5433);
+- a circuit breaker on checkout's stock-commit call.
+
 ### W5.7 Correctness evidence
 
 - **Golden diff:** identical to the single application (29/29) through the gateway.
@@ -1348,3 +1398,6 @@ about 0.1 s after its 500th scan. Batches averaged 486–551 scans per push.
 21. **(Week 5) Scans still in checkout's queue are lost if checkout is killed** (analytics
     resumes from what it stored, so the sequence stays gapless). A durable broker would fix
     that, and is next week's subject.
+22. **(Week 5) Group commit and a separate PostgreSQL instance for inventory were explored
+    but not measured on an idle machine** (W5.6, "Re-run and explored settings"). Neither is
+    part of the submitted version.

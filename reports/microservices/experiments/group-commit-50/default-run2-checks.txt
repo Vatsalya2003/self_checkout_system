@@ -1,0 +1,17 @@
+== stock (inventory_db)
+  ok    SKUs with negative stock                                       0
+  ok    SKUs where 10000 - stock <> SUM(applied)                       0
+== sales (checkout_db)
+  ok    payments still PENDING                                         0
+== checkout_db vs inventory_db
+  ok    completed sales (checkout) = stock commits (inventory)         49445
+  ok    sale lines with no matching stock-commit line                  0
+  ok    stock-commit lines with no matching sale line                  0
+     (lines compared: 461574 in checkout, 461574 in inventory)
+== popularity windows (analytics_db)
+  ok    scan_log gaps (max(seq) - count)                               0
+  ok    scan_log starts at seq 1 (or is empty)                         1
+  ok    windows not equal to a brute-force recount                     0
+== totals
+     sales 49445, units taken 423942, units short (sold out) 95210, low-stock alerts 6, scans 519152, windows 1038
+PASS

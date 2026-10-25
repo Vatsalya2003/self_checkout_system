@@ -1,0 +1,9 @@
+started catalog-service (pid 19529) on :8081
+  catalog-service healthy
+started checkout-service (pid 19550) on :8082
+started inventory-service (pid 19553) on :8083
+started analytics-service (pid 19556) on :8084
+  checkout-service healthy
+  inventory-service healthy
+  analytics-service healthy
+gateway up on :8080 -> all services reachable through one base URL

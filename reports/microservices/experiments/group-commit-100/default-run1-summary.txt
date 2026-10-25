@@ -1,0 +1,19 @@
+label=default-run1 stations=10 duration=60
+load before: { 3.46 5.22 6.19 }
+load after:  { 8.60 6.44 6.58 }
+cpu analytics-service      15.1 %  (of one core, avg over 61 s)
+cpu catalog-service         0.1 %  (of one core, avg over 61 s)
+cpu checkout-service      124.1 %  (of one core, avg over 61 s)
+cpu inventory-service      35.4 %  (of one core, avg over 61 s)
+cpu nginx                  32.2 %  (of one core, avg over 61 s)
+cpu postgres              146.9 %  (of one core, avg over 61 s)
+2026-10-24T21:09:02.775-07:00  INFO 22950 --- [checkout-service] [scanlog-metrics] c.s.s.scanlog.ScanLogPublisher           : scan-log publisher | accepted=529800 written=529800 dropped=0 lost=0 | batches=1003 avgBatch=528 | queue depth=0 max=149 cap=65536 | lastSeq=529800 | writeErrors=0 resyncs=0 synced=true
+2026-10-24T21:09:02.756-07:00  INFO 22950 --- [checkout-service] [   saga-metrics] c.s.s.transactions.SagaCounters          : saga | payments=50486 stockRetries=0 replayed=0 rolledBack=0 ambiguous=0 resolved=0 recovered=0 finishRetries=0 | stock call mean=8103us max=137ms | haltHook=off
+2026-10-24T21:09:03.343-07:00  INFO 22956 --- [analytics-service] [ipeline-metrics] c.s.s.a.pipeline.AnalyticsPipeline       : analytics lag | lastSeq=529800 | behind scan_log now=0 max=657 mean=236 scans | read lag mean=65 max=152 ms | gapStalls=0
+  tx/s=841.3 tx=50486 items=529800 wall=60.0s
+  START_TRANSACTION      ok=50486 err=0 mean=0.195 p50=0.162 p95=0.343 p99=0.676 max=15.5 ms
+  SCAN_ITEM              ok=529800 err=0 mean=0.170 p50=0.145 p95=0.288 p99=0.503 max=20.6 ms
+  COMPLETE_TRANSACTION   ok=50486 err=0 mean=9.904 p50=7.613 p95=23.380 p99=35.472 max=146.4 ms
+  stock commit timings | commits=50486 | mean lockWait=6566us criticalSection=1212us | implied ceiling if 66% of baskets share the hottest SKU: 1250 tx/s
+postgres: commit_delay=100 commit_siblings=5 fsync=on synchronous_commit=on
+disk free after: 3 GB

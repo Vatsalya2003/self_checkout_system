@@ -185,6 +185,17 @@ The submitted reports are the better of two runs each. The second runs were 826.
 - every popularity window matched a brute-force recount;
 - the test hook was off.
 
+**Re-run (2026-10-24).** The same version was run 4 more times the next day, with the same
+procedure:
+- default: **803.2 and 809.5 tx/s**;
+- stress: **817.0 and 814.2 tx/s**;
+- 0 errors, and the cross-database invariant passed in every run.
+
+That is within the submitted runs' spread, so the result reproduces. Group commit
+(`commit_delay`) was also tried then, but not on an idle machine, so it is inconclusive and
+not adopted. Details and raw runs:
+[`reports/microservices/experiments/`](reports/microservices/experiments/README.md).
+
 **Where the 16 % went.** A payment now costs one HTTP call and **three durable commits**
 instead of one. Inventory's commit happens while it holds the most popular SKU's row lock,
 and it shares the database server's write-ahead log with checkout's two commits. So every
@@ -235,7 +246,7 @@ add crash-safety for scans still in checkout's queue, and is next week's subject
   - group commit (PostgreSQL `commit_delay` with `commit_siblings`, `synchronous_commit` left on);
   - `inventory_db` on a separate PostgreSQL instance, so its WAL isn't shared with checkout's commits.
 
-  The load runs for these overlapped other work on the same laptop, so the numbers can't be compared with the results above. Neither is part of this version.
+  The load runs for these overlapped other work on the same laptop, so the numbers can't be compared with the results above. Neither is part of this version. The group-commit runs are in [`reports/microservices/experiments/`](reports/microservices/experiments/README.md); the separate instance was never load-tested.
 
 ---
 

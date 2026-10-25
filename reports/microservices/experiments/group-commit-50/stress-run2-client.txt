@@ -1,0 +1,588 @@
+Self-Checkout Load Client starting...
+  baseUrl=http://localhost:8080 stations=100 duration=120s basket=[1..20]
+Fetching catalog...
+Catalog loaded: 2000 items.
+Starting 100 simulated station(s) for 120s...
+[station-098] transaction failed: Transport error calling http://localhost:8080/transactions/3f9c1a6b-28cd-4f6c-9c5d-e0e2e246f888/complete: request timed out
+[station-085] transaction failed: Transport error calling http://localhost:8080/transactions/fe59fc0a-3c58-4fdc-931f-73c45eeb83c0/complete: request timed out
+[station-009] transaction failed: Transport error calling http://localhost:8080/transactions/694d223c-4de0-4a6d-8d00-1f1ba446151a/complete: request timed out
+[station-037] transaction failed: Transport error calling http://localhost:8080/transactions/33e47800-bed5-44ad-a6ac-f17f956897cc/complete: request timed out
+[station-082] transaction failed: Transport error calling http://localhost:8080/transactions/2b2e6d11-3a0f-49dc-be29-ecc5078d503d/complete: request timed out
+[station-092] transaction failed: Transport error calling http://localhost:8080/transactions/393e4ae0-6767-46be-824b-44cd1b290ba9/complete: request timed out
+[station-051] transaction failed: Transport error calling http://localhost:8080/transactions/9a040016-546e-46ee-a05d-27229738cfc0/complete: request timed out
+[station-089] transaction failed: Transport error calling http://localhost:8080/transactions/26fdc071-36a3-48f8-aaf1-1301bf5233df/complete: request timed out
+[station-099] transaction failed: Transport error calling http://localhost:8080/transactions/97b44c8c-2836-492f-a267-e4fa3884d8a8/complete: request timed out
+[station-021] transaction failed: Transport error calling http://localhost:8080/transactions/d7b0dcc3-a351-47c3-8f8d-b353f8c3f41b/complete: request timed out
+[station-036] transaction failed: Transport error calling http://localhost:8080/transactions/d1a9d905-e273-49c7-bc4a-2aa8482532b6/complete: request timed out
+[station-004] transaction failed: Transport error calling http://localhost:8080/transactions/912d701a-bbf8-48a9-94d3-c7a33a4cc58d/complete: request timed out
+[station-052] transaction failed: Transport error calling http://localhost:8080/transactions/c8214188-ab35-41d7-8171-3e84cc441ed1/complete: request timed out
+[station-039] transaction failed: Transport error calling http://localhost:8080/transactions/76172490-2c0b-4748-9be4-46ab719ec0e8/complete: request timed out
+[station-016] transaction failed: Transport error calling http://localhost:8080/transactions/e0bfefa4-e8fe-44b3-adc9-bc0d9e85b5bd/complete: request timed out
+[station-027] transaction failed: Transport error calling http://localhost:8080/transactions/35a67185-13eb-41a2-b4e8-4ac49af140e6/complete: request timed out
+[station-048] transaction failed: Transport error calling http://localhost:8080/transactions/464a79ee-e8ab-4f8e-b31e-7392eaf21633/complete: request timed out
+[station-050] transaction failed: Transport error calling http://localhost:8080/transactions/3fc76461-2bfe-4b5b-879a-31c77c23beda/complete: request timed out
+[station-012] transaction failed: Transport error calling http://localhost:8080/transactions/52b1c617-374b-48ab-81ef-6f81e53ab7e6/complete: request timed out
+[station-024] transaction failed: Transport error calling http://localhost:8080/transactions/4b7eabcf-1f6e-419b-953b-939aba2b81f3/complete: request timed out
+[station-067] transaction failed: Transport error calling http://localhost:8080/transactions/6747a5d1-2530-4daf-ab73-e104429a6e2d/complete: request timed out
+[station-068] transaction failed: Transport error calling http://localhost:8080/transactions/b1dce73e-2126-40fb-be66-d3c07d669a7e/complete: request timed out
+[station-062] transaction failed: Transport error calling http://localhost:8080/transactions/a1a718c5-5836-432c-843a-8d7319b05b31/complete: request timed out
+[station-074] transaction failed: Transport error calling http://localhost:8080/transactions/f9728053-d800-4c18-96f5-fb914cb1299b/complete: request timed out
+[station-007] transaction failed: Transport error calling http://localhost:8080/transactions/f3fbcd0c-b47e-43b8-aa50-67e591b84ea8/complete: request timed out
+[station-091] transaction failed: Transport error calling http://localhost:8080/transactions/438e4624-9a4f-4196-bdd7-41f1b0a8031b/complete: request timed out
+[station-014] transaction failed: Transport error calling http://localhost:8080/transactions/9c6771e3-aeb5-44d2-9700-e524a9ed30ed/complete: request timed out
+[station-035] transaction failed: Transport error calling http://localhost:8080/transactions/b1c255a6-50b9-4eea-8110-2f94d699ffd5/complete: request timed out
+[station-095] transaction failed: Transport error calling http://localhost:8080/transactions/f5c73383-982b-4878-bd70-55e8e6cca451/complete: request timed out
+[station-046] transaction failed: Transport error calling http://localhost:8080/transactions/8fc63500-e594-460b-9614-47451d3c5f7f/complete: request timed out
+[station-079] transaction failed: Transport error calling http://localhost:8080/transactions/054d4049-f604-4b20-88e1-1fbd6d4b57ba/complete: request timed out
+[station-087] transaction failed: Transport error calling http://localhost:8080/transactions/bb8a549a-7f03-4bd0-9754-5a47467dc2c5/complete: request timed out
+[station-075] transaction failed: Transport error calling http://localhost:8080/transactions/c73cd731-abc1-4aab-b717-d17af07fbd1d/complete: request timed out
+[station-042] transaction failed: Transport error calling http://localhost:8080/transactions/999104c1-f070-47a7-8201-7bef11459840/complete: request timed out
+[station-069] transaction failed: Transport error calling http://localhost:8080/transactions/bc3f5a48-bec5-4d49-9c65-5cd3372ccecb/complete: request timed out
+[station-090] transaction failed: Transport error calling http://localhost:8080/transactions/a4484ffa-bee2-4f12-909b-2b4cba0b0e86/complete: request timed out
+[station-034] transaction failed: Transport error calling http://localhost:8080/transactions/4018574c-214c-48ad-8cfc-268e2540d813/complete: request timed out
+[station-096] transaction failed: Transport error calling http://localhost:8080/transactions/27b5b7be-9f5c-4c46-8ecb-2135132bae68/complete: request timed out
+[station-003] transaction failed: Transport error calling http://localhost:8080/transactions/b7265166-0f52-4dbf-aafe-bc2eae60b94b/complete: request timed out
+[station-044] transaction failed: Transport error calling http://localhost:8080/transactions/95d4730f-ef6f-4c6a-a53e-047109b0b69d/complete: request timed out
+[station-058] transaction failed: Transport error calling http://localhost:8080/transactions/525abe16-ca37-4504-95af-af9285d06ef3/complete: request timed out
+[station-030] transaction failed: Transport error calling http://localhost:8080/transactions/50e795a4-396d-41f5-9114-2050acc88cfc/complete: request timed out
+[station-045] transaction failed: Transport error calling http://localhost:8080/transactions/ea744a4a-21a1-4b3e-8667-48d92c4e8f84/complete: request timed out
+[station-065] transaction failed: Transport error calling http://localhost:8080/transactions/35dbdb60-d419-4e58-8ec4-7af5cb07cc1e/complete: request timed out
+[station-078] transaction failed: Transport error calling http://localhost:8080/transactions/6186c3e6-4e29-4364-8c45-b84ca94dd9fa/complete: request timed out
+[station-017] transaction failed: Transport error calling http://localhost:8080/transactions/a38a4d8b-7cc7-42b6-951f-97c59700012b/complete: request timed out
+[station-054] transaction failed: Transport error calling http://localhost:8080/transactions/5ae60241-30b1-4976-83ca-ea7a8b2965da/complete: request timed out
+[station-072] transaction failed: Transport error calling http://localhost:8080/transactions/97ae49dc-3133-470e-ace9-110b6be504de/complete: request timed out
+[station-019] transaction failed: Transport error calling http://localhost:8080/transactions/92f1589a-e3e2-41ff-b858-da4899b1b6c7/complete: request timed out
+[station-060] transaction failed: Transport error calling http://localhost:8080/transactions/5737ad8a-59ff-43ee-96cd-7dba5c9d2224/complete: request timed out
+[station-066] transaction failed: Transport error calling http://localhost:8080/transactions/42b27b37-a2e9-491f-b09c-6c31984eb08e/complete: request timed out
+[station-086] transaction failed: Transport error calling http://localhost:8080/transactions/a71ee4e5-a5f5-43c9-9718-924644f7d7df/complete: request timed out
+[station-057] transaction failed: Transport error calling http://localhost:8080/transactions/4c8a4e5a-89e0-490c-bf48-1dbc009ff7db/complete: request timed out
+[station-033] transaction failed: Transport error calling http://localhost:8080/transactions/bc64373a-0d1a-4fcc-acd8-c5496a691cf6/complete: request timed out
+[station-053] transaction failed: Transport error calling http://localhost:8080/transactions/7f58d2ab-96de-4807-a67e-6c4662298fa4/complete: request timed out
+[station-023] transaction failed: Transport error calling http://localhost:8080/transactions/23c6aa95-5fa6-425e-82d2-ccf986f59568/complete: request timed out
+[station-077] transaction failed: Transport error calling http://localhost:8080/transactions/e7cd1074-3918-40b9-b600-a861e065d1cc/complete: request timed out
+[station-070] transaction failed: Transport error calling http://localhost:8080/transactions/4619b918-996c-4a55-91bc-dd34274eeacf/complete: request timed out
+[station-049] transaction failed: Transport error calling http://localhost:8080/transactions/64a02426-2c6c-4405-ad8b-387900cab102/complete: request timed out
+[station-020] transaction failed: Transport error calling http://localhost:8080/transactions/5d257172-478f-428a-8863-23af7f8e0dc0/complete: request timed out
+[station-025] transaction failed: Transport error calling http://localhost:8080/transactions/574cb9cd-e483-4c5f-acb7-1e853c2df517/complete: request timed out
+[station-088] transaction failed: Transport error calling http://localhost:8080/transactions/755aabf0-c434-440e-becb-7f9c1c157cdf/complete: request timed out
+[station-015] transaction failed: Transport error calling http://localhost:8080/transactions/c9fa613f-8ac7-44b5-a155-db8fdaa17a39/complete: request timed out
+[station-022] transaction failed: Transport error calling http://localhost:8080/transactions/75563e39-79c7-4d55-bfd8-7c5c14aa972b/complete: request timed out
+[station-006] transaction failed: Transport error calling http://localhost:8080/transactions/3b1ae18d-a549-487b-96f1-acd8f473f5f5/complete: request timed out
+[station-055] transaction failed: Transport error calling http://localhost:8080/transactions/75754068-f329-467d-81b3-2694074f1de6/complete: request timed out
+[station-061] transaction failed: Transport error calling http://localhost:8080/transactions/de349eb4-8ed7-43f7-b866-314d75dba85c/complete: request timed out
+[station-100] transaction failed: Transport error calling http://localhost:8080/transactions/9e69e109-8682-4ac6-ac53-2c961de607be/complete: request timed out
+[station-008] transaction failed: Transport error calling http://localhost:8080/transactions/e18b5b37-3938-4277-b1c1-e504fe1f0e90/complete: request timed out
+[station-056] transaction failed: Transport error calling http://localhost:8080/transactions/e9341b39-5540-4bad-801b-adcd98ea1c55/complete: request timed out
+[station-059] transaction failed: Transport error calling http://localhost:8080/transactions/04197ec7-58a8-4bc1-96b6-e6d95cbb7dc5/complete: request timed out
+[station-038] transaction failed: Transport error calling http://localhost:8080/transactions/97bc7a0a-f035-4f8c-8c97-4e0f70273e9d/complete: request timed out
+[station-080] transaction failed: Transport error calling http://localhost:8080/transactions/28d4db10-c983-43f3-8401-105db3e4621f/complete: request timed out
+[station-026] transaction failed: Transport error calling http://localhost:8080/transactions/8d9e610c-81ef-450c-9a87-c86d0953cccd/complete: request timed out
+[station-005] transaction failed: Transport error calling http://localhost:8080/transactions/b196953b-1283-46e6-9f93-e24b06e1e855/complete: request timed out
+[station-001] transaction failed: Transport error calling http://localhost:8080/transactions/342fe215-c69a-4dc7-b0fb-eada6400867b/complete: request timed out
+[station-097] transaction failed: Transport error calling http://localhost:8080/transactions/3288ab60-a49d-4df2-a9e8-ea4feb0c3ba7/complete: request timed out
+[station-073] transaction failed: Transport error calling http://localhost:8080/transactions/f2cabe59-77fe-47e5-8d93-b78b90a22791/complete: request timed out
+[station-018] transaction failed: Transport error calling http://localhost:8080/transactions/a6ba2abf-02ef-4e4b-afcf-07d7c33855ac/complete: request timed out
+[station-063] transaction failed: Transport error calling http://localhost:8080/transactions/7d1b196f-e60e-4e44-bb69-3d6548d474cc/complete: request timed out
+[station-076] transaction failed: Transport error calling http://localhost:8080/transactions/e1f47231-5087-47b6-9dde-f473dc994c40/complete: request timed out
+[station-071] transaction failed: Transport error calling http://localhost:8080/transactions/d2b3cbc4-f3aa-40b3-9449-b4ed359a1dd9/complete: request timed out
+[station-011] transaction failed: Transport error calling http://localhost:8080/transactions/52aa48b1-8b32-4128-8455-5eccdccfe878/complete: request timed out
+[station-031] transaction failed: Transport error calling http://localhost:8080/transactions/50af122f-90fb-42ba-a7fb-76e0c4ac7f63/complete: request timed out
+[station-081] transaction failed: Transport error calling http://localhost:8080/transactions/9eedab00-06fd-428f-ba10-30c1db7750f2/complete: request timed out
+[station-041] transaction failed: Transport error calling http://localhost:8080/transactions/df06096d-9a45-41f2-bc3a-7ce18a5c2658/complete: request timed out
+[station-094] transaction failed: Transport error calling http://localhost:8080/transactions/c4cbc00d-2c98-4c4f-9ee1-9882bb303649/complete: request timed out
+[station-084] transaction failed: Transport error calling http://localhost:8080/transactions/ae9fc5c9-73a9-4d5a-aa31-c25a4fd64696/complete: request timed out
+[station-029] transaction failed: Transport error calling http://localhost:8080/transactions/4c2a6a65-6045-4a3c-9bc1-93cff817b595/complete: request timed out
+[station-010] transaction failed: Transport error calling http://localhost:8080/transactions/f27146a9-da65-4b76-b5dc-56afadb4a5f4/complete: request timed out
+[station-043] transaction failed: Transport error calling http://localhost:8080/transactions/369b6990-a22e-43df-a6a2-4b7475b975ca/complete: request timed out
+[station-028] transaction failed: Transport error calling http://localhost:8080/transactions/632e4dc5-e6dc-4377-ab9f-514804575073/complete: request timed out
+[station-032] transaction failed: Transport error calling http://localhost:8080/transactions/bb752113-59c6-4937-926a-3bbd28e5161a/complete: request timed out
+[station-047] transaction failed: Transport error calling http://localhost:8080/transactions/631f5074-ef1f-44ff-9310-d29c301c8b31/complete: request timed out
+[station-040] transaction failed: Transport error calling http://localhost:8080/transactions/5f686e2b-50aa-4f02-a6a9-bc302b2b2703/complete: request timed out
+[station-013] transaction failed: Transport error calling http://localhost:8080/transactions/56446dc2-f6ec-42cf-926d-0c228ab56607/complete: request timed out
+[station-002] transaction failed: Transport error calling http://localhost:8080/transactions: HTTP/1.1 header parser received no bytes
+[station-093] transaction failed: Transport error calling http://localhost:8080/transactions/c098bedb-8b68-4e3a-b558-dfbbefa56397/complete: request timed out
+[station-083] transaction failed: Transport error calling http://localhost:8080/transactions/9a7f98d4-3af0-4e40-affc-5fad69e79cdd/complete: request timed out
+[station-064] transaction failed: Transport error calling http://localhost:8080/transactions/1b20328f-d9c8-4e92-979b-5a0287e16de1/complete: request timed out
+[station-050] transaction failed: Unexpected status 504 from http://localhost:8080/transactions/132cf927-0072-4d62-ab49-d0b8a8bb6eb1/complete: <html>
+<head><title>504 Gateway Time-out</title></head>
+<body>
+<center><h1>504 Gateway Time-out</h1></center>
+<hr><center>nginx/1.31.6</center>
+</body>
+</html>
+
+[station-095] transaction failed: Unexpected status 504 from http://localhost:8080/transactions/4b4a1b91-d695-4bf8-8121-e5c6fa13c347/complete: <html>
+<head><title>504 Gateway Time-out</title></head>
+<body>
+<center><h1>504 Gateway Time-out</h1></center>
+<hr><center>nginx/1.31.6</center>
+</body>
+</html>
+
+[station-002] transaction failed: Unexpected status 504 from http://localhost:8080/transactions/c9bed7e4-2ebe-465f-aba5-374092537847/complete: <html>
+<head><title>504 Gateway Time-out</title></head>
+<body>
+<center><h1>504 Gateway Time-out</h1></center>
+<hr><center>nginx/1.31.6</center>
+</body>
+</html>
+
+[station-036] transaction failed: Transport error calling http://localhost:8080/transactions/587d70b7-933a-4101-a046-094c20f3f1d9/complete: request timed out
+[station-026] transaction failed: Unexpected status 504 from http://localhost:8080/transactions/2a102cc1-6e24-4890-ad03-4caabc5c31a8/complete: <html>
+<head><title>504 Gateway Time-out</title></head>
+<body>
+<center><h1>504 Gateway Time-out</h1></center>
+<hr><center>nginx/1.31.6</center>
+</body>
+</html>
+
+[station-090] transaction failed: Transport error calling http://localhost:8080/transactions/b94f13e6-4184-4719-a160-2e932580b0c8/complete: request timed out
+[station-033] transaction failed: Transport error calling http://localhost:8080/transactions/a87bf155-fa6d-45b5-9f85-4355b0c6cabd/complete: request timed out
+[station-015] transaction failed: Transport error calling http://localhost:8080/transactions/f2ea4843-08fa-4f3d-8acf-179a3f73d066/complete: request timed out
+[station-079] transaction failed: Transport error calling http://localhost:8080/transactions/beba7551-c094-4721-a32f-4ef23234bac7/complete: request timed out
+[station-053] transaction failed: Transport error calling http://localhost:8080/transactions/e2425977-5c3b-492a-b0f8-b1650f06b09f/complete: request timed out
+[station-017] transaction failed: Transport error calling http://localhost:8080/transactions/3a5e11a2-6e7b-42b2-9f7e-8bce27a2956e/complete: request timed out
+[station-069] transaction failed: Transport error calling http://localhost:8080/transactions/d60156b2-7ba8-4ae4-8a60-aa0ac2ad5c93/complete: request timed out
+[station-060] transaction failed: Transport error calling http://localhost:8080/transactions/7fdd6edf-9004-4aaf-8706-8ee398e000d3/complete: request timed out
+[station-010] transaction failed: Transport error calling http://localhost:8080/transactions/19e5d761-7c0a-445c-ab86-98c4dea24b2d/complete: request timed out
+[station-054] transaction failed: Transport error calling http://localhost:8080/transactions/030bc03e-2b9e-430e-8801-aa27c3f3502b/complete: request timed out
+[station-078] transaction failed: Transport error calling http://localhost:8080/transactions/4c8fdad8-b07a-4540-b554-0fd65ceeddf4/complete: request timed out
+[station-031] transaction failed: Transport error calling http://localhost:8080/transactions/a68d4d23-6118-4ed7-8594-4b3a5c943724/complete: request timed out
+[station-057] transaction failed: Transport error calling http://localhost:8080/transactions/2febed0d-5b9f-4fd8-b73c-0fd6387ba167/complete: request timed out
+[station-081] transaction failed: Transport error calling http://localhost:8080/transactions/a5a130f2-ac70-411c-92ac-96211cdd364c/complete: request timed out
+[station-068] transaction failed: Transport error calling http://localhost:8080/transactions/b5cb03e9-800b-48df-9e11-7433fd3d56fa/complete: request timed out
+[station-045] transaction failed: Transport error calling http://localhost:8080/transactions/3a149791-97bc-4a07-bcd7-71566a68e3db/complete: request timed out
+[station-067] transaction failed: Transport error calling http://localhost:8080/transactions/11f4a560-d3df-4b7d-bdbb-613f14f7cdc6/complete: request timed out
+[station-061] transaction failed: Transport error calling http://localhost:8080/transactions/4039178a-6b9a-4578-b744-7f4c42e2e06d/complete: request timed out
+[station-021] transaction failed: Transport error calling http://localhost:8080/transactions/f8620091-73ef-4e33-81de-55995f809bea/complete: request timed out
+[station-006] transaction failed: Transport error calling http://localhost:8080/transactions/940e9887-4dbe-418e-afcf-04164b3e0ddc/complete: request timed out
+[station-092] transaction failed: Transport error calling http://localhost:8080/transactions/e6b9a27e-04b0-455b-a745-2eea1e4c91e0/complete: request timed out
+[station-080] transaction failed: Transport error calling http://localhost:8080/transactions/809b0631-3c4c-4593-87cf-9d0e66130310/complete: request timed out
+[station-056] transaction failed: Unexpected status 502 from http://localhost:8080/transactions/6153d2c2-bcca-4a0f-953a-de4e20636c71/items: <html>
+<head><title>502 Bad Gateway</title></head>
+<body>
+<center><h1>502 Bad Gateway</h1></center>
+<hr><center>nginx/1.31.6</center>
+</body>
+</html>
+
+[station-035] transaction failed: Transport error calling http://localhost:8080/transactions/138726e9-da88-4444-bac9-d1c010ab694c/complete: request timed out
+[station-024] transaction failed: Transport error calling http://localhost:8080/transactions/1a9a6c92-4dd6-4fe0-ae8c-15732d987394/complete: request timed out
+[station-025] transaction failed: Transport error calling http://localhost:8080/transactions/2299fedc-1631-4220-8d1d-92f2c6344e69/complete: request timed out
+[station-005] transaction failed: Transport error calling http://localhost:8080/transactions/f59bfc16-55db-4056-b9a4-3bb1d0a71a2b/complete: request timed out
+[station-070] transaction failed: Transport error calling http://localhost:8080/transactions/1ab15b84-5cf2-41d9-ad3b-3eddf9324c22/complete: request timed out
+[station-089] transaction failed: Transport error calling http://localhost:8080/transactions/4820ca86-c6f1-4fbd-bca4-6075eebbd709/complete: request timed out
+[station-052] transaction failed: Transport error calling http://localhost:8080/transactions/7d7a9ccf-2e31-4aeb-a869-a4122324e8c6/complete: request timed out
+[station-091] transaction failed: Transport error calling http://localhost:8080/transactions/4ab1a974-a4fa-4153-ace6-b1ae38456973/complete: request timed out
+[station-055] transaction failed: Transport error calling http://localhost:8080/transactions/682f6c1e-9dc4-4939-8e1c-506dd771de9a/complete: request timed out
+[station-098] transaction failed: Transport error calling http://localhost:8080/transactions/32978e0b-9518-4510-8664-86743fd1dfeb/complete: request timed out
+[station-044] transaction failed: Transport error calling http://localhost:8080/transactions/e280f0b0-9a9c-4058-a433-70534d987fd5/complete: request timed out
+[station-100] transaction failed: Transport error calling http://localhost:8080/transactions/df1ad2c9-7c64-4f3c-9bbc-dbf19c5ab8b3/complete: request timed out
+[station-075] transaction failed: Transport error calling http://localhost:8080/transactions/542e729f-df70-4cf1-a638-38da3bc4d702/complete: request timed out
+[station-099] transaction failed: Transport error calling http://localhost:8080/transactions/7f438831-26b7-4d4c-a8ed-245d90f24098/complete: request timed out
+[station-073] transaction failed: Unexpected status 504 from http://localhost:8080/transactions/f14713d8-3fee-4d22-a8ec-39ab547dc9aa/complete: <html>
+<head><title>504 Gateway Time-out</title></head>
+<body>
+<center><h1>504 Gateway Time-out</h1></center>
+<hr><center>nginx/1.31.6</center>
+</body>
+</html>
+
+[station-072] transaction failed: Transport error calling http://localhost:8080/transactions/d4fef8d7-a965-4ae0-a21e-ae092cf14daa/complete: request timed out
+[station-088] transaction failed: Transport error calling http://localhost:8080/transactions/925029af-b7f5-4a79-a60c-5f3b20a4a848/complete: request timed out
+[station-001] transaction failed: Transport error calling http://localhost:8080/transactions/102c4b5b-2d31-44f1-8029-0f27bdb4e219/complete: request timed out
+[station-084] transaction failed: Transport error calling http://localhost:8080/transactions/62969382-8831-4fda-8021-d29d59eedd47/complete: request timed out
+[station-003] transaction failed: Transport error calling http://localhost:8080/transactions/81bd8857-fbdf-4e25-ada6-daba575ffa09/complete: request timed out
+[station-058] transaction failed: Transport error calling http://localhost:8080/transactions/7734cee6-3025-4a8a-8425-eacc630ce933/complete: request timed out
+[station-086] transaction failed: Transport error calling http://localhost:8080/transactions/99ba0883-faea-4432-b2a6-528df3429b22/complete: request timed out
+[station-065] transaction failed: Transport error calling http://localhost:8080/transactions/70fe956e-b648-4cd9-aad5-d76a049f8aa6/complete: request timed out
+[station-039] transaction failed: Transport error calling http://localhost:8080/transactions/b1cfee65-e6d1-4220-ad79-17f7aee43874/complete: request timed out
+[station-027] transaction failed: Transport error calling http://localhost:8080/transactions/1c4f71be-bfcf-4edf-aced-d880cf35da23/complete: request timed out
+[station-018] transaction failed: Transport error calling http://localhost:8080/transactions/e2fe5f12-1de1-4a3e-b999-e9231ea3db0e/complete: request timed out
+[station-012] transaction failed: Transport error calling http://localhost:8080/transactions/cf5b5771-9162-4a00-a1ef-801fbfc9e474/complete: request timed out
+[station-059] transaction failed: Transport error calling http://localhost:8080/transactions/10424158-356f-4c42-a14a-21ccb2009171/complete: request timed out
+[station-040] transaction failed: Transport error calling http://localhost:8080/transactions/5a88a2e8-5fbc-46a0-8cfa-39068563b1ea/complete: request timed out
+[station-051] transaction failed: Transport error calling http://localhost:8080/transactions/cfc5fd22-8800-48ef-b938-dbc720102acf/complete: request timed out
+[station-083] transaction failed: Transport error calling http://localhost:8080/transactions/b4dc495b-cbd9-4012-b8ef-63bc7b32ca8d/complete: request timed out
+[station-022] transaction failed: Transport error calling http://localhost:8080/transactions/f43b9066-ea8f-4080-9331-8a827ef19fab/complete: request timed out
+[station-009] transaction failed: Transport error calling http://localhost:8080/transactions/269d75b3-37bf-41e5-b2c6-5d9d7db0d2c9/complete: request timed out
+[station-028] transaction failed: Transport error calling http://localhost:8080/transactions/8a716ac8-caa6-4d48-9aee-3e5cf0024891/complete: request timed out
+[station-042] transaction failed: Transport error calling http://localhost:8080/transactions/eeb16f45-461a-48ac-b46d-cb01af404c06/complete: request timed out
+[station-007] transaction failed: Transport error calling http://localhost:8080/transactions/8e53b345-495d-4441-b4ed-dcba84a31ba8/complete: request timed out
+[station-013] transaction failed: Transport error calling http://localhost:8080/transactions/3e92976a-1848-43fb-98dc-8a1173248f88/complete: request timed out
+[station-014] transaction failed: Transport error calling http://localhost:8080/transactions/8dd33580-aaa9-49a6-8a49-9b17afd17766/complete: request timed out
+[station-016] transaction failed: Transport error calling http://localhost:8080/transactions/f524c04c-7ac1-45bf-a851-022f8350ec12/complete: request timed out
+[station-074] transaction failed: Transport error calling http://localhost:8080/transactions/315aa077-37a0-4778-a080-7f0cce1806b0/complete: request timed out
+[station-064] transaction failed: Transport error calling http://localhost:8080/transactions/d18f1093-0d8b-4077-be7c-6662f3c382b7/complete: request timed out
+[station-087] transaction failed: Transport error calling http://localhost:8080/transactions/0bd17af7-81c9-472b-b855-207f2248a2c9/complete: request timed out
+[station-030] transaction failed: Transport error calling http://localhost:8080/transactions/fc1d217e-8106-4748-b32e-f51aa680fc15/complete: request timed out
+[station-082] transaction failed: Transport error calling http://localhost:8080/transactions/2f89545b-a371-4e5c-9a04-a194a65a7e16/complete: request timed out
+[station-034] transaction failed: Transport error calling http://localhost:8080/transactions/85ccf041-fc3d-4356-88d8-8aa714290628/complete: request timed out
+[station-029] transaction failed: Transport error calling http://localhost:8080/transactions/324d63e5-e7cc-4ff1-af90-76d1b0ffdcf1/complete: request timed out
+[station-071] transaction failed: Transport error calling http://localhost:8080/transactions/90f5a11c-81e0-4a81-baa6-6ab480d77359/complete: request timed out
+[station-094] transaction failed: Transport error calling http://localhost:8080/transactions/510826b6-55f3-4db3-8867-8881161ac2d8/complete: request timed out
+[station-077] transaction failed: Transport error calling http://localhost:8080/transactions/6b28524c-f9a2-4bc2-9443-67604eaed917/complete: request timed out
+[station-032] transaction failed: Transport error calling http://localhost:8080/transactions/92186be1-feab-4c33-8f88-a186397e1e72/complete: request timed out
+[station-020] transaction failed: Transport error calling http://localhost:8080/transactions/1ea38ebe-54f8-47c0-9cf1-7371fe465e14/complete: request timed out
+[station-093] transaction failed: Transport error calling http://localhost:8080/transactions/e0995658-8653-42d6-87c2-2e78075b22a2/complete: request timed out
+[station-046] transaction failed: Transport error calling http://localhost:8080/transactions/4372b4a9-ffcf-4a99-ae6e-fc29d4ab524a/complete: request timed out
+[station-037] transaction failed: Transport error calling http://localhost:8080/transactions/e4f5d120-359e-44fa-861d-7da78d7f6357/complete: request timed out
+[station-063] transaction failed: Transport error calling http://localhost:8080/transactions/537ea0b5-54c9-49cd-b102-e2bb3a980699/complete: request timed out
+[station-062] transaction failed: Transport error calling http://localhost:8080/transactions/d6b44767-52c6-49a9-9de1-10ad62fde08e/complete: request timed out
+[station-085] transaction failed: Transport error calling http://localhost:8080/transactions/4281bdad-9f6b-4435-aed1-0c171920ec7f/complete: request timed out
+[station-047] transaction failed: Transport error calling http://localhost:8080/transactions/1cfb7f20-39a1-4b84-b02f-d1e2abad1eba/complete: request timed out
+[station-096] transaction failed: Transport error calling http://localhost:8080/transactions/460ff319-9331-4484-b7de-e1cbd320a256/complete: request timed out
+[station-019] transaction failed: Transport error calling http://localhost:8080/transactions/b55c29f6-bde3-4ee4-833e-c16a27b31670/complete: request timed out
+[station-049] transaction failed: Transport error calling http://localhost:8080/transactions/f4897afc-3389-4016-9c26-b46397521869/complete: request timed out
+[station-076] transaction failed: Transport error calling http://localhost:8080/transactions/f52873db-4a28-4faf-8b36-d74c0c3ec8f9/complete: request timed out
+[station-066] transaction failed: Transport error calling http://localhost:8080/transactions/f04f5123-8fec-4e51-b40a-196c8afbeb63/complete: request timed out
+[station-048] transaction failed: Transport error calling http://localhost:8080/transactions/e3d94f03-ddb0-4e31-8e6a-bfe2ca1e79d1/complete: request timed out
+[station-097] transaction failed: Transport error calling http://localhost:8080/transactions/e84716fb-40e7-42f9-9a02-2786f4d0c580/complete: request timed out
+[station-043] transaction failed: Transport error calling http://localhost:8080/transactions/885e7a39-3e33-4059-9b23-b503cbbf9500/complete: request timed out
+[station-023] transaction failed: Transport error calling http://localhost:8080/transactions/59181607-e641-4ca3-898c-dbd2a90f9835/complete: request timed out
+[station-041] transaction failed: Transport error calling http://localhost:8080/transactions/c4e44ce9-e339-431b-b1b0-11dff040bcd6/complete: request timed out
+[station-008] transaction failed: Transport error calling http://localhost:8080/transactions/e17729c2-26e7-4870-a10a-e7b78d443056/complete: request timed out
+[station-011] transaction failed: Transport error calling http://localhost:8080/transactions/f4bc1bb5-346b-4259-925a-593fb4884b7c/items: request timed out
+[station-050] transaction failed: Transport error calling http://localhost:8080/transactions: HTTP/1.1 header parser received no bytes
+[station-038] transaction failed: Transport error calling http://localhost:8080/transactions/bd22517b-58c0-496a-afbd-0453981385d1/complete: request timed out
+[station-004] transaction failed: Transport error calling http://localhost:8080/transactions/a613e68c-cbe5-442f-aba2-a88d452b428e/complete: request timed out
+[station-046] transaction failed: Transport error calling http://localhost:8080/transactions/5d02e965-8bd3-4d3b-a198-b895af36c2b0/complete: request timed out
+[station-062] transaction failed: Transport error calling http://localhost:8080/transactions/f806c2f8-4634-4a6d-90ae-70a338f179d6/complete: request timed out
+[station-090] transaction failed: Transport error calling http://localhost:8080/transactions/383fd13a-7a8f-44dc-8ea0-f67ffb927746/complete: request timed out
+[station-024] transaction failed: Transport error calling http://localhost:8080/transactions/8a26f9d4-d05f-48f9-936c-72c46f48b6b9/complete: request timed out
+[station-077] transaction failed: Transport error calling http://localhost:8080/transactions/10a96647-2bcb-45c8-ab31-fad48b70dfed/complete: request timed out
+[station-054] transaction failed: Transport error calling http://localhost:8080/transactions/8d010f86-b01a-489e-bfa7-2bee0d3dc68c/complete: request timed out
+[station-021] transaction failed: Transport error calling http://localhost:8080/transactions/60a412b1-2ca1-4760-a9f0-8a44c660ecd1/complete: request timed out
+[station-092] transaction failed: Transport error calling http://localhost:8080/transactions/a28e7921-4948-480d-a72d-3a70e2de3ae7/complete: request timed out
+[station-060] transaction failed: Transport error calling http://localhost:8080/transactions/a640da6a-8426-4e74-92f3-58c3c071109b/complete: request timed out
+[station-087] transaction failed: Transport error calling http://localhost:8080/transactions/ef382555-8aa0-4983-87ca-e08684fb1a48/complete: request timed out
+[station-032] transaction failed: Transport error calling http://localhost:8080/transactions/534c2efc-dadb-4053-bcf7-36d14b5d6c15/complete: request timed out
+[station-080] transaction failed: Transport error calling http://localhost:8080/transactions/dd9172f5-7008-40fd-8307-17df29fcac7a/complete: request timed out
+[station-010] transaction failed: Transport error calling http://localhost:8080/transactions/502b3737-1461-4fb0-93ae-36737bceca0c/complete: request timed out
+[station-029] transaction failed: Transport error calling http://localhost:8080/transactions/c73e062e-25ea-496d-ac62-46facfc16d8a/complete: request timed out
+[station-097] transaction failed: Transport error calling http://localhost:8080/transactions/7fa1a502-2a77-4f5e-a865-781fff5e7a55/complete: request timed out
+[station-099] transaction failed: Transport error calling http://localhost:8080/transactions/68919790-cd2a-445b-bc1f-f9ef436d942f/complete: request timed out
+[station-063] transaction failed: Transport error calling http://localhost:8080/transactions/bad2cc39-2d97-4c3a-8cd1-0a144212eb26/complete: request timed out
+[station-001] transaction failed: Transport error calling http://localhost:8080/transactions/75763533-dd7b-4203-b3e6-db19978ba90f/complete: request timed out
+[station-083] transaction failed: Transport error calling http://localhost:8080/transactions/5aa5e615-b37f-4880-80b8-cd567e953b3c/complete: request timed out
+[station-093] transaction failed: Transport error calling http://localhost:8080/transactions/66e474e9-3e3f-4cf6-b5a4-6611d517fb40/complete: request timed out
+[station-058] transaction failed: Transport error calling http://localhost:8080/transactions/eb91de0f-4550-4050-9d48-07139f3d5b5f/complete: request timed out
+[station-009] transaction failed: Transport error calling http://localhost:8080/transactions/676f64fb-6082-475f-8054-1df12381c637/complete: request timed out
+[station-038] transaction failed: Transport error calling http://localhost:8080/transactions/45f717a2-5a99-4a6a-9fb4-629ca38d25bd/complete: request timed out
+[station-069] transaction failed: Transport error calling http://localhost:8080/transactions/e7c2c9b5-5e99-4233-aca8-d2dcdb0c9685/complete: request timed out
+[station-052] transaction failed: Transport error calling http://localhost:8080/transactions/086e67ad-82e3-4446-9382-cce9f8845900/complete: request timed out
+[station-002] transaction failed: Transport error calling http://localhost:8080/transactions/ef8cca43-6cb2-461e-a158-8fbbe7e17f08/complete: request timed out
+[station-047] transaction failed: Transport error calling http://localhost:8080/transactions/03517662-bc80-44fa-bae6-29f5d678b556/complete: request timed out
+[station-050] transaction failed: Transport error calling http://localhost:8080/transactions/3bf70852-664b-4305-8e6b-b77490fb9b8e/complete: request timed out
+[station-039] transaction failed: Transport error calling http://localhost:8080/transactions/42b5791d-0304-4f4c-a35f-a3739830f89a/complete: request timed out
+[station-043] transaction failed: Transport error calling http://localhost:8080/transactions/4e536c75-6e8a-4582-9fd4-6e3770cfb802/complete: request timed out
+[station-011] transaction failed: Transport error calling http://localhost:8080/transactions/d0904ce1-a6f4-45c2-8365-73e9223a70a1/complete: request timed out
+[station-059] transaction failed: Transport error calling http://localhost:8080/transactions/05c208c4-367e-4a88-b1bd-ea7d67a1e063/complete: request timed out
+[station-070] transaction failed: Transport error calling http://localhost:8080/transactions/a3b314e2-1020-42dc-9cd9-a2eb9db60d8e/complete: request timed out
+[station-065] transaction failed: Transport error calling http://localhost:8080/transactions/7b0fb496-d2f4-4947-bb19-f7478f067281/complete: request timed out
+[station-079] transaction failed: Transport error calling http://localhost:8080/transactions/78b9be84-4a0e-4aed-bc97-9f400a3b7a7e/complete: request timed out
+[station-028] transaction failed: Transport error calling http://localhost:8080/transactions/52f04243-8268-44c9-825b-bc24ea324269/complete: request timed out
+[station-051] transaction failed: Transport error calling http://localhost:8080/transactions/10b26685-7d6d-4625-a3e7-f13502d5d1e8/complete: request timed out
+[station-048] transaction failed: Transport error calling http://localhost:8080/transactions/e96f9dbb-0025-43be-99de-b7410dd0950e/complete: request timed out
+[station-020] transaction failed: Transport error calling http://localhost:8080/transactions/b621b0f0-bcea-43d6-a5b4-f4fda3cb96be/complete: request timed out
+[station-091] transaction failed: Transport error calling http://localhost:8080/transactions/97775c93-0d4f-4a8a-ac72-e9123897d781/complete: request timed out
+[station-100] transaction failed: Transport error calling http://localhost:8080/transactions/c0620002-5a2c-45c3-a781-6c49c0b1970e/complete: request timed out
+[station-019] transaction failed: Transport error calling http://localhost:8080/transactions/8b15620d-d6a3-4b3e-a1eb-a14558b5a631/complete: request timed out
+[station-005] transaction failed: Transport error calling http://localhost:8080/transactions/76bd295c-79ec-4242-a84c-67085726301e/complete: request timed out
+[station-042] transaction failed: Transport error calling http://localhost:8080/transactions/9d71e1bf-b0b8-4bd8-96f8-ba018a4d3a2a/complete: request timed out
+[station-074] transaction failed: Transport error calling http://localhost:8080/transactions/ae770d1b-58d4-40a5-b9e6-36fcc38ab0d0/complete: request timed out
+[station-022] transaction failed: Transport error calling http://localhost:8080/transactions/4bea45d8-f7c7-4248-8d55-d0f92e7f7153/complete: request timed out
+[station-030] transaction failed: Transport error calling http://localhost:8080/transactions/344f7bb2-09a5-4a9e-b623-c0cae150c856/complete: request timed out
+[station-057] transaction failed: Transport error calling http://localhost:8080/transactions/e5af18cc-10ae-4930-b3cd-2465abf283a4/complete: request timed out
+[station-012] transaction failed: Transport error calling http://localhost:8080/transactions/a7a9ed50-55a5-4fe4-a255-8104884d6a03/complete: request timed out
+[station-095] transaction failed: Transport error calling http://localhost:8080/transactions/af688f51-9b6a-4414-8f8d-54edd5ae38be/complete: request timed out
+[station-015] transaction failed: Transport error calling http://localhost:8080/transactions/afbd3b1e-8767-4c46-9da3-6fe638f58be8/complete: request timed out
+[station-055] transaction failed: Transport error calling http://localhost:8080/transactions/4dee5544-0e6e-418c-9994-c3a4dad77981/complete: request timed out
+[station-023] transaction failed: Transport error calling http://localhost:8080/transactions/c7f4a61c-5f57-4624-9733-eaad1c059d90/complete: request timed out
+[station-044] transaction failed: Transport error calling http://localhost:8080/transactions/2636e4ce-bf05-4dbd-8e95-1a46d208574f/complete: request timed out
+[station-037] transaction failed: Transport error calling http://localhost:8080/transactions/b2c580c8-34b1-4c87-9fb8-5f6e80d651bf/complete: request timed out
+[station-078] transaction failed: Transport error calling http://localhost:8080/transactions/42cccdb4-049d-4a37-bf8a-a7479c76bed9/complete: request timed out
+[station-026] transaction failed: Transport error calling http://localhost:8080/transactions/f019f9dc-202b-4258-ac86-7bf7c9056b44/complete: request timed out
+[station-098] transaction failed: Transport error calling http://localhost:8080/transactions/3a3614b9-6962-4a50-924f-c81a94f4a0a9/complete: request timed out
+[station-053] transaction failed: Transport error calling http://localhost:8080/transactions/561c1d05-a4e8-4ae9-bd57-501b88ee9758/complete: request timed out
+[station-094] transaction failed: Transport error calling http://localhost:8080/transactions/b3d42b89-081d-4eab-897c-aa87b201b89b/complete: request timed out
+[station-081] transaction failed: Transport error calling http://localhost:8080/transactions/4e1b96fc-927d-41c0-b79f-0cfb805d250a/complete: request timed out
+[station-017] transaction failed: Transport error calling http://localhost:8080/transactions/c7d2bcc1-90dd-41f5-a6c1-4c90631c4c25/complete: request timed out
+[station-088] transaction failed: Transport error calling http://localhost:8080/transactions/ada8f5a6-b868-4808-8f0f-afce914c7cbb/complete: request timed out
+[station-064] transaction failed: Transport error calling http://localhost:8080/transactions/9be4a125-4384-42b5-8e99-66cc2a6ca65e/complete: request timed out
+[station-075] transaction failed: Transport error calling http://localhost:8080/transactions/3bc1c1f1-97a7-4e45-804d-d358d5890524/complete: request timed out
+[station-089] transaction failed: Transport error calling http://localhost:8080/transactions/036e025d-4f3d-4514-9c00-460c7e8aacc8/complete: request timed out
+[station-084] transaction failed: Transport error calling http://localhost:8080/transactions/50badc9d-bb76-4f35-8db1-3e4fbf6f3640/complete: request timed out
+[station-086] transaction failed: Transport error calling http://localhost:8080/transactions/0b2a9775-ad0a-4d7d-b729-4e1af58b070b/complete: request timed out
+[station-034] transaction failed: Transport error calling http://localhost:8080/transactions/4a81d9df-a560-48ea-9ede-4076c93f1c46/complete: request timed out
+[station-031] transaction failed: Transport error calling http://localhost:8080/transactions/d41291bb-8e4d-4db0-b05e-971bb3ae8d83/complete: request timed out
+[station-067] transaction failed: Transport error calling http://localhost:8080/transactions/d7678d24-e31b-466c-8162-5dab12ba7002/complete: request timed out
+[station-027] transaction failed: Transport error calling http://localhost:8080/transactions/cdc0864b-c65e-41c0-a164-e3cefe25a643/complete: request timed out
+[station-068] transaction failed: Transport error calling http://localhost:8080/transactions/c2d7ddb1-0fc0-4637-9aa8-4e4f035fabe5/complete: request timed out
+[station-056] transaction failed: Transport error calling http://localhost:8080/transactions/06d3b417-75d9-40d5-bad5-5010f89674ff/complete: request timed out
+[station-014] transaction failed: Transport error calling http://localhost:8080/transactions/c88e42b7-28ba-4e0d-afca-069e31d5d474/complete: request timed out
+[station-004] transaction failed: Transport error calling http://localhost:8080/transactions/ef0f755e-fbfc-4e9c-92f5-ba0e89acd52e/complete: request timed out
+[station-071] transaction failed: Transport error calling http://localhost:8080/transactions/8893acb1-7d19-4d63-9586-06999be8f867/complete: request timed out
+[station-007] transaction failed: Transport error calling http://localhost:8080/transactions/f7733014-d799-4bd1-af3e-5c0af9b39351/complete: request timed out
+[station-072] transaction failed: Transport error calling http://localhost:8080/transactions/44363930-74ed-41dd-9760-0fe7aa061186/complete: request timed out
+[station-073] transaction failed: Transport error calling http://localhost:8080/transactions/6c0c3a6b-fd64-45cf-91b3-71f2fadf018a/complete: request timed out
+[station-085] transaction failed: Transport error calling http://localhost:8080/transactions/0ac73ff4-268e-4337-9ffe-a97bfebc0af3/complete: request timed out
+[station-018] transaction failed: Transport error calling http://localhost:8080/transactions/f7867ab0-cede-4efa-985e-e6cca81e54a8/complete: request timed out
+[station-040] transaction failed: Transport error calling http://localhost:8080/transactions/a4430e78-7c30-419e-93e7-8ce8e1712b34/complete: request timed out
+[station-036] transaction failed: Transport error calling http://localhost:8080/transactions/a026a5e2-2e55-48bf-9d1d-743a3dd76291/complete: request timed out
+[station-006] transaction failed: Transport error calling http://localhost:8080/transactions/8264ad8b-a792-49cd-8193-c9c89f82a81a/complete: request timed out
+[station-035] transaction failed: Transport error calling http://localhost:8080/transactions/cb7c1ce3-9c9c-4837-b3c8-f1a1f2498adb/complete: request timed out
+[station-025] transaction failed: Transport error calling http://localhost:8080/transactions/b6b4b0b8-00b6-42e0-baa9-44923bd8c99a/complete: request timed out
+[station-013] transaction failed: Transport error calling http://localhost:8080/transactions/15a6ca8e-7c98-4d4f-83e0-795a5d39a210/complete: request timed out
+[station-066] transaction failed: Transport error calling http://localhost:8080/transactions/1ccd85cd-cf53-4e16-8960-3098db68bf47/complete: request timed out
+[station-041] transaction failed: Transport error calling http://localhost:8080/transactions/b29dbdba-b6bc-4b6b-9232-39fd6ede0a5e/complete: request timed out
+[station-082] transaction failed: Transport error calling http://localhost:8080/transactions/a58a5e61-7068-41fb-a484-6ee33bdd092a/complete: request timed out
+[station-008] transaction failed: Transport error calling http://localhost:8080/transactions/ac6f98a4-04c1-4547-83f9-d96eeb299b66/complete: request timed out
+[station-003] transaction failed: Transport error calling http://localhost:8080/transactions/65dc5a33-e18f-4a4b-8e4c-97ad9ec78952/complete: request timed out
+[station-061] transaction failed: Transport error calling http://localhost:8080/transactions/605eb68e-d0c4-4c54-b1a9-a30782f7687f/complete: request timed out
+[station-045] transaction failed: Transport error calling http://localhost:8080/transactions/c24a7bce-e77b-4539-a93e-ba8a62bb75ad/complete: request timed out
+[station-033] transaction failed: Transport error calling http://localhost:8080/transactions/95f890bc-3ace-4d60-9b2e-b790cf1e376e/complete: request timed out
+[station-096] transaction failed: Transport error calling http://localhost:8080/transactions/a2825848-11c9-4856-9a0b-32088eae3e6f/complete: request timed out
+[station-076] transaction failed: Transport error calling http://localhost:8080/transactions/aaf3ca9e-e363-4787-bd74-f47bb007b82c/complete: request timed out
+[station-049] transaction failed: Transport error calling http://localhost:8080/transactions/9abea98a-7e85-41b4-b1b6-5a328bf770dc/complete: request timed out
+[station-016] transaction failed: Transport error calling http://localhost:8080/transactions: HTTP/1.1 header parser received no bytes
+[station-082] transaction failed: Transport error calling http://localhost:8080/transactions/c681f3cb-8730-426d-b6d7-d206d0625051/complete: request timed out
+[station-043] transaction failed: Transport error calling http://localhost:8080/transactions/8f8ba29a-842a-48ed-ac6e-01caef5b1849/complete: request timed out
+[station-040] transaction failed: Transport error calling http://localhost:8080/transactions/326d4bfd-6f5e-4f38-bd2b-4ff976ce312d/complete: request timed out
+[station-099] transaction failed: Transport error calling http://localhost:8080/transactions/4c416bae-5dd7-4617-94ca-273e1df6607f/complete: request timed out
+[station-061] transaction failed: Transport error calling http://localhost:8080/transactions/3bdbe409-f685-4b00-9911-77605916a6ee/complete: request timed out
+[station-009] transaction failed: Transport error calling http://localhost:8080/transactions/aa752f8b-cfc6-452a-8810-06a303209d53/complete: request timed out
+[station-010] transaction failed: Transport error calling http://localhost:8080/transactions/278a77c8-c7ae-4ac1-b53f-6bd3282a5610/complete: request timed out
+[station-056] transaction failed: Transport error calling http://localhost:8080/transactions/5e59bd9c-97ed-4697-a629-e536111093c0/complete: request timed out
+[station-086] transaction failed: Transport error calling http://localhost:8080/transactions/45ca37a8-6116-4898-88d6-a9e7bfeeba80/complete: request timed out
+[station-012] transaction failed: Transport error calling http://localhost:8080/transactions/ae682f72-5f3b-4b34-b89d-19c5ee2314a9/complete: request timed out
+[station-095] transaction failed: Transport error calling http://localhost:8080/transactions/de71d22c-3c2f-437a-a1c3-6a6598979fd4/complete: request timed out
+[station-093] transaction failed: Transport error calling http://localhost:8080/transactions/d4c7fbca-a232-4649-bb2c-4133e36ebc0e/complete: request timed out
+[station-030] transaction failed: Transport error calling http://localhost:8080/transactions/ac3eaefc-0a5e-45b0-8eb8-c53a0238e0ac/complete: request timed out
+[station-006] transaction failed: Transport error calling http://localhost:8080/transactions/611f9b68-90b7-45a6-a9bb-552a3077793e/complete: request timed out
+[station-066] transaction failed: Transport error calling http://localhost:8080/transactions/fabaab49-8e78-47e8-b6ba-703cbfc345a9/complete: request timed out
+[station-018] transaction failed: Transport error calling http://localhost:8080/transactions/bc033db8-1431-4f48-b9b5-e81f4328bb15/complete: request timed out
+[station-081] transaction failed: Transport error calling http://localhost:8080/transactions/289c0971-138a-4dba-b87f-0fce806b1e8b/complete: request timed out
+[station-047] transaction failed: Transport error calling http://localhost:8080/transactions/0ea8d7ef-f5e5-4133-a3e1-cdcc0a4202e3/complete: request timed out
+[station-011] transaction failed: Transport error calling http://localhost:8080/transactions/71840392-af71-4c3f-8fd9-89ccc90a7267/complete: request timed out
+[station-080] transaction failed: Transport error calling http://localhost:8080/transactions/07b716f2-b541-4368-9e77-a701a80d9fef/complete: request timed out
+[station-057] transaction failed: Transport error calling http://localhost:8080/transactions/f0fbf844-5d6c-4f09-8349-ce2717d48f9b/complete: request timed out
+[station-028] transaction failed: Transport error calling http://localhost:8080/transactions/1ab77a99-6c03-4b6b-ba1e-93c9cef86963/complete: request timed out
+[station-008] transaction failed: Transport error calling http://localhost:8080/transactions/3c65d3a9-12da-4e2a-be51-4030e7f98437/complete: request timed out
+[station-003] transaction failed: Transport error calling http://localhost:8080/transactions/8d4c32a3-915d-4123-9a80-4ae2943e8617/complete: request timed out
+[station-025] transaction failed: Transport error calling http://localhost:8080/transactions/34af84b9-f747-4455-9203-4de70f5de62d/complete: request timed out
+[station-051] transaction failed: Transport error calling http://localhost:8080/transactions/1ce7bab2-eb41-4175-aeb3-7e84205cebc6/complete: request timed out
+[station-064] transaction failed: Transport error calling http://localhost:8080/transactions/bf273738-e259-4cc4-bc1a-103a6c128d01/complete: request timed out
+[station-039] transaction failed: Transport error calling http://localhost:8080/transactions/17263aee-f06b-487c-b164-b60bb0ad361f/complete: request timed out
+[station-100] transaction failed: Transport error calling http://localhost:8080/transactions/00a8a2e0-d887-48f5-8ff7-2935c5fa49cc/complete: request timed out
+[station-021] transaction failed: Transport error calling http://localhost:8080/transactions/6bde3845-1ece-409c-b6c1-37f29116fd75/complete: request timed out
+[station-085] transaction failed: Transport error calling http://localhost:8080/transactions/b2796936-7fba-497d-9b33-4b4abeda87bd/complete: request timed out
+[station-055] transaction failed: Transport error calling http://localhost:8080/transactions/4a732005-5164-4efd-a190-c88421577d66/complete: request timed out
+[station-046] transaction failed: Transport error calling http://localhost:8080/transactions/695806fc-34db-4e70-98d3-3aa7d99a7c30/complete: request timed out
+[station-042] transaction failed: Transport error calling http://localhost:8080/transactions/2cb74e6e-deef-4dcb-9d3a-69ca17bbc96d/complete: request timed out
+[station-087] transaction failed: Transport error calling http://localhost:8080/transactions/73f051c8-0ede-421c-9113-b17fe9942990/complete: request timed out
+[station-013] transaction failed: Transport error calling http://localhost:8080/transactions/935d65b9-2f0d-4213-ac30-cdcae2c39776/complete: request timed out
+[station-029] transaction failed: Transport error calling http://localhost:8080/transactions/f499953d-9b3d-437c-b079-f426a583e922/complete: request timed out
+[station-045] transaction failed: Transport error calling http://localhost:8080/transactions/5190e498-cef2-4d23-ad83-e0b45946fcf9/complete: request timed out
+[station-058] transaction failed: Transport error calling http://localhost:8080/transactions/02e5d839-07ea-4f90-9b1e-ab673262abb7/complete: request timed out
+[station-001] transaction failed: Transport error calling http://localhost:8080/transactions/bc28c295-bcfa-49d9-be8f-c76a33bfaad8/complete: request timed out
+[station-063] transaction failed: Transport error calling http://localhost:8080/transactions/0f9f5187-a915-4aec-b30c-834d1719030c/complete: request timed out
+[station-068] transaction failed: Transport error calling http://localhost:8080/transactions/9faf85a4-0120-49f2-9764-0b396f2823fd/complete: request timed out
+[station-089] transaction failed: Transport error calling http://localhost:8080/transactions/e6eacc11-6cac-4064-98cb-04b1c17d8415/complete: request timed out
+[station-041] transaction failed: Transport error calling http://localhost:8080/transactions/154a3d94-6966-4a34-8856-bef5977d1fda/complete: request timed out
+[station-079] transaction failed: Transport error calling http://localhost:8080/transactions/e5589eab-829b-4fac-8af0-dc6433d03d3d/complete: request timed out
+[station-078] transaction failed: Transport error calling http://localhost:8080/transactions/184ba4c5-206b-4819-8d19-d27c2e5de630/complete: request timed out
+[station-072] transaction failed: Transport error calling http://localhost:8080/transactions/6a8da20b-d849-47e5-b6f7-0a5deedcb308/complete: request timed out
+[station-023] transaction failed: Transport error calling http://localhost:8080/transactions/c6942b25-5e39-409f-8dce-baac18825ecb/complete: request timed out
+[station-052] transaction failed: Transport error calling http://localhost:8080/transactions/26c87ae4-600d-4904-8d28-36b5aeb79331/complete: request timed out
+[station-075] transaction failed: Transport error calling http://localhost:8080/transactions/26c9716a-ff24-4ece-8160-c5aab5000c62/complete: request timed out
+[station-090] transaction failed: Transport error calling http://localhost:8080/transactions/3a8582fb-2b7e-45d1-a806-d7692c737352/complete: request timed out
+[station-073] transaction failed: Transport error calling http://localhost:8080/transactions/cf2462fa-dfe0-4e28-b255-ae572633cf96/complete: request timed out
+[station-005] transaction failed: Transport error calling http://localhost:8080/transactions/1c841784-1a17-4ada-9180-5b2f33e94169/complete: request timed out
+[station-004] transaction failed: Transport error calling http://localhost:8080/transactions/ff6c4dde-ea40-4831-9244-b8a573190ad9/complete: request timed out
+[station-053] transaction failed: Transport error calling http://localhost:8080/transactions/c46c2029-d135-4ff9-8948-668f09c4d9a4/complete: request timed out
+[station-071] transaction failed: Transport error calling http://localhost:8080/transactions/c40a220c-2725-416f-a9c1-4e232a24c86b/complete: request timed out
+[station-002] transaction failed: Transport error calling http://localhost:8080/transactions/da45fa17-1678-45a7-9ea7-a850a30684db/complete: request timed out
+[station-049] transaction failed: Transport error calling http://localhost:8080/transactions/11924f69-6b7e-4ac5-b5d8-7120c4bd778a/complete: request timed out
+[station-083] transaction failed: Transport error calling http://localhost:8080/transactions/3f6ce123-2af8-4ea4-bf56-4dda5698d65c/complete: request timed out
+[station-044] transaction failed: Transport error calling http://localhost:8080/transactions/955926e6-1cc9-4711-b378-be00e61ad6bc/complete: request timed out
+[station-022] transaction failed: Transport error calling http://localhost:8080/transactions/88186434-56ee-40c0-ba28-3d466b8da827/complete: request timed out
+[station-027] transaction failed: Transport error calling http://localhost:8080/transactions/7a73082c-4631-4c8b-aea5-7ae3c5416274/complete: request timed out
+[station-007] transaction failed: Transport error calling http://localhost:8080/transactions/b0feb337-0865-4a3a-a48e-9ee0f2bb9f82/complete: request timed out
+[station-050] transaction failed: Transport error calling http://localhost:8080/transactions/c1c1fcd4-685c-409c-8666-5526317ee513/complete: request timed out
+[station-032] transaction failed: Transport error calling http://localhost:8080/transactions/3e987454-e56d-438c-acea-62ff5eb53c24/complete: request timed out
+[station-070] transaction failed: Transport error calling http://localhost:8080/transactions/71862d92-90ed-402f-8a65-5f32f5261a30/complete: request timed out
+[station-065] transaction failed: Transport error calling http://localhost:8080/transactions/2143e415-c0d6-4a3c-8770-20de870de59f/complete: request timed out
+[station-031] transaction failed: Transport error calling http://localhost:8080/transactions/ef734063-1f28-452d-a23c-9cef75b98af0/complete: request timed out
+[station-069] transaction failed: Transport error calling http://localhost:8080/transactions/6f6d75aa-ae0f-442d-aa44-d4bccd3ab7ea/complete: request timed out
+[station-074] transaction failed: Transport error calling http://localhost:8080/transactions/82719f25-a4f0-4eb2-a420-8b67b25c3716/complete: request timed out
+[station-060] transaction failed: Transport error calling http://localhost:8080/transactions/f5b3e805-6d47-4279-94c8-676a3f1e1000/complete: request timed out
+[station-077] transaction failed: Transport error calling http://localhost:8080/transactions/6c6c6e22-7827-4185-895a-978dd967bf25/complete: request timed out
+[station-092] transaction failed: Transport error calling http://localhost:8080/transactions/dc90ca7e-2b79-4b3f-9177-65ff6be86e15/complete: request timed out
+[station-026] transaction failed: Transport error calling http://localhost:8080/transactions/1036ecb1-7460-442b-bb4d-4fbd89af5e10/complete: request timed out
+[station-096] transaction failed: Transport error calling http://localhost:8080/transactions/80f5dcde-0607-443a-a7a7-0515b4ca1d3c/complete: request timed out
+[station-059] transaction failed: Transport error calling http://localhost:8080/transactions/83dcc510-4b96-4a2e-8c03-4c85df8bfaec/complete: request timed out
+[station-034] transaction failed: Transport error calling http://localhost:8080/transactions/853c5473-12ef-412f-8e80-0fa81d6b3b47/complete: request timed out
+[station-036] transaction failed: Transport error calling http://localhost:8080/transactions/63b7f945-aaa2-4755-abc4-24accb5314f8/complete: request timed out
+[station-014] transaction failed: Transport error calling http://localhost:8080/transactions/5eb4b41b-6b27-43ce-a96e-443b7eac8698/complete: request timed out
+[station-035] transaction failed: Transport error calling http://localhost:8080/transactions/7a91ff28-0c46-4e98-a4fb-a3236e8135d3/complete: request timed out
+[station-091] transaction failed: Transport error calling http://localhost:8080/transactions/4938e7ad-8ab9-4f27-9ee4-8f0fa886d7bb/complete: request timed out
+[station-017] transaction failed: Transport error calling http://localhost:8080/transactions/6046a748-02f8-403a-94c3-5c40bf05f735/complete: request timed out
+[station-033] transaction failed: Transport error calling http://localhost:8080/transactions/a2992884-26db-4edd-bb29-865621f3abad/complete: request timed out
+[station-015] transaction failed: Transport error calling http://localhost:8080/transactions/f15df2aa-3279-4e95-9753-d707b196b242/complete: request timed out
+[station-024] transaction failed: Transport error calling http://localhost:8080/transactions/e97a7790-a85a-45b5-ba08-2712b1458e73/complete: request timed out
+[station-062] transaction failed: Transport error calling http://localhost:8080/transactions/9e7be1ee-484f-46ff-b2ae-f316c037f343/complete: request timed out
+[station-076] transaction failed: Transport error calling http://localhost:8080/transactions/acb3d9e1-805c-46c2-8041-16c539a63af5/complete: request timed out
+[station-067] transaction failed: Transport error calling http://localhost:8080/transactions/311a5954-a99a-4934-af3e-b873828f0589/complete: request timed out
+[station-016] transaction failed: Transport error calling http://localhost:8080/transactions/ba975a21-e43f-458e-908a-c05336bb189b/complete: request timed out
+[station-097] transaction failed: Transport error calling http://localhost:8080/transactions/eb840bac-aafd-4a23-ad47-be610f421a17/complete: request timed out
+[station-019] transaction failed: Transport error calling http://localhost:8080/transactions/417c5807-1a27-4c4d-b3bf-650ee0b7dc19/complete: request timed out
+[station-038] transaction failed: Transport error calling http://localhost:8080/transactions/59b0f458-47d9-4cee-95a0-7da4435d97e0/complete: request timed out
+[station-020] transaction failed: Transport error calling http://localhost:8080/transactions/00d168a5-b025-42c7-996e-da36ae0d972c/complete: request timed out
+[station-094] transaction failed: Transport error calling http://localhost:8080/transactions/cfbe57b5-3214-4e3e-b28a-05f0458a0a5d/complete: request timed out
+[station-098] transaction failed: Transport error calling http://localhost:8080/transactions/f849485d-5c8d-409a-95b1-3c9233fb593b/complete: request timed out
+[station-084] transaction failed: Transport error calling http://localhost:8080/transactions/3efc7484-240c-40ae-9ba7-770e3bcf6edf/complete: request timed out
+[station-048] transaction failed: Transport error calling http://localhost:8080/transactions/0ea123a4-ef4c-4e2a-afa1-fa63a65bc82c/complete: request timed out
+[station-054] transaction failed: Transport error calling http://localhost:8080/transactions/aabf39c1-3f10-4ff0-ae8a-8ea2c277c760/complete: request timed out
+[station-037] transaction failed: Transport error calling http://localhost:8080/transactions/5b747ab7-eac2-4dde-ac22-e557f292a8d9/items: request timed out
+[station-088] transaction failed: Transport error calling http://localhost:8080/transactions/ca9a9f91-e3b6-47f0-90a1-e05cb4e3bdf9/items: HTTP/1.1 header parser received no bytes
+[station-025] transaction failed: Transport error calling http://localhost:8080/transactions/e4552cf6-555c-47f5-bd14-2099e4fd0399/complete: request timed out
+[station-066] transaction failed: Transport error calling http://localhost:8080/transactions/945f6e64-da1d-40a8-8584-a0b4d6bb8d36/complete: request timed out
+[station-073] transaction failed: Transport error calling http://localhost:8080/transactions/c91469ff-3e1f-4790-bd79-9a0988fed9b1/complete: request timed out
+[station-043] transaction failed: Transport error calling http://localhost:8080/transactions/8643c966-0d8c-4e29-8c64-a34662cf7333/complete: request timed out
+[station-006] transaction failed: Transport error calling http://localhost:8080/transactions/a3e5bc5c-5a60-4fa5-9cff-1c7a486c1359/complete: request timed out
+[station-016] transaction failed: Transport error calling http://localhost:8080/transactions/555b5858-a105-4146-95c5-44ba72e8f82e/complete: request timed out
+[station-053] transaction failed: Transport error calling http://localhost:8080/transactions/5ae5cc7d-685b-440f-a6e9-7beb87595a54/complete: request timed out
+[station-050] transaction failed: Transport error calling http://localhost:8080/transactions/fbdea2b6-7d9c-4859-8025-f5f6ae7c0530/complete: request timed out
+[station-090] transaction failed: Transport error calling http://localhost:8080/transactions/2485662a-17e3-4551-98d6-2019d7269482/complete: request timed out
+[station-099] transaction failed: Transport error calling http://localhost:8080/transactions/b5746874-3551-4b34-a65f-8dfc6feb2f97/complete: request timed out
+[station-051] transaction failed: Transport error calling http://localhost:8080/transactions/c3bda213-246a-4be0-ab5f-c2ad38da8099/complete: request timed out
+[station-007] transaction failed: Transport error calling http://localhost:8080/transactions/944489d5-4dd3-4cb0-bc9b-048d52319e0e/complete: request timed out
+[station-009] transaction failed: Transport error calling http://localhost:8080/transactions/10155819-d94e-47cd-8975-bb28393a5ecd/complete: request timed out
+[station-024] transaction failed: Transport error calling http://localhost:8080/transactions/0bd67c6f-91fe-4b02-bef3-2ceaa7ad8bd8/complete: request timed out
+[station-048] transaction failed: Transport error calling http://localhost:8080/transactions/d430c739-bc8a-45f5-b91c-be6324960e51/complete: request timed out
+[station-092] transaction failed: Transport error calling http://localhost:8080/transactions/f5894569-cdd5-4d8d-9e64-4c73efa5f569/complete: request timed out
+[station-068] transaction failed: Transport error calling http://localhost:8080/transactions/a664ebf5-a510-46ed-8c33-55422a690f11/complete: request timed out
+[station-035] transaction failed: Transport error calling http://localhost:8080/transactions/a5fc275d-1632-44a8-a3c7-2fc0be7fe2a7/complete: request timed out
+[station-069] transaction failed: Transport error calling http://localhost:8080/transactions/bb0b614e-1a19-43b3-99fc-9ecb20178175/complete: request timed out
+[station-011] transaction failed: Transport error calling http://localhost:8080/transactions/3d01f831-7711-46e5-93e4-68e4af79631d/complete: request timed out
+[station-027] transaction failed: Transport error calling http://localhost:8080/transactions/d52e1f56-bb9b-4758-8b4f-6048bc5545dc/complete: request timed out
+[station-008] transaction failed: Transport error calling http://localhost:8080/transactions/2e4d41bc-248d-4880-88ae-d2bec5d61bd7/complete: request timed out
+[station-030] transaction failed: Transport error calling http://localhost:8080/transactions/f4ba072c-635a-4c66-80da-98511193780b/complete: request timed out
+[station-017] transaction failed: Transport error calling http://localhost:8080/transactions/0ee13588-1272-450a-8250-f62388ddc42a/complete: request timed out
+[station-019] transaction failed: Transport error calling http://localhost:8080/transactions/38fafe27-4a24-4424-9328-c9a00c246a1f/complete: request timed out
+[station-005] transaction failed: Transport error calling http://localhost:8080/transactions/92d7c652-6b6b-4a77-aa14-75f89e8d99a9/complete: request timed out
+[station-010] transaction failed: Transport error calling http://localhost:8080/transactions/b0ab7dca-9b52-4c3f-a7a5-cd770fe84258/complete: request timed out
+[station-093] transaction failed: Transport error calling http://localhost:8080/transactions/6573267c-a3fc-4977-a0d5-58b0e0f7f0b7/complete: request timed out
+[station-026] transaction failed: Transport error calling http://localhost:8080/transactions/47152aa7-6a9f-4962-a9bc-2b7c5a200f6f/complete: request timed out
+[station-057] transaction failed: Transport error calling http://localhost:8080/transactions/a495f2bf-739d-48f0-98f1-508e399fc4ef/complete: request timed out
+[station-096] transaction failed: Transport error calling http://localhost:8080/transactions/15928fa8-7ccf-4499-bdf8-f2190ba5f9f1/complete: request timed out
+[station-052] transaction failed: Transport error calling http://localhost:8080/transactions/072ad80f-bc25-4fca-8f4c-a7a7ceec3cbc/complete: request timed out
+[station-087] transaction failed: Transport error calling http://localhost:8080/transactions/18d1110a-35df-41a1-b22b-1cbcb1dba6d6/complete: request timed out
+[station-074] transaction failed: Transport error calling http://localhost:8080/transactions/6cd03cba-a831-4bfa-9186-7586fd42a23d/complete: request timed out
+[station-060] transaction failed: Transport error calling http://localhost:8080/transactions/7dbc9924-59bd-40e9-bf03-df4071a7d29b/complete: request timed out
+[station-001] transaction failed: Transport error calling http://localhost:8080/transactions/53497da4-6922-42d7-997d-13746d9426c0/complete: request timed out
+[station-097] transaction failed: Transport error calling http://localhost:8080/transactions/52d8ed43-1e32-4038-ac93-b584e8bc3da9/complete: request timed out
+[station-080] transaction failed: Transport error calling http://localhost:8080/transactions/e8167a67-800a-49c6-b4f5-1aae0dc0d6f9/complete: request timed out
+[station-034] transaction failed: Transport error calling http://localhost:8080/transactions/481fd004-f06e-495a-bd24-4011b2a82758/complete: request timed out
+[station-046] transaction failed: Transport error calling http://localhost:8080/transactions/f2fbdba1-b833-49cd-9d2b-27addfa98c01/complete: request timed out
+[station-095] transaction failed: Transport error calling http://localhost:8080/transactions/2cdf8fa5-c062-402a-8986-fd37dba920cc/complete: request timed out
+[station-020] transaction failed: Transport error calling http://localhost:8080/transactions/2b1aa90c-a1cf-443c-905d-32bc9d7d6172/complete: request timed out
+[station-018] transaction failed: Transport error calling http://localhost:8080/transactions/c07647db-7087-492d-b682-763d6a1e7329/complete: request timed out
+[station-064] transaction failed: Transport error calling http://localhost:8080/transactions/bcb361f8-3358-4037-aa7c-992cef081b96/complete: request timed out
+[station-086] transaction failed: Transport error calling http://localhost:8080/transactions/6573b59c-e688-4f75-92d4-4baab95e0b54/complete: request timed out
+[station-056] transaction failed: Transport error calling http://localhost:8080/transactions/078a8fb3-c93b-49e7-a3b2-dd1627b47617/complete: request timed out
+[station-072] transaction failed: Transport error calling http://localhost:8080/transactions/2ec0f141-cd1e-4eb8-b057-3fbc2439973a/complete: request timed out
+[station-075] transaction failed: Transport error calling http://localhost:8080/transactions/c46c861e-8b08-4a38-a761-d76eb14d9ac7/complete: request timed out
+[station-081] transaction failed: Transport error calling http://localhost:8080/transactions/45d8a22d-aeef-4210-b401-f2170f2dac98/complete: request timed out
+[station-013] transaction failed: Transport error calling http://localhost:8080/transactions/4a136316-5c56-4621-9351-dd922dc17c17/complete: request timed out
+[station-063] transaction failed: Transport error calling http://localhost:8080/transactions/61e58f16-fc89-44f9-98aa-90496c174efe/complete: request timed out
+[station-037] transaction failed: Transport error calling http://localhost:8080/transactions/12c51d30-ce91-4dd3-b865-3e63c418712b/complete: request timed out
+[station-091] transaction failed: Transport error calling http://localhost:8080/transactions/b4016d59-1feb-4ff4-8362-71928fcabc2f/complete: request timed out
+[station-021] transaction failed: Transport error calling http://localhost:8080/transactions/76480a48-cc73-4b95-8d07-2be4acb4b0db/complete: request timed out
+[station-062] transaction failed: Transport error calling http://localhost:8080/transactions/8701a830-bfe1-467f-bab6-ec35d5c756bf/complete: request timed out
+[station-041] transaction failed: Transport error calling http://localhost:8080/transactions/5e58e58d-75f2-4194-a3eb-28c529a58463/complete: request timed out
+[station-002] transaction failed: Transport error calling http://localhost:8080/transactions/b21dd05d-9615-42b6-b6e6-21a9c7c191ab/complete: request timed out
+[station-036] transaction failed: Transport error calling http://localhost:8080/transactions/990403c9-4edc-4ab4-895f-e3e7677f601a/complete: request timed out
+[station-059] transaction failed: Transport error calling http://localhost:8080/transactions/9e94ca86-90e4-4fec-a141-deff0c3f0ed1/complete: request timed out
+[station-094] transaction failed: Transport error calling http://localhost:8080/transactions/3c0aac0b-f59a-4218-ac00-b4cc3829bf1e/complete: request timed out
+[station-031] transaction failed: Transport error calling http://localhost:8080/transactions/1516e89f-e48c-44cf-a9ed-92a2759520f3/complete: request timed out
+[station-032] transaction failed: Transport error calling http://localhost:8080/transactions/9d218cfb-27dd-47d4-9ae0-4721178261f8/complete: request timed out
+[station-045] transaction failed: Transport error calling http://localhost:8080/transactions/f8c5150f-9539-4a94-b8b8-fd6e100b9072/complete: request timed out
+[station-078] transaction failed: Transport error calling http://localhost:8080/transactions/411b200a-7ba6-4586-8c98-c35e79b5a7c1/complete: request timed out
+[station-088] transaction failed: Transport error calling http://localhost:8080/transactions/9b74cbb5-ad21-412c-ad98-ee64dbafc785/complete: request timed out
+[station-003] transaction failed: Transport error calling http://localhost:8080/transactions/319836f9-6f99-4b3a-b5c2-235231201875/complete: request timed out
+[station-100] transaction failed: Transport error calling http://localhost:8080/transactions/fda72d8c-44cb-4b5e-9091-c5987c4bd941/complete: request timed out
+[station-065] transaction failed: Transport error calling http://localhost:8080/transactions/704cbdde-ad27-4a66-9cb3-2f22ea63020b/complete: request timed out
+[station-054] transaction failed: Transport error calling http://localhost:8080/transactions/13da769a-c2cf-4631-a8f4-10971264393e/complete: request timed out
+[station-038] transaction failed: Transport error calling http://localhost:8080/transactions/d27a4877-cb18-49fd-919a-257ee3226682/complete: request timed out
+[station-067] transaction failed: Transport error calling http://localhost:8080/transactions/09b7d258-162f-42a8-a7da-625734c27ae1/complete: request timed out
+[station-082] transaction failed: Transport error calling http://localhost:8080/transactions/abe756ca-edd1-4283-a38b-1e238440f68b/complete: request timed out
+[station-049] transaction failed: Transport error calling http://localhost:8080/transactions/93f6ea45-9aa0-493a-83aa-1d27dbec1fd6/complete: request timed out
+[station-047] transaction failed: Transport error calling http://localhost:8080/transactions/7ea914f9-1826-426c-8ba1-79d675a46255/complete: request timed out
+[station-042] transaction failed: Transport error calling http://localhost:8080/transactions/9b5db1c3-3a24-4f35-a2f8-9bc86c56d20f/complete: request timed out
+[station-012] transaction failed: Transport error calling http://localhost:8080/transactions/e81f5786-b322-4939-9265-c341021ccd05/complete: request timed out
+[station-040] transaction failed: Transport error calling http://localhost:8080/transactions/20d7c54c-e6b7-4614-92e7-94bacddd379a/complete: request timed out
+[station-014] transaction failed: Transport error calling http://localhost:8080/transactions/625f42cb-7f7e-46f5-b37f-6fed9a51b206/complete: request timed out
+[station-071] transaction failed: Transport error calling http://localhost:8080/transactions/4a65dbe7-669b-4c18-963b-914631167c22/complete: request timed out
+[station-084] transaction failed: Transport error calling http://localhost:8080/transactions/d4e0c735-8aea-4733-bf78-d2029e150f90/complete: request timed out
+[station-044] transaction failed: Transport error calling http://localhost:8080/transactions/74bee55a-a81f-471f-89c3-24af3bf3ebad/items: request timed out
+[station-058] transaction failed: Transport error calling http://localhost:8080/transactions/8ede2ab7-6c99-4424-bf20-e100c304cdc4/complete: request timed out
+[station-079] transaction failed: Transport error calling http://localhost:8080/transactions/36fc34b3-46f8-479b-8263-8a3d4677111f/complete: request timed out
+[station-015] transaction failed: Transport error calling http://localhost:8080/transactions/708557b9-ccc6-4372-a108-001d14359cc2/complete: request timed out
+[station-077] transaction failed: Transport error calling http://localhost:8080/transactions/2366beaa-52b1-4abc-aef7-72cde2badd23/complete: request timed out
+[station-029] transaction failed: Transport error calling http://localhost:8080/transactions/38400230-7ffb-4b27-b2b1-633fdac55ddf/complete: request timed out
+[station-070] transaction failed: Transport error calling http://localhost:8080/transactions/4989eea3-cd79-4d44-a9ef-641281cf822b/complete: request timed out
+[station-028] transaction failed: Transport error calling http://localhost:8080/transactions/62211af6-afd5-43b8-94f1-0961a46637ed/complete: request timed out
+[station-089] transaction failed: Transport error calling http://localhost:8080/transactions/1b70965f-f344-4701-bfcd-ca5430c76f6f/complete: request timed out
+[station-085] transaction failed: Transport error calling http://localhost:8080/transactions/5c8b6f48-36be-40b7-98ad-914a921b50bf/complete: request timed out
+[station-023] transaction failed: Transport error calling http://localhost:8080/transactions/df10e378-eb08-4bfd-ad39-80c6200ef14f/complete: request timed out
+[station-004] transaction failed: Transport error calling http://localhost:8080/transactions/4d8f02c0-58d9-441d-89de-2ea0d1af96f0/complete: request timed out
+[station-022] transaction failed: Transport error calling http://localhost:8080/transactions/ae6d0340-7ba2-4457-b829-014b836dec1e/complete: request timed out
+[station-076] transaction failed: Transport error calling http://localhost:8080/transactions/c1f809a1-54f9-4206-809c-53786cc8e684/complete: request timed out
+[station-033] transaction failed: Transport error calling http://localhost:8080/transactions/79961d04-6ed4-4a98-a5f6-0024fa99dc17/complete: request timed out
+[station-083] transaction failed: Transport error calling http://localhost:8080/transactions/13302885-af99-4652-914b-52c2ad48f642/complete: request timed out
+[station-039] transaction failed: Transport error calling http://localhost:8080/transactions/523195a4-a67d-4c27-9ba9-dd43894fedda/complete: request timed out
+[station-055] transaction failed: Transport error calling http://localhost:8080/transactions/c7d9819f-1c5e-4c51-8e64-5980eb29b27e/complete: request timed out
+[station-098] transaction failed: Transport error calling http://localhost:8080/transactions/6a1d5a96-28d9-4ed4-ac74-c9480809b320/complete: request timed out
+[station-061] transaction failed: Transport error calling http://localhost:8080/transactions/88cf254c-628b-478e-a382-99073d09e0ad/items: HTTP/1.1 header parser received no bytes
+Duration elapsed, waiting for in-flight transactions to finish...
+Fetching low-stock alerts and popular items...
+
+================ LOAD TEST REPORT ================
+Base URL:        http://localhost:8080
+Stations:        100
+Duration:        120.1s (requested 120s)
+Transactions:    76531 (637.0/sec)
+Items scanned:   806314 (6711.2/sec)
+
+Operation                    OK   Errors   Mean(ms)    P50(ms)    P95(ms)    P99(ms)    Max(ms)     Err%
+START_TRANSACTION         77029        3       0.49       0.22       0.53       2.40      96.08    0.00%
+SCAN_ITEM                806314        6       0.28       0.19       0.47       1.67     108.43    0.00%
+COMPLETE_TRANSACTION      76531      492     151.42     120.93     332.04     531.03    1309.65    0.64%
+
+Low-stock alerts (9):
+  SKU-000001   Item 1                         stock=0      threshold=50
+  SKU-000002   Item 2                         stock=0      threshold=50
+  SKU-000003   Item 3                         stock=0      threshold=50
+  SKU-000004   Item 4                         stock=0      threshold=50
+  SKU-000005   Item 5                         stock=0      threshold=50
+  SKU-000006   Item 6                         stock=0      threshold=50
+  SKU-000007   Item 7                         stock=0      threshold=50
+  SKU-000008   Item 8                         stock=0      threshold=50
+  SKU-000009   Item 9                         stock=0      threshold=50
+
+Most popular items (top 10):
+  #1   SKU-000001   Item 1                         scans=140
+  #2   SKU-000002   Item 2                         scans=58
+  #3   SKU-000003   Item 3                         scans=44
+  #4   SKU-000004   Item 4                         scans=37
+  #5   SKU-000005   Item 5                         scans=28
+  #6   SKU-000006   Item 6                         scans=20
+  #7   SKU-000008   Item 8                         scans=19
+  #8   SKU-000007   Item 7                         scans=16
+  #9   SKU-000009   Item 9                         scans=16
+  #10  SKU-000013   Item 13                        scans=15
+===================================================
+
+JSON report written to: /Users/rohitdabhi/Desktop/ADV_SOFT_DEV/self-checkout/reports/microservices/experiments/group-commit-50/report-20261024-194246.json
