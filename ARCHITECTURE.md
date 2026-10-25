@@ -11,7 +11,7 @@ database each, coordinated by a saga (Week 5, [§ Week 5](#week-5-microservices)
 Week 1 organized classes by technical type (`controller/`, `service/`,
 `repository/`). That reads like layers but nothing enforced it: HTTP types had
 already leaked into the business code, and the services built API-shaped DTOs.
-This week the layers are real packages with **dependency rules enforced by a
+In Week 2 the layers became real packages with **dependency rules enforced by a
 test that fails the build**.
 
 All numbers come from JSON reports produced by the unmodified course load
@@ -24,6 +24,11 @@ Anything not measured is labelled a prediction.
 ---
 
 ## 1. Required architectural characteristics
+
+Defined in Week 2. A measurement without a week label is from Week 2; rows 7, 8, 9, 11 and
+12 show the Week 3 final figures (`pipeline-v2`). Weeks 4 and 5 re-check the correctness
+rows in their own sections ([§ Week 4](#week-4-service-based-architecture),
+[§ Week 5](#week-5-microservices)).
 
 | # | Characteristic | Concrete, testable requirement | How it is verified |
 |---|---|---|---|
@@ -50,24 +55,24 @@ Anything not measured is labelled a prediction.
 
 ### Priority 1 — Correctness under concurrency
 
-Unchanged from Week 1, and still first. A fast checkout that loses stock is
+Unchanged from Week 1, and first in every week since. A fast checkout that loses stock is
 worthless, and the damage is silent: no error is raised, and it is only visible
-by auditing the database afterwards. **The refactor was not allowed to touch
+by auditing the database afterwards. **The Week 2 refactor was not allowed to touch
 any of it** — same locks, same lock order, same clamping, same window logic.
 
 **What we give up.** Completions serialize on hot rows. Under the Zipf
 workload `SKU-000001` takes ~12% of all scans and appears in roughly two thirds
-of baskets, so most completions queue on one row. At 100 stations
-`COMPLETE_TRANSACTION` p95 is 185.50 ms against 32.68 ms at 10 stations. Locks
+of baskets, so most completions queue on one row. In Week 2, at 100 stations
+`COMPLETE_TRANSACTION` p95 was 185.50 ms against 32.68 ms at 10 stations. Locks
 are held until commit, and throughput does not scale with stations.
 
-### Priority 2 — Modifiability (this week's actual subject)
+### Priority 2 — Modifiability (Week 2's subject)
 
-The assignment is about structure, so this is the characteristic the week is
-spent buying. Concretely it means: a change confined to one concern touches one
+Week 2's assignment was about structure, so this is the characteristic that week
+spent its effort buying. Concretely it means: a change confined to one concern touches one
 package, and the compiler plus a test stop you from creating a shortcut.
 
-**What we gained, measured.**
+**What Week 2 gained, measured.**
 
 - **47 HTTP-leak violations → 0.** `TransactionService` no longer names a
   single HTTP status. The business rules could be served over gRPC, a message
@@ -78,7 +83,7 @@ package, and the compiler plus a test stop you from creating a shortcut.
 - **The rules are executable.** `LayeredArchitectureTest` fails the build on a
   violation, so the structure cannot quietly rot back.
 
-**What we gave up, honestly.**
+**What Week 2 gave up, honestly.**
 
 - **Seven near-duplicate result records.** `CatalogItem`/`ItemDto`,
   `TransactionView`/`TransactionResponse`, `ScanOutcome`/`ScanResult`,
@@ -90,21 +95,22 @@ package, and the compiler plus a test stop you from creating a shortcut.
   shape and the domain shape need to differ. **Until then this is a real,
   visible cost, not a hidden one.**
 - **More classes.** 42 production classes became 58.
-- **Sinkholes.** Some paths now pass through a layer that adds nothing —
+- **Sinkholes.** Since Week 2, some paths pass through a layer that adds nothing —
   see §4.3.
 - **A small latency cost at low load**, see §3.2.
 
 ### Priority 3 — Simplicity and operability
 
-Still one process and one database.
+In Weeks 2 and 3, still one process and one database. (Week 4 split it into four
+services over one database, and Week 5 gave each service its own database.)
 
 **What we gave up.** Single point of failure; vertical scaling only. And this
 is worth stating plainly because layering invites the opposite assumption:
 
 > **Layering changed nothing about deployment, scaling or fault isolation.**
-> It is a *source-code* structure. There is still one JAR, one JVM, one
-> Postgres, one thread pool and one connection pool. If the process dies the
-> whole store stops, exactly as in Week 1. Layers bought modifiability and
+> It is a *source-code* structure. In Weeks 2 and 3 there was still one JAR, one JVM, one
+> Postgres, one thread pool and one connection pool. If the process died the
+> whole store stopped, exactly as in Week 1. Layers bought modifiability and
 > testability; they did not buy availability, elasticity or independent
 > deployment. Those need the later weeks' architectures.
 
@@ -218,6 +224,8 @@ differences smaller than that carry no signal.
 ## 4. The layered design
 
 ### 4.1 The layers
+
+*Week 2 design (layered, single app).*
 
 ```mermaid
 graph TD
@@ -436,6 +444,8 @@ so that is the part that was refactored.
 Five filters, one thread each, connected by five bounded
 `ArrayBlockingQueue`s behind a `Pipe<T>` interface. Full description and
 diagram in **[PIPELINE.md](PIPELINE.md)**.
+
+*Week 3 design (in-process pipeline).*
 
 ```
 request thread --offer--> [ingest] --+--> [window] --> [rank] --> [sink] --> popular_snapshots
@@ -798,6 +808,8 @@ one place this system cannot afford one.
 
 ### W4.2 The design
 
+*Week 4 design (one shared database).*
+
 ```mermaid
 flowchart LR
     LC["load client<br/>one base URL"] --> GW["nginx gateway :8080<br/>path routing, keep-alive"]
@@ -1111,12 +1123,83 @@ tables. With a database per service that coupling is gone. Three things depended
 | checkout writing `scan_log`, analytics reading it | checkout **pushes** numbered batches to `POST /internal/scans`; analytics stores them in its own `scan_log` |
 | every service reading `items` for prices and names | catalog-service owns `items`; the others load `GET /items` once and cache it |
 
+[![Load client to the nginx gateway on :8080, which routes to four services: catalog :8081, inventory :8083, checkout :8082 and analytics :8084. Each service talks only to its own database: catalog_db, inventory_db, checkout_db and analytics_db, all four on one PostgreSQL server. checkout calls inventory to commit stock (the saga pivot) and pushes scan batches to analytics. At startup, checkout, inventory and analytics each load GET /items from catalog, and checkout asks analytics for GET /internal/scans/max-seq.](docs/diagrams/architecture.svg)](docs/diagrams/architecture.png)
+
+*Week 5 design (microservices, a database each).* Solid arrows are request traffic and
+the saga's calls; dashed arrows are each service's own database and the startup calls.
+At startup, checkout, inventory and analytics each load `GET /items` from catalog, and
+checkout's scan writer asks analytics for `GET /internal/scans/max-seq` once it starts (W5.3).
+
+<details>
+<summary>Text version (Mermaid)</summary>
+
+```mermaid
+flowchart LR
+    LC["Load client<br/>one base URL"] -->|HTTP| GW["nginx :8080<br/>/internal/** = 404"]
+    GW --> CA["catalog-service :8081"]
+    GW --> IN["inventory-service :8083"]
+    GW --> CO["checkout-service :8082<br/>saga orchestrator"]
+    GW --> AN["analytics-service :8084"]
+    CO ==>|"POST /internal/stock/commit"| IN
+    CO -->|"POST /internal/scans (async)"| AN
+    CO -.->|"GET /internal/scans/max-seq (startup)"| AN
+    CO -.->|"GET /items (startup)"| CA
+    IN -.->|"GET /items (startup)"| CA
+    AN -.->|"GET /items (startup)"| CA
+    subgraph PG["one PostgreSQL server, four databases"]
+        CAD[("catalog_db<br/>items")]
+        IND[("inventory_db<br/>stock, alerts, commits")]
+        COD[("checkout_db<br/>transactions, lines")]
+        AND[("analytics_db<br/>scan_log, snapshots")]
+    end
+    CA -.-> CAD
+    IN -.-> IND
+    CO -.-> COD
+    AN -.-> AND
+```
+
+</details>
+
 The one update that now spans two databases is **paying**: units leave inventory's shelf, and
 the sale is recorded in checkout's database.
 
 ### W5.2 The payment saga
 
 The full steps are in [MICROSERVICES.md](MICROSERVICES.md#how-the-multi-database-update-is-coordinated-the-payment-saga).
+
+[![Sequence: the station calls complete; checkout writes the sale as PENDING in checkout_db (tx A), then calls inventory's stock commit. Inventory claims the transaction id, locks the rows in SKU order, clamps and decrements, records the lines and any low-stock alerts, and commits in inventory_db, then answers with the applied quantities. Checkout then records them and marks the sale COMPLETED (tx B) and returns the receipt, or 503 if inventory is down or silent.](docs/diagrams/flow-payment-saga.svg)](docs/diagrams/flow-payment-saga.png)
+
+*Week 5 payment saga.* Inventory's own transaction claims the id, locks the basket's rows in
+SKU order, clamps and decrements, records the lines and any low-stock alerts, and commits.
+
+<details>
+<summary>Text version (Mermaid)</summary>
+
+```mermaid
+sequenceDiagram
+    participant S as Station (via nginx)
+    participant C as checkout-service
+    participant CD as checkout_db
+    participant I as inventory-service
+    participant ID as inventory_db
+    Note over S,CD: Before the pivot: nothing irreversible
+    S->>C: POST …/complete (basket claimed in memory)
+    C->>CD: tx A: INSERT sale PENDING + lines
+    Note over C,ID: The pivot: inventory's own transaction
+    C->>I: POST /internal/stock/commit {transactionId, lines}
+    I->>ID: claim transaction id (idempotency)
+    I->>ID: SELECT … ORDER BY sku FOR NO KEY UPDATE
+    I->>ID: clamp, decrement
+    I->>ID: record lines + low-stock alerts
+    I->>ID: COMMIT
+    I-->>C: 200 applied per SKU
+    Note over S,CD: After the pivot: forward only
+    C->>CD: tx B: applied quantities, COMPLETED
+    C-->>S: 200 receipt (or 503 if inventory is down / silent)
+```
+
+</details>
+
 The design decisions:
 
 - **Orchestration, with checkout as orchestrator.** The `complete` request must return a
@@ -1161,6 +1244,27 @@ differs: an HTTP POST instead of an INSERT. Analytics makes the guarantees on it
   maximum;
 - a retried batch is absorbed by the primary key;
 - the 200 answer is sent only after the commit.
+
+[![Data flow: a scan is offered to checkout's batching writer, which numbers scans and POSTs batches to analytics' scan ingest; analytics stores them in its own scan_log, and its poller feeds window, rank and sink, which write popular_snapshots, served by GET /analytics/popular-items.](docs/diagrams/flow-scan-handoff.svg)](docs/diagrams/flow-scan-handoff.png)
+
+*Week 5 scan hand-off (batched HTTP push).*
+
+<details>
+<summary>Text version (Mermaid)</summary>
+
+```mermaid
+flowchart TB
+    SC["Scan · POST …/items"] -->|"offer ≤10 ms"| WR["checkout: batching writer<br/>numbers seq, one thread"]
+    WR -->|"POST /internal/scans"| IG
+    subgraph AN["analytics-service :8084"]
+        IG["Scan ingest<br/>no gaps, no doubles"] -->|INSERT| SL[("scan_log")]
+        SL -->|"seq > last"| PO["ScanLogPoller"] --> WI["Window"] --> RA["Rank"] --> SI["Sink"]
+    end
+    SI -->|INSERT| PS[("popular_snapshots")]
+    PS -.->|latest| API["GET /analytics/popular-items"]
+```
+
+</details>
 
 Two Week 4 behaviours had to be re-designed:
 - **Resuming the seq after a restart.** Checkout no longer has `MAX(seq)` in its own database,

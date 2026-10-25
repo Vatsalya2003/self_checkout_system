@@ -8,7 +8,7 @@
     "column_fit": "spread",
     "viewBox": [
       1080,
-      640
+      696
     ],
     "legend": {
       "mode": "hidden"
@@ -54,12 +54,12 @@
     },
     {
       "from": 290,
-      "to": 438,
+      "to": 494,
       "label": "The pivot: inventory's own transaction"
     },
     {
-      "from": 476,
-      "to": 566,
+      "from": 532,
+      "to": 622,
       "label": "After the pivot: forward only"
     }
   ],
@@ -107,13 +107,27 @@
       "from": "inventory",
       "to": "invdb",
       "y": 394,
-      "label": "clamp, decrement, COMMIT"
+      "label": "clamp, decrement"
+    },
+    {
+      "id": "record",
+      "from": "inventory",
+      "to": "invdb",
+      "y": 422,
+      "label": "record lines + low-stock alerts"
+    },
+    {
+      "id": "txcommit",
+      "from": "inventory",
+      "to": "invdb",
+      "y": 450,
+      "label": "COMMIT"
     },
     {
       "id": "applied",
       "from": "inventory",
       "to": "checkout",
-      "y": 422,
+      "y": 478,
       "label": "200 applied per SKU",
       "variant": "return"
     },
@@ -121,14 +135,14 @@
       "id": "txb",
       "from": "checkout",
       "to": "codb",
-      "y": 496,
+      "y": 552,
       "label": "tx B: applied quantities, COMPLETED"
     },
     {
       "id": "receipt",
       "from": "checkout",
       "to": "station",
-      "y": 524,
+      "y": 580,
       "label": "200 receipt",
       "variant": "return"
     },
@@ -136,7 +150,7 @@
       "id": "unknown",
       "from": "checkout",
       "to": "station",
-      "y": 552,
+      "y": 608,
       "label": "or 503 if inventory is down / silent",
       "variant": "dashed"
     }
@@ -145,7 +159,7 @@
     {
       "participant": "checkout",
       "from": 196,
-      "to": 558,
+      "to": 614,
       "type": "backend"
     },
     {
@@ -157,19 +171,19 @@
     {
       "participant": "inventory",
       "from": 310,
-      "to": 428,
+      "to": 484,
       "type": "backend"
     },
     {
       "participant": "invdb",
       "from": 333,
-      "to": 400,
+      "to": 456,
       "type": "database"
     },
     {
       "participant": "codb",
-      "from": 491,
-      "to": 502,
+      "from": 547,
+      "to": 558,
       "type": "database"
     }
   ]

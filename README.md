@@ -22,7 +22,7 @@ as a **saga**. Spring Boot 4.1.1, Java 21, PostgreSQL 16, nginx.
 
 ## Architecture
 
-[![Load client to the nginx gateway on :8080, which routes to four services: catalog :8081, inventory :8083, checkout :8082 and analytics :8084. Each service talks only to its own database: catalog_db, inventory_db, checkout_db and analytics_db, on one PostgreSQL server. checkout calls inventory to commit stock (the saga pivot) and pushes scan batches to analytics.](docs/diagrams/architecture.svg)](docs/diagrams/architecture.png)
+[![Load client to the nginx gateway on :8080, which routes to four services: catalog :8081, inventory :8083, checkout :8082 and analytics :8084. Each service talks only to its own database: catalog_db, inventory_db, checkout_db and analytics_db, all four on one PostgreSQL server. checkout calls inventory to commit stock (the saga pivot) and pushes scan batches to analytics. At startup, checkout, inventory and analytics each load GET /items from catalog, and checkout asks analytics for GET /internal/scans/max-seq.](docs/diagrams/architecture.svg)](docs/diagrams/architecture.png)
 
 <details>
 <summary>Text version (Mermaid), if the image does not load</summary>
@@ -36,6 +36,10 @@ flowchart LR
     GW --> AN["analytics-service :8084"]
     CO ==>|"POST /internal/stock/commit"| IN
     CO -->|"POST /internal/scans (async)"| AN
+    CO -.->|"GET /internal/scans/max-seq (startup)"| AN
+    CO -.->|"GET /items (startup)"| CA
+    IN -.->|"GET /items (startup)"| CA
+    AN -.->|"GET /items (startup)"| CA
     subgraph PG["one PostgreSQL server, four databases"]
         CAD[("catalog_db<br/>items")]
         IND[("inventory_db<br/>stock, alerts, commits")]
@@ -79,7 +83,7 @@ The `/internal/**` endpoints are service-to-service only. nginx answers them wit
 
 ## Paying: a saga across two databases
 
-[![Sequence: the station calls complete; checkout writes the sale as PENDING in checkout_db (tx A), then calls inventory's stock commit. Inventory claims the transaction id, locks the rows in SKU order, clamps, decrements and commits in inventory_db, and answers with the applied quantities. Checkout then records them and marks the sale COMPLETED (tx B) and returns the receipt, or 503 if inventory is down or silent.](docs/diagrams/flow-payment-saga.svg)](docs/diagrams/flow-payment-saga.png)
+[![Sequence: the station calls complete; checkout writes the sale as PENDING in checkout_db (tx A), then calls inventory's stock commit. Inventory claims the transaction id, locks the rows in SKU order, clamps and decrements, records the lines and any low-stock alerts, and commits in inventory_db, then answers with the applied quantities. Checkout then records them and marks the sale COMPLETED (tx B) and returns the receipt, or 503 if inventory is down or silent.](docs/diagrams/flow-payment-saga.svg)](docs/diagrams/flow-payment-saga.png)
 
 Stock lives in inventory's database and sales live in checkout's, so paying can't be one
 database transaction any more. Checkout **orchestrates** it in four steps:
@@ -90,7 +94,8 @@ database transaction any more. Checkout **orchestrates** it in four steps:
    - claims the transaction id;
    - locks the basket's rows in SKU order;
    - takes `min(asked, in stock)`;
-   - decrements stock and records what it took.
+   - decrements stock;
+   - records the lines it took and any low-stock alerts, then commits.
 4. **Record the result (tx B).** Checkout stores what inventory took and marks the sale COMPLETED.
 
 **What keeps this correct:**
@@ -126,7 +131,9 @@ sequenceDiagram
     C->>I: POST /internal/stock/commit {transactionId, lines}
     I->>ID: claim transaction id (idempotency)
     I->>ID: SELECT … ORDER BY sku FOR NO KEY UPDATE
-    I->>ID: clamp, decrement, COMMIT
+    I->>ID: clamp, decrement
+    I->>ID: record lines + low-stock alerts
+    I->>ID: COMMIT
     I-->>C: 200 applied per SKU
     Note over S,CD: After the pivot: forward only
     C->>CD: tx B: applied quantities, COMPLETED

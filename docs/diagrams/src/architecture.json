@@ -6,8 +6,8 @@
     "locale": "en",
     "quality_profile": "showcase",
     "viewBox": [
-      1300,
-      700
+      1350,
+      820
     ]
   },
   "components": [
@@ -17,11 +17,11 @@
       "label": "Load client",
       "sublabel": "one base URL",
       "pos": [
-        30,
-        330
+        10,
+        400
       ],
       "size": [
-        140,
+        115,
         64
       ]
     },
@@ -31,11 +31,11 @@
       "label": "nginx gateway",
       "sublabel": ":8080 · /internal/** = 404",
       "pos": [
-        220,
-        330
+        185,
+        400
       ],
       "size": [
-        180,
+        160,
         64
       ]
     },
@@ -45,11 +45,11 @@
       "label": "catalog-service",
       "sublabel": ":8081 · GET /items",
       "pos": [
-        500,
-        100
+        920,
+        432
       ],
       "size": [
-        210,
+        180,
         64
       ]
     },
@@ -59,8 +59,8 @@
       "label": "inventory-service",
       "sublabel": ":8083 · /inventory/low-stock",
       "pos": [
-        500,
-        250
+        410,
+        210
       ],
       "size": [
         210,
@@ -73,7 +73,7 @@
       "label": "checkout-service",
       "sublabel": ":8082 · /transactions/**",
       "pos": [
-        500,
+        410,
         400
       ],
       "size": [
@@ -88,8 +88,8 @@
       "label": "analytics-service",
       "sublabel": ":8084 · /analytics/popular-items",
       "pos": [
-        500,
-        550
+        410,
+        590
       ],
       "size": [
         210,
@@ -102,11 +102,11 @@
       "label": "catalog_db",
       "sublabel": "items",
       "pos": [
-        1060,
-        100
+        1170,
+        432
       ],
       "size": [
-        190,
+        160,
         64
       ]
     },
@@ -116,8 +116,8 @@
       "label": "inventory_db",
       "sublabel": "stock · alerts · commits",
       "pos": [
-        1060,
-        250
+        420,
+        70
       ],
       "size": [
         190,
@@ -130,12 +130,12 @@
       "label": "checkout_db",
       "sublabel": "transactions · lines",
       "pos": [
-        1060,
-        400
+        700,
+        300
       ],
       "size": [
-        190,
-        64
+        180,
+        56
       ]
     },
     {
@@ -144,8 +144,8 @@
       "label": "analytics_db",
       "sublabel": "scan_log · snapshots",
       "pos": [
-        1060,
-        550
+        420,
+        730
       ],
       "size": [
         190,
@@ -153,19 +153,7 @@
       ]
     }
   ],
-  "boundaries": [
-    {
-      "kind": "region",
-      "label": "one PostgreSQL server, four databases",
-      "wraps": [
-        "catdb",
-        "invdb",
-        "codb",
-        "andb"
-      ],
-      "pad": 22
-    }
-  ],
+  "boundaries": [],
   "connections": [
     {
       "id": "client-gw",
@@ -177,7 +165,19 @@
     {
       "id": "gw-catalog",
       "from": "gateway",
-      "to": "catalog"
+      "to": "catalog",
+      "fromSide": "top",
+      "toSide": "top",
+      "via": [
+        [
+          265,
+          30
+        ],
+        [
+          1010,
+          30
+        ]
+      ]
     },
     {
       "id": "gw-inventory",
@@ -207,21 +207,31 @@
       "from": "inventory",
       "to": "invdb",
       "label": "own DB only",
-      "variant": "dashed"
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom"
     },
     {
       "id": "checkout-db",
       "from": "checkout",
       "to": "codb",
       "label": "own DB only",
-      "variant": "dashed"
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "left"
     },
     {
       "id": "analytics-db",
       "from": "analytics",
       "to": "andb",
       "label": "own DB only",
-      "variant": "dashed"
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        515,
+        692
+      ]
     },
     {
       "id": "saga",
@@ -232,8 +242,8 @@
       "fromSide": "top",
       "toSide": "bottom",
       "labelAt": [
-        605,
-        357
+        508,
+        300
       ]
     },
     {
@@ -244,9 +254,49 @@
       "fromSide": "bottom",
       "toSide": "top",
       "labelAt": [
-        605,
-        507
+        515,
+        527
       ]
+    },
+    {
+      "id": "maxseq",
+      "from": "checkout",
+      "to": "analytics",
+      "label": "GET /internal/scans/max-seq (startup)",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "right"
+    },
+    {
+      "id": "inv-catalog",
+      "from": "inventory",
+      "to": "catalog",
+      "label": "GET /items (startup)",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelAt": [
+        770,
+        242
+      ]
+    },
+    {
+      "id": "co-catalog",
+      "from": "checkout",
+      "to": "catalog",
+      "label": "GET /items (startup)",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "an-catalog",
+      "from": "analytics",
+      "to": "catalog",
+      "label": "GET /items (startup)",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "bottom"
     }
   ],
   "cards": [
@@ -254,7 +304,7 @@
       "dot": "emerald",
       "title": "Own data store each",
       "items": [
-        "catalog_db, inventory_db, checkout_db, analytics_db",
+        "four databases on one PostgreSQL server",
         "a role can open its own database only",
         "no cross-service joins are possible"
       ]
@@ -265,7 +315,7 @@
       "items": [
         "checkout → inventory: POST /internal/stock/commit",
         "checkout → analytics: POST /internal/scans",
-        "all three others load GET /items from catalog once"
+        "at startup: GET /items from catalog; checkout also asks analytics for max-seq"
       ]
     },
     {

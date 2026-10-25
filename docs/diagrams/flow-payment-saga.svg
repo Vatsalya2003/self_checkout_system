@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg viewBox="0 0 1080 640" role="img" lang="en" aria-labelledby="archify-diagram-title archify-diagram-description" data-preset="classic" data-quality-profile="showcase" style="" width="1080" height="640" xmlns="http://www.w3.org/2000/svg"><style>
+<svg viewBox="0 0 1080 696" role="img" lang="en" aria-labelledby="archify-diagram-title archify-diagram-description" data-preset="classic" data-quality-profile="showcase" style="" width="1080" height="696" xmlns="http://www.w3.org/2000/svg"><style>
 /*
 JetBrains Mono variable WOFF2 subsets from Google Fonts service revision v24.
 These fixed bytes are shared by the viewer and its SVG/raster exports.
@@ -443,28 +443,28 @@ rect.c-bg-rect { fill: var(--bg); }
         <!-- Time Segments -->
         <rect data-graph-role="structural-frame" data-composition-frame-kind="segment" data-composition-frame-id="0" x="48" y="176" width="984" height="76" rx="10" class="c-lane" stroke-width="1"/>
 
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="segment" data-composition-frame-id="1" x="48" y="290" width="984" height="148" rx="10" class="c-lane" stroke-width="1"/>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="segment" data-composition-frame-id="1" x="48" y="290" width="984" height="204" rx="10" class="c-lane" stroke-width="1"/>
 
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="segment" data-composition-frame-id="2" x="48" y="476" width="984" height="90" rx="10" class="c-lane" stroke-width="1"/>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="segment" data-composition-frame-id="2" x="48" y="532" width="984" height="90" rx="10" class="c-lane" stroke-width="1"/>
 
         <!-- Lifelines -->
-        <path d="M 145.5 142 L 145.5 575" class="a-default" stroke-width="0.8" stroke-dasharray="3,7"/>
-        <path d="M 348.25 142 L 348.25 575" class="a-default" stroke-width="0.8" stroke-dasharray="3,7"/>
-        <path d="M 551 142 L 551 575" class="a-default" stroke-width="0.8" stroke-dasharray="3,7"/>
-        <path d="M 753.75 142 L 753.75 575" class="a-default" stroke-width="0.8" stroke-dasharray="3,7"/>
-        <path d="M 956.5 142 L 956.5 575" class="a-default" stroke-width="0.8" stroke-dasharray="3,7"/>
+        <path d="M 145.5 142 L 145.5 631" class="a-default" stroke-width="0.8" stroke-dasharray="3,7"/>
+        <path d="M 348.25 142 L 348.25 631" class="a-default" stroke-width="0.8" stroke-dasharray="3,7"/>
+        <path d="M 551 142 L 551 631" class="a-default" stroke-width="0.8" stroke-dasharray="3,7"/>
+        <path d="M 753.75 142 L 753.75 631" class="a-default" stroke-width="0.8" stroke-dasharray="3,7"/>
+        <path d="M 956.5 142 L 956.5 631" class="a-default" stroke-width="0.8" stroke-dasharray="3,7"/>
 
         <!-- Activations -->
-        <rect x="343.25" y="196" width="10" height="362" rx="3" class="c-mask"/>
-        <rect x="343.25" y="196" width="10" height="362" rx="3" class="c-backend" stroke-width="1"/>
+        <rect x="343.25" y="196" width="10" height="418" rx="3" class="c-mask"/>
+        <rect x="343.25" y="196" width="10" height="418" rx="3" class="c-backend" stroke-width="1"/>
         <rect x="546" y="219" width="10" height="11" rx="3" class="c-mask"/>
         <rect x="546" y="219" width="10" height="11" rx="3" class="c-database" stroke-width="1"/>
-        <rect x="748.75" y="310" width="10" height="118" rx="3" class="c-mask"/>
-        <rect x="748.75" y="310" width="10" height="118" rx="3" class="c-backend" stroke-width="1"/>
-        <rect x="951.5" y="333" width="10" height="67" rx="3" class="c-mask"/>
-        <rect x="951.5" y="333" width="10" height="67" rx="3" class="c-database" stroke-width="1"/>
-        <rect x="546" y="491" width="10" height="11" rx="3" class="c-mask"/>
-        <rect x="546" y="491" width="10" height="11" rx="3" class="c-database" stroke-width="1"/>
+        <rect x="748.75" y="310" width="10" height="174" rx="3" class="c-mask"/>
+        <rect x="748.75" y="310" width="10" height="174" rx="3" class="c-backend" stroke-width="1"/>
+        <rect x="951.5" y="333" width="10" height="123" rx="3" class="c-mask"/>
+        <rect x="951.5" y="333" width="10" height="123" rx="3" class="c-database" stroke-width="1"/>
+        <rect x="546" y="547" width="10" height="11" rx="3" class="c-mask"/>
+        <rect x="546" y="547" width="10" height="11" rx="3" class="c-database" stroke-width="1"/>
 
         <!-- Messages -->
         <g data-edge-from="station" data-edge-to="checkout" data-edge-label="POST …/complete (basket claimed in memory)" data-edge-key="0" data-edge-id="pay">
@@ -507,43 +507,59 @@ rect.c-bg-rect { fill: var(--bg); }
         </g>
         </g>
 
-        <g data-edge-from="inventory" data-edge-to="invdb" data-edge-label="clamp, decrement, COMMIT" data-edge-key="5" data-edge-id="write">
+        <g data-edge-from="inventory" data-edge-to="invdb" data-edge-label="clamp, decrement" data-edge-key="5" data-edge-id="write">
           <path data-composition-edge-from="inventory" data-composition-edge-to="invdb" data-composition-edge-id="write" data-composition-points="760.75,394;949.5,394" d="M 760.75 394 L 949.5 394" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
         <g>
-          <rect x="786.725" y="374" width="136.8" height="16" rx="3" class="c-mask"/>
-          <text x="855.125" y="384" class="t-backend" font-size="9" text-anchor="middle">clamp, decrement, COMMIT</text>
+          <rect x="807.525" y="374" width="95.2" height="16" rx="3" class="c-mask"/>
+          <text x="855.125" y="384" class="t-backend" font-size="9" text-anchor="middle">clamp, decrement</text>
         </g>
         </g>
 
-        <g data-edge-from="inventory" data-edge-to="checkout" data-edge-label="200 applied per SKU" data-edge-key="6" data-edge-id="applied">
-          <path data-composition-edge-from="inventory" data-composition-edge-to="checkout" data-composition-edge-id="applied" data-composition-points="746.75,422;355.25,422" d="M 746.75 422 L 355.25 422" class="a-default" stroke-width="1.4" stroke-dasharray="3,5" marker-end="url(#arrowhead)"/>
+        <g data-edge-from="inventory" data-edge-to="invdb" data-edge-label="record lines + low-stock alerts" data-edge-key="6" data-edge-id="record">
+          <path data-composition-edge-from="inventory" data-composition-edge-to="invdb" data-composition-edge-id="record" data-composition-points="760.75,422;949.5,422" d="M 760.75 422 L 949.5 422" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
         <g>
-          <rect x="495.6" y="402" width="110.8" height="16" rx="3" class="c-mask"/>
-          <text x="551" y="412" class="t-muted" font-size="9" text-anchor="middle">200 applied per SKU</text>
+          <rect x="768.525" y="402" width="173.20000000000002" height="16" rx="3" class="c-mask"/>
+          <text x="855.125" y="412" class="t-backend" font-size="9" text-anchor="middle">record lines + low-stock alerts</text>
         </g>
         </g>
 
-        <g data-edge-from="checkout" data-edge-to="codb" data-edge-label="tx B: applied quantities, COMPLETED" data-edge-key="7" data-edge-id="txb">
-          <path data-composition-edge-from="checkout" data-composition-edge-to="codb" data-composition-edge-id="txb" data-composition-points="355.25,496;544,496" d="M 355.25 496 L 544 496" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
+        <g data-edge-from="inventory" data-edge-to="invdb" data-edge-label="COMMIT" data-edge-key="7" data-edge-id="txcommit">
+          <path data-composition-edge-from="inventory" data-composition-edge-to="invdb" data-composition-edge-id="txcommit" data-composition-points="760.75,450;949.5,450" d="M 760.75 450 L 949.5 450" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
         <g>
-          <rect x="352.625" y="476" width="194" height="16" rx="3" class="c-mask"/>
-          <text x="449.625" y="486" class="t-backend" font-size="9" text-anchor="middle">tx B: applied quantities, COMPLETED</text>
+          <rect x="833.525" y="430" width="43.2" height="16" rx="3" class="c-mask"/>
+          <text x="855.125" y="440" class="t-backend" font-size="9" text-anchor="middle">COMMIT</text>
         </g>
         </g>
 
-        <g data-edge-from="checkout" data-edge-to="station" data-edge-label="200 receipt" data-edge-key="8" data-edge-id="receipt">
-          <path data-composition-edge-from="checkout" data-composition-edge-to="station" data-composition-edge-id="receipt" data-composition-points="341.25,524;152.5,524" d="M 341.25 524 L 152.5 524" class="a-default" stroke-width="1.4" stroke-dasharray="3,5" marker-end="url(#arrowhead)"/>
+        <g data-edge-from="inventory" data-edge-to="checkout" data-edge-label="200 applied per SKU" data-edge-key="8" data-edge-id="applied">
+          <path data-composition-edge-from="inventory" data-composition-edge-to="checkout" data-composition-edge-id="applied" data-composition-points="746.75,478;355.25,478" d="M 746.75 478 L 355.25 478" class="a-default" stroke-width="1.4" stroke-dasharray="3,5" marker-end="url(#arrowhead)"/>
         <g>
-          <rect x="212.275" y="504" width="69.2" height="16" rx="3" class="c-mask"/>
-          <text x="246.875" y="514" class="t-muted" font-size="9" text-anchor="middle">200 receipt</text>
+          <rect x="495.6" y="458" width="110.8" height="16" rx="3" class="c-mask"/>
+          <text x="551" y="468" class="t-muted" font-size="9" text-anchor="middle">200 applied per SKU</text>
         </g>
         </g>
 
-        <g data-edge-from="checkout" data-edge-to="station" data-edge-label="or 503 if inventory is down / silent" data-edge-key="9" data-edge-id="unknown">
-          <path data-composition-edge-from="checkout" data-composition-edge-to="station" data-composition-edge-id="unknown" data-composition-points="341.25,552;152.5,552" d="M 341.25 552 L 152.5 552" class="a-dashed" stroke-width="1.4" marker-end="url(#arrowhead-dashed)"/>
+        <g data-edge-from="checkout" data-edge-to="codb" data-edge-label="tx B: applied quantities, COMPLETED" data-edge-key="9" data-edge-id="txb">
+          <path data-composition-edge-from="checkout" data-composition-edge-to="codb" data-composition-edge-id="txb" data-composition-points="355.25,552;544,552" d="M 355.25 552 L 544 552" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
         <g>
-          <rect x="147.27499999999998" y="532" width="199.20000000000002" height="16" rx="3" class="c-mask"/>
-          <text x="246.875" y="542" class="t-messagebus" font-size="9" text-anchor="middle">or 503 if inventory is down / silent</text>
+          <rect x="352.625" y="532" width="194" height="16" rx="3" class="c-mask"/>
+          <text x="449.625" y="542" class="t-backend" font-size="9" text-anchor="middle">tx B: applied quantities, COMPLETED</text>
+        </g>
+        </g>
+
+        <g data-edge-from="checkout" data-edge-to="station" data-edge-label="200 receipt" data-edge-key="10" data-edge-id="receipt">
+          <path data-composition-edge-from="checkout" data-composition-edge-to="station" data-composition-edge-id="receipt" data-composition-points="341.25,580;152.5,580" d="M 341.25 580 L 152.5 580" class="a-default" stroke-width="1.4" stroke-dasharray="3,5" marker-end="url(#arrowhead)"/>
+        <g>
+          <rect x="212.275" y="560" width="69.2" height="16" rx="3" class="c-mask"/>
+          <text x="246.875" y="570" class="t-muted" font-size="9" text-anchor="middle">200 receipt</text>
+        </g>
+        </g>
+
+        <g data-edge-from="checkout" data-edge-to="station" data-edge-label="or 503 if inventory is down / silent" data-edge-key="11" data-edge-id="unknown">
+          <path data-composition-edge-from="checkout" data-composition-edge-to="station" data-composition-edge-id="unknown" data-composition-points="341.25,608;152.5,608" d="M 341.25 608 L 152.5 608" class="a-dashed" stroke-width="1.4" marker-end="url(#arrowhead-dashed)"/>
+        <g>
+          <rect x="147.27499999999998" y="588" width="199.20000000000002" height="16" rx="3" class="c-mask"/>
+          <text x="246.875" y="598" class="t-messagebus" font-size="9" text-anchor="middle">or 503 if inventory is down / silent</text>
         </g>
         </g>
 
@@ -557,8 +573,8 @@ rect.c-bg-rect { fill: var(--bg); }
           <text x="62" y="281" class="t-dim" font-size="9" font-weight="600">The pivot: inventory's own transaction</text>
         </g>
         <g data-graph-role="segment-label" data-segment-id="2">
-          <rect x="56" y="454" width="164.8" height="18" rx="3" class="c-mask"/>
-          <text x="62" y="467" class="t-dim" font-size="9" font-weight="600">After the pivot: forward only</text>
+          <rect x="56" y="510" width="164.8" height="18" rx="3" class="c-mask"/>
+          <text x="62" y="523" class="t-dim" font-size="9" font-weight="600">After the pivot: forward only</text>
         </g>
 
         <!-- Participants -->
