@@ -231,6 +231,11 @@ add crash-safety for scans still in checkout's queue, and is next week's subject
 - **Scans still in checkout's queue are lost if checkout is killed.** Analytics stays gapless, because numbering resumes from what it stored.
 - **`scan_log` grows without pruning** in analytics_db.
 - **The hottest SKU's row lock is still the throughput ceiling.** Splitting into services moved it into inventory, but didn't remove it.
+- **Two database-side ideas were explored but not measured on an idle machine:**
+  - group commit (PostgreSQL `commit_delay` with `commit_siblings`, `synchronous_commit` left on);
+  - `inventory_db` on a separate PostgreSQL instance, so its WAL isn't shared with checkout's commits.
+
+  The load runs for these overlapped other work on the same laptop, so the numbers can't be compared with the results above. Neither is part of this version.
 
 ---
 
