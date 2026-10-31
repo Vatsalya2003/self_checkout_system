@@ -5,11 +5,12 @@
 #
 # Checks, in order:
 #   catalog / inventory   stopped: only their own route returns 502; restarted: back to 200
-#   analytics             stopped while 10 s of load runs: checkout is unaffected, scans pile
-#                         up in scan_log; restarted: it restores its window and catches up
+#   analytics             stopped while 10 s of load runs: checkout is unaffected, scans wait
+#                         in the broker's analytics.scans queue (Week 6); restarted: it
+#                         stores them, restores its window and catches up
 #   checkout              restarted with an open basket: the basket is gone (404) because
-#                         unpaid baskets live in memory; scan_log numbering carries on
-#                         from MAX(seq) with no gap
+#                         unpaid baskets live in memory; scan_log numbering (done by
+#                         analytics since Week 6) carries on from MAX(seq) with no gap
 # Ends with check-windows.sql (gapless, every window matches) and the
 # cross-database invariant (scripts/check-invariant-micro.sh, Week 5).
 set -u
@@ -45,6 +46,7 @@ echo "== stop analytics-service, keep scanning for 10 s without it"
 before=$(psql -X -qtA analytics_db -c "select coalesce(max(window_end),0) from popular_snapshots")
 stop1 analytics-service; load 10 no-analytics; probe
 echo "  scan_log: $(scanlog); last stored window_end before restart: $before"
+echo "  waiting in the broker: $(${RABBITMQ_SBIN:-/opt/homebrew/sbin}/rabbitmqctl -q list_queues name messages | awk '$1=="analytics.scans"{print $2}') scan batches in analytics.scans"
 start1 analytics-service
 until [ $(psql -X -qtA analytics_db -c "select (select coalesce(max(seq),0) from scan_log)/500*500 - (select coalesce(max(window_end),0) from popular_snapshots)") -le 0 ]; do sleep 0.5; done
 echo "  caught up: last window_end $(psql -X -qtA analytics_db -c 'select max(window_end) from popular_snapshots')"
