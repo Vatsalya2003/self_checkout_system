@@ -23,7 +23,9 @@ import java.util.TreeMap;
 // INVENTORY-SERVICE, business layer: the stock half of a payment.
 //
 // Week 5. checkout-service no longer owns stock, so when a customer pays it
-// calls POST /internal/stock/commit here. This is the PIVOT of the payment
+// asks inventory to commit the stock (Week 6: a StockCommitRequested event,
+// handled by StockCommitListener; Week 5: POST /internal/stock/commit). This
+// is the PIVOT of the payment
 // saga: before this commit nothing irreversible has happened; once it commits,
 // units have really left the shelf, and checkout must finish the sale.
 //

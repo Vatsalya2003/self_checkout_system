@@ -1,6 +1,5 @@
 package com.selfcheckout.self_checkout.analytics;
 
-import com.selfcheckout.self_checkout.analytics.exception.ScanGapException;
 import com.selfcheckout.self_checkout.persistence.repository.ScanLogRow;
 import com.selfcheckout.self_checkout.persistence.repository.ScanStore;
 import com.selfcheckout.self_checkout.transactions.exception.InvalidRequestException;
@@ -8,28 +7,39 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.List;
 
-// ANALYTICS-SERVICE, business layer: accepting scans pushed by checkout.
+// ANALYTICS-SERVICE, business layer: storing the scans checkout publishes.
 //
-// Week 5. The hand-off used to be a shared table. Now checkout's single writer
-// thread POSTs numbered batches here, waits for the answer, and only then
-// sends the next batch -- so batches arrive in order. This class makes the
-// three guarantees the windows depend on:
-//   gapless    a batch must continue from what is stored (else 409 SCAN_GAP)
-//   no doubles a retried batch is absorbed by the seq primary key
-//   durable    the answer is sent only after the INSERT has committed
-// From the table on, nothing changed: ScanLogPoller reads it exactly as in
-// Week 4.
+// Week 5: checkout numbered the scans and POSTed them here. Week 6: they
+// arrive as ScansRecorded events from RabbitMQ (ScanBatchListener), with NO
+// numbers, and this class numbers them as it stores them. In ONE transaction:
+//
+//   1. take the numbering lock (only one numbering transaction at a time)
+//   2. next seq = MAX(seq) + 1
+//   3. claim the batch id in scan_batches -- if it is already there, this is
+//      a redelivered batch: store nothing, number nothing
+//   4. insert the scans as seq next .. next + n - 1
+//   5. commit -- only then is the message acked
+//
+// The guarantees the windows depend on:
+//   gapless     only this transaction assigns seqs, from MAX + 1, and a
+//               rolled-back batch takes its numbers back with it
+//   no doubles  the batch id is the redelivery check (step 3)
+//   in order    one consumer, one batch at a time, in the order checkout's
+//               single writer thread published them
+// From scan_log on, nothing changed: ScanLogPoller reads it exactly as in
+// Week 4. Week 5's GET /internal/scans/max-seq is gone: checkout no longer
+// needs to know where the numbering is.
 @Service
 public class ScanIngestService {
 
-    /** One pushed scan, as the API layer hands it over. */
-    public record IncomingScan(long seq, String sku, Instant scannedAt) {}
+    /** One published scan, as the listener hands it over. */
+    public record IncomingScan(String sku, Instant scannedAt) {}
 
-    /** What one push did. */
-    public record IngestResult(int inserted, int duplicates, long maxSeq) {}
+    /** What one batch did: stored as first..last, or skipped as a duplicate. */
+    public record IngestResult(boolean duplicate, int stored, long firstSeq, long lastSeq) {}
 
     private final ScanStore store;
 
@@ -38,34 +48,30 @@ public class ScanIngestService {
     }
 
     @Transactional
-    public IngestResult accept(List<IncomingScan> scans) {
+    public IngestResult accept(String batchId, List<IncomingScan> scans) {
+        if (batchId == null || batchId.isBlank()) {
+            throw new InvalidRequestException("a batch needs a batchId");
+        }
         if (scans == null || scans.isEmpty()) {
             throw new InvalidRequestException("a batch needs at least one scan");
         }
-        List<ScanLogRow> sorted = scans.stream()
-                .map(s -> s == null ? new ScanLogRow(0, null, null) : new ScanLogRow(s.seq(), s.sku(), s.scannedAt()))
-                .sorted(Comparator.comparingLong(ScanLogRow::seq))
-                .toList();
-        for (int i = 0; i < sorted.size(); i++) {
-            ScanLogRow r = sorted.get(i);
-            if (r.sku() == null || r.scannedAt() == null || r.seq() <= 0) {
-                throw new InvalidRequestException("every scan needs a positive seq, a sku and a time");
-            }
-            if (i > 0 && r.seq() != sorted.get(i - 1).seq() + 1) {
-                throw new InvalidRequestException("a batch must be a contiguous run of seq numbers");
+        for (IncomingScan s : scans) {
+            if (s == null || s.sku() == null || s.scannedAt() == null) {
+                throw new InvalidRequestException("every scan needs a sku and a time");
             }
         }
-        long max = store.maxSeq();
-        if (sorted.get(0).seq() > max + 1) {
-            throw new ScanGapException("batch starts at seq " + sorted.get(0).seq()
-                    + " but only 1.." + max + " are stored", max);
+        store.lockNumbering();
+        long first = store.maxSeq() + 1;
+        long last = first + scans.size() - 1;
+        if (!store.claimBatch(batchId, first, last)) {
+            return new IngestResult(true, 0, 0, 0);
         }
-        int inserted = store.insertNew(sorted);
-        long newMax = Math.max(max, sorted.get(sorted.size() - 1).seq());
-        return new IngestResult(inserted, sorted.size() - inserted, newMax);
-    }
-
-    public long maxSeq() {
-        return store.maxSeq();
+        List<ScanLogRow> rows = new ArrayList<>(scans.size());
+        long seq = first;
+        for (IncomingScan s : scans) {                 // keep checkout's order
+            rows.add(new ScanLogRow(seq++, s.sku(), s.scannedAt()));
+        }
+        store.insert(rows);
+        return new IngestResult(false, rows.size(), first, last);
     }
 }

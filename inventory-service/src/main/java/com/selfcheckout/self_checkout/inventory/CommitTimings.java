@@ -14,7 +14,8 @@ import java.util.concurrent.atomic.AtomicLong;
  *
  * Week 5: moved here from checkout-service, because the row locks moved here.
  * Stock now lives in inventory_db, so the locking SELECT, the decrement and
- * the commit all happen inside inventory-service (POST /internal/stock/commit).
+ * the commit all happen inside inventory-service (Week 6: for each
+ * StockCommitRequested event; Week 5: POST /internal/stock/commit).
  *
  * Why this exists: "complete takes 80 ms at 100 stations" is not actionable,
  * because almost all of it is a queue. Two numbers are:

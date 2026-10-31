@@ -14,8 +14,8 @@ import java.util.List;
 //
 // Week 5: inventory owns stock and the low-stock alerts in its own database,
 // and WRITES them too (StockCommitService). The one thing it does not own is
-// item names -- those come from catalog-service, loaded once over HTTP
-// (HttpCatalogCache), because inventory may not open catalog_db.
+// item names -- those come from catalog-service, received once as an event
+// (BrokerCatalogCache, Week 6), because inventory may not open catalog_db.
 @Service
 public class InventoryService {
 

@@ -5,6 +5,10 @@
 #   catalog_db  inventory_db  checkout_db  analytics_db
 # -- and each one may be opened only by that service's role (db/roles.sql).
 #
+# Week 6: also resets the broker -- every RabbitMQ queue the services use is
+# deleted, so no message from a previous run survives into the next one (the
+# services re-declare them, empty, when they start).
+#
 # Run with the services stopped:
 #   scripts/stop-all.sh && db/reset.sh && scripts/start-all.sh
 #
@@ -34,8 +38,19 @@ for svc in catalog inventory checkout analytics; do
     "${PSQL[@]}" -d "$db" -f "$svc/grants.sql"
 done
 
+# The broker: delete our queues (and their dead-letter queues). Missing ones
+# are fine. Needs RabbitMQ running (scripts/start-all.sh starts it).
+RMQ="${RABBITMQ_SBIN:-/opt/homebrew/sbin}/rabbitmqctl"
+for queue in catalog.requests inventory.stock-commit checkout.stock-replies analytics.scans; do
+    for name in "$queue" "$queue.dlq"; do
+        "$RMQ" -q delete_queue "$name" >/dev/null 2>&1 || true
+    done
+done
+left=$("$RMQ" -q list_queues name 2>/dev/null | grep -c -E '^(catalog|inventory|checkout|analytics)\.' || true)
+
 q() { psql -X -tA -d "$1" -c "$2"; }
 echo "reset: catalog_db $(q catalog_db 'SELECT count(*) FROM items') items |" \
      "inventory_db $(q inventory_db 'SELECT count(*) || '"' SKUs, qty '"' || min(qty) || '"'..'"' || max(qty) FROM stock') |" \
      "checkout_db $(q checkout_db 'SELECT count(*) FROM transactions') sales |" \
-     "analytics_db $(q analytics_db 'SELECT count(*) FROM scan_log') scans"
+     "analytics_db $(q analytics_db 'SELECT count(*) FROM scan_log') scans |" \
+     "broker queues left $left"

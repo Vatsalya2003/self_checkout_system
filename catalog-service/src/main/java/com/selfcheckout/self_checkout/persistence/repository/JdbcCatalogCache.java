@@ -15,8 +15,9 @@ import java.util.Map;
 //
 // Week 5: this used to live in a shared library and read the one shared
 // database for all four services. Now only catalog-service can open
-// catalog_db, so this class lives here, and the other services load the
-// catalog from GET /items instead (catalog-client's HttpCatalogCache).
+// catalog_db, so this class lives here, and the other services get the
+// catalog from this service instead (Week 6: as a CatalogPublished event,
+// catalog-client's BrokerCatalogCache).
 // Same interface either way, so nothing above the persistence layer changed.
 //
 // Loaded LAZILY on first use, never in a constructor or @PostConstruct, so a

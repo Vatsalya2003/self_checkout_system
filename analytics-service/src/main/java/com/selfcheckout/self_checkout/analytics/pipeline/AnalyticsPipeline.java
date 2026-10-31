@@ -22,7 +22,7 @@ import java.util.List;
  *
  * Shape (see PIPELINE.md and MICROSERVICES.md):
  *
- *   scan_log (analytics' own; filled from checkout's pushes, POST /internal/scans)
+ *   scan_log (analytics' own; filled from checkout's ScansRecorded events)
  *      --poll--> [poller] --put--> [window] --put--> [rank] --put--> [sink] --> popular_snapshots
  *
  * One thread per filter, a bounded queue between each pair, and every pipe a

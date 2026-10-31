@@ -30,6 +30,11 @@ import java.util.TreeMap;
 //   certainly not committed   -> undo tx A, reopen the basket, 503
 //   unknown (no answer)       -> 503, basket stays COMPLETING, and the
 //                                resolver keeps going until inventory answers
+//
+// Week 6: the "call" is a StockCommitRequested event and its reply through
+// RabbitMQ (BrokerInventoryClient). Once the broker has confirmed the request
+// it sits in a durable queue, so if inventory is down it WILL process it when
+// it returns: no reply is therefore always "unknown", never "not committed".
 @Component
 public class PaymentSaga {
 

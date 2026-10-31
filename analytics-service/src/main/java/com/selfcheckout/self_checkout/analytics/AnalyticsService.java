@@ -21,9 +21,10 @@ import java.util.List;
  * the checkout code called ScanRecorder.recordScan() on this class and the scan
  * went straight into an in-process queue. Checkout and analytics are now
  * separate processes. Week 4 handed scans over through a shared table; since
- * Week 5 (a database per service) checkout-service pushes numbered batches to
- * POST /internal/scans, ScanIngestService stores them in this service's own
- * scan_log, and ScanLogPoller reads them back in order (see AnalyticsPipeline).
+ * Week 5 (a database per service) checkout-service sends batches of scans to
+ * this service -- since Week 6 as ScansRecorded events through RabbitMQ --
+ * ScanIngestService numbers and stores them in this service's own scan_log,
+ * and ScanLogPoller reads them back in order (see AnalyticsPipeline).
  */
 @Service
 public class AnalyticsService {

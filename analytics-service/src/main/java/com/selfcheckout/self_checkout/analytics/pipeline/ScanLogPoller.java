@@ -14,19 +14,19 @@ import java.util.concurrent.atomic.AtomicLong;
  *
  * In the single application, scans reached analytics through an in-process
  * queue. Checkout and analytics are now separate processes with separate
- * databases (Week 5): checkout-service pushes every scan, numbered with a
- * gapless sequence, to POST /internal/scans; ScanIngestService stores them in
- * analytics' own scan_log; and this filter reads them back in exactly that
- * order and puts them on the window pipe.
+ * databases (Week 5): checkout-service publishes every scan to RabbitMQ in
+ * batches (Week 6); ScanIngestService numbers them with a gapless sequence as
+ * it stores them in analytics' own scan_log; and this filter reads them back
+ * in exactly that order and puts them on the window pipe.
  *
  *   SELECT seq, sku, scanned_at FROM scan_log WHERE seq > :last ORDER BY seq LIMIT 5000
  *
  * Two rules make the window bounds correct:
  *  - ORDER: rows are handed downstream strictly by seq, so the window filter's
  *    "seq % 500 == 0" boundaries are the same scans they were in Week 3.
- *  - NO GAPS: every row must be last + 1. checkout-service sends batches one
- *    at a time in seq order and ScanIngestService refuses a batch that would
- *    leave a hole, so a gap should be impossible -- but if one ever appears this filter STOPS at it and waits
+ *  - NO GAPS: every row must be last + 1. ScanIngestService assigns seqs from
+ *    MAX(seq) + 1 in the same transaction that inserts them, so a gap should
+ *    be impossible -- but if one ever appears this filter STOPS at it and waits
  *    rather than skip a scan and silently shift every window after it.
  *
  * The thread loop is kept apart from pollOnce(), so the logic can be tested

@@ -11,9 +11,10 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 // Business function: stock. It owns every unit on the shelf and every
 // low-stock alert, and it is the only service that changes them:
 //   GET  /inventory/low-stock        public, through the gateway
-//   POST /internal/stock/commit      internal: the stock half of a payment,
-//                                    called by checkout-service (the saga's
-//                                    orchestrator), never through the gateway
+//   StockCommitRequested events      the stock half of a payment, sent by
+//                                    checkout-service (the saga's orchestrator)
+//                                    through RabbitMQ (Week 6; Week 5 had an
+//                                    internal HTTP endpoint for this)
 @SpringBootApplication
 @EnableConfigurationProperties(SelfCheckoutProperties.class)
 public class InventoryServiceApplication {

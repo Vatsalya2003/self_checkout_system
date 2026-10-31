@@ -12,8 +12,9 @@ import java.util.List;
 // here (since Week 5 it is not even in the same database).
 //
 // Two implementations: catalog-service's JdbcCatalogCache reads its own
-// database; every other service uses HttpCatalogCache, which loads the same
-// list from catalog-service's GET /items.
+// database; every other service uses BrokerCatalogCache, which receives the
+// same list from catalog-service as a CatalogPublished event (Week 6; Week 5
+// loaded it from GET /items).
 public interface CatalogCache {
 
     /** The item, or null if no such SKU. */

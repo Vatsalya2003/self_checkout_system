@@ -19,6 +19,11 @@
 			<groupId>com.selfcheckout</groupId>
 			<artifactId>shared-web</artifactId>
 		</dependency>
+		<!-- Week 6: every cross-service message goes through RabbitMQ. -->
+		<dependency>
+			<groupId>com.selfcheckout</groupId>
+			<artifactId>messaging</artifactId>
+		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc</artifactId>

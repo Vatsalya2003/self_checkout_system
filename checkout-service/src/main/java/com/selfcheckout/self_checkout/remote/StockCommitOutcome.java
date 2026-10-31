@@ -2,9 +2,10 @@ package com.selfcheckout.self_checkout.remote;
 
 import java.util.Map;
 
-// CHECKOUT-SERVICE, remote layer. What one call to inventory's
-// POST /internal/stock/commit told us. Exactly three possibilities, and the
-// payment saga does something different for each:
+// CHECKOUT-SERVICE, remote layer. What one attempt at inventory's stock
+// commit told us (Week 6: a StockCommitRequested event and its reply; Week 5:
+// POST /internal/stock/commit). Exactly three possibilities, and the payment
+// saga does something different for each:
 //
 //   Committed     inventory answered 200: the stock commit is durable.
 //                 applied = units actually taken per SKU (the clamp);

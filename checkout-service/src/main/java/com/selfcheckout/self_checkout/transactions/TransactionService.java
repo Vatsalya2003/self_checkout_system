@@ -157,7 +157,9 @@ public class TransactionService {
      *      or a scan arriving at the same moment, now gets 409.
      *   2. tx A (checkout_db): save the sale as PENDING, lines included.
      *      This is the saga log, written BEFORE anything irreversible.
-     *   3. call inventory: POST /internal/stock/commit. THE PIVOT. Inventory
+     *   3. ask inventory to commit the stock: THE PIVOT. Week 6: a
+     *      StockCommitRequested event through RabbitMQ, answered by a
+     *      StockCommitted event (Week 5: POST /internal/stock/commit). Inventory
      *      locks, clamps, decrements and records the commit in one local
      *      transaction of its own, keyed on this transaction id.
      *   4. tx B (checkout_db): store the applied quantities, status COMPLETED.

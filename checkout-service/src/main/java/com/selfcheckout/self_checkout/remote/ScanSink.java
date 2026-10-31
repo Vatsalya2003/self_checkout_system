@@ -2,19 +2,16 @@ package com.selfcheckout.self_checkout.remote;
 
 import java.util.List;
 
-// CHECKOUT-SERVICE, remote layer. Where numbered scans go: analytics-service.
-// An interface so the publisher (scanlog layer) is unit-tested with a fake and
-// never sees HTTP.
+// CHECKOUT-SERVICE, remote layer. Where scans go: analytics-service, through
+// the broker. An interface so the publisher (scanlog layer) is unit-tested
+// with a fake and never sees RabbitMQ.
 public interface ScanSink {
 
     /**
-     * Deliver one batch of consecutive seqs. Returns only once analytics has
-     * stored it durably. Throws ScanGapRejectedException if analytics says the
-     * batch would leave a hole; any other exception means "not known to be
-     * delivered -- send the same batch again".
+     * Publish one batch, in scan order. Returns only once the broker has
+     * confirmed it is in the durable analytics.scans queue. Any exception means
+     * "not known to be delivered -- send the same batch again, with the same
+     * batchId" (analytics skips a batch id it has already stored).
      */
-    void push(List<ScanLogRow> rows);
-
-    /** The highest seq analytics has stored: where numbering continues after a restart. */
-    long maxSeq();
+    void push(String batchId, List<RecordedScan> scans);
 }

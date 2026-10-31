@@ -8,9 +8,10 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 // ANALYTICS-SERVICE entry point. Its own jar, its own process, port 8084, and
 // since Week 5 its own database, analytics_db.
 //
-// Business function: popular items. checkout-service pushes every scan to
-// POST /internal/scans in numbered batches; this service stores them in its
-// own scan_log, runs them through the Week 3 window -> rank -> sink pipeline,
+// Business function: popular items. checkout-service publishes every scan to
+// RabbitMQ in batches (ScansRecorded on analytics.scans, Week 6); this service
+// numbers and stores them in its own scan_log, runs them through the Week 3
+// window -> rank -> sink pipeline,
 // writes popular_snapshots, and serves GET /analytics/popular-items. It never
 // calls checkout-service; item names come from catalog-service.
 @SpringBootApplication

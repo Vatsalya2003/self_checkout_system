@@ -58,8 +58,25 @@ healthy() {  # name port heap path status
   echo "  $1 healthy"
 }
 
-# Week 5: catalog first. The other three load the catalog from its GET /items
-# at startup (they may not read catalog_db), so it should already answer.
+# Week 6: the broker first. Every service talks to the others only through
+# RabbitMQ, so it should be up before any of them starts (they would retry,
+# but starting in order keeps the logs clean).
+RMQ_SBIN="${RABBITMQ_SBIN:-/opt/homebrew/sbin}"
+if ! "$RMQ_SBIN/rabbitmq-diagnostics" -q check_running >/dev/null 2>&1; then
+  echo "starting rabbitmq..."
+  brew services start rabbitmq >/dev/null
+  for i in $(seq 60); do
+    "$RMQ_SBIN/rabbitmq-diagnostics" -q check_running >/dev/null 2>&1 && break
+    sleep 1
+  done
+fi
+"$RMQ_SBIN/rabbitmq-diagnostics" -q check_running >/dev/null 2>&1 \
+  || { echo "rabbitmq is not running" >&2; exit 1; }
+echo "rabbitmq running"
+
+# Week 5: catalog first. The other three ask it for the catalog at startup
+# (Week 6: CatalogRequested through the broker; they may not read
+# catalog_db), so it should already be listening.
 set -- ${SERVICES[0]}; launch "$@"; healthy "$@"
 for s in "${SERVICES[@]:1}"; do set -- $s; launch "$@"; done
 for s in "${SERVICES[@]:1}"; do set -- $s; healthy "$@"; done
