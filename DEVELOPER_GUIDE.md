@@ -1020,7 +1020,7 @@ Organized by layer, top to bottom.
 | `src/test/.../transactions/OpenBasketTest.java` | The guarantees the database used to give the basket and now have to come from the class: first-scan line order, and claim-once. |
 | `src/test/.../analytics/pipeline/IngestTeeTest.java` | That a full audit branch is dropped from rather than waited on, and that the window branch is unaffected. |
 | `scripts/_client.py`, `scripts/test-*.py` | Shared helper + five behavioural tests. Each one wants a **freshly restarted server**; chaining them without a restart fails on leftover state, not on a bug. |
-| `reports/*.json` | The committed load-test reports. `reports/perf/` holds every raw run from the performance work, including the ones that were reverted or contaminated. |
+| `reports/*.json` | The two graded Week 6 load-test reports, and nothing else (`.gitignore` keeps it that way). Week 6's raw runs, summaries and checks are in `docs/perf/week6-raw/`; earlier weeks' reports stay on their own tags (e.g. `reports/perf/` on `pipeline-v2`). |
 
 ## 8. Deep dives
 

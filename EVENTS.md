@@ -142,7 +142,10 @@ Numbering inside the transaction that stores the scans has neither problem.
 
 ## Evidence
 
-- [`reports/event-driven/failure-tests.txt`](reports/event-driven/failure-tests.txt), all
+- The two graded load-test reports are in [`reports/`](reports/); every raw run, summary and
+  invariant check is in [`docs/perf/week6-raw/`](docs/perf/week6-raw/). Ran on battery at 71 %,
+  11:53–12:32, same conditions for both builds.
+- [`docs/perf/week6-raw/failure-tests.txt`](docs/perf/week6-raw/failure-tests.txt), all
   PASS. It tests:
   - the broker stopped under load;
   - inventory down;
@@ -152,5 +155,5 @@ Numbering inside the transaction that stores the scans has neither problem.
   - a publisher confirm timeout;
   - `/internal/**` gone;
   - no service-to-service connections ([`scripts/check-connections.sh`](scripts/check-connections.sh)).
-- [`reports/event-driven/verification/`](reports/event-driven/verification/): the golden diff
+- [`docs/perf/week6-raw/verification/`](docs/perf/week6-raw/verification/): the golden diff
   (identical, 29/29), the five behavioural scripts and the restart walkthrough.

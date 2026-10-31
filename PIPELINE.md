@@ -209,7 +209,7 @@ because with raw scans on the writer does ~1.27 M inserts instead of ~2,500.
 ## Measured pipeline metrics — the two submitted runs
 
 Taken from the server's own 10-second metrics line, on the runs in
-[`reports/`](reports/).
+[`reports/` on the `pipeline-v2` tag](https://github.com/Vatsalya2003/self_checkout_system/tree/pipeline-v2/reports).
 
 | | default (10 st, 60 s) | stress (100 st, 120 s) |
 |---|---|---|
@@ -263,7 +263,7 @@ revisited by writing one more implementation, without touching a filter.
 
 ## Beyond the pipeline
 
-The load-test numbers in [`reports/`](reports/) are substantially higher than
+The load-test numbers in [`reports/` on the `pipeline-v2` tag](https://github.com/Vatsalya2003/self_checkout_system/tree/pipeline-v2/reports) are substantially higher than
 the earlier `pipeline-v1` tag, and the pipeline is **not** the reason. The
 pipeline work removed the per-scan `scan_log` INSERT from the request path; a
 separate round of performance work then went after the checkout path itself.

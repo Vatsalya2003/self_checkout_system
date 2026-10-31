@@ -2,7 +2,7 @@
 
 Every number here comes from a real run on this laptop (8 cores, PostgreSQL 16
 via Homebrew, server and load client on the same machine). Raw reports are kept
-under `reports/perf/<phase>/`. Nothing is hand-written or rounded up, and no run
+under `reports/perf/<phase>/` on the [`pipeline-v2` tag](https://github.com/Vatsalya2003/self_checkout_system/tree/pipeline-v2/reports/perf). Nothing is hand-written or rounded up, and no run
 is discarded — reverted phases keep their row.
 
 **Throughput is a closed loop:** the load client runs a fixed number of stations,
@@ -488,7 +488,7 @@ that is a real, measured option, not a hypothetical.
 ## Final result
 
 Four runs, fresh restart before each, packaged jar, machine cooled first.
-Raw reports in `reports/perf/final/`.
+Raw reports in [`reports/perf/final/` on the `pipeline-v2` tag](https://github.com/Vatsalya2003/self_checkout_system/tree/pipeline-v2/reports/perf/final).
 
 | | baseline (`pipeline-v1`) | final | change |
 |---|---|---|---|

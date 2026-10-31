@@ -19,7 +19,7 @@ test that fails the build**.
 All numbers come from JSON reports produced by the unmodified course load
 client against the code as committed: the two graded runs in
 [`reports/`](reports/), and for the Week 3 performance work every run in
-`reports/perf/` — including the ones that were reverted or taken while the
+[`reports/perf/` on the `pipeline-v2` tag](https://github.com/Vatsalya2003/self_checkout_system/tree/pipeline-v2/reports/perf) — including the ones that were reverted or taken while the
 machine was throttling, which are kept and labelled rather than dropped.
 Anything not measured is labelled a prediction.
 
@@ -644,7 +644,7 @@ three checkout behaviour scripts passing unchanged.
 
 The performance work (the second half of Week 3) kept the architecture and the contract exactly as they were and went
 after throughput. Every claim here is backed by a run recorded in
-[`perf-results.md`](perf-results.md), with the raw JSON in `reports/perf/`.
+[`perf-results.md`](perf-results.md), with the raw JSON in [`reports/perf/` on the `pipeline-v2` tag](https://github.com/Vatsalya2003/self_checkout_system/tree/pipeline-v2/reports/perf).
 
 ### 7.1 Result
 
@@ -659,7 +659,7 @@ after throughput. Every claim here is backed by a run recorded in
 
 ### 7.2 A note on how these were launched
 
-The Week 1–3 reports in [`reports/`](reports/) were produced with
+The Week 1–3 reports ([`reports/` on the `pipeline-v2` tag](https://github.com/Vatsalya2003/self_checkout_system/tree/pipeline-v2/reports)) were produced with
 `./mvnw spring-boot:run`. That plugin starts the JVM with
 `-XX:TieredStopAtLevel=1`, which caps the JIT at C1 — worth about 20 % of
 throughput. Every performance-work number, **including the baseline it is compared
@@ -762,7 +762,7 @@ worst period to ~330. The critical section — the server's own work — grew fr
 fraction, so this is the machine, not the code. The pool-size sweep was
 therefore re-run **interleaved** (16, 32, 64, 16, 32, 64, …) after a cooldown,
 so drift is shared across arms rather than charged to whichever ran last.
-Every contaminated run is kept in `reports/perf/contaminated-thermal/` and
+Every contaminated run is kept in [`reports/perf/contaminated-thermal/` on the `pipeline-v2` tag](https://github.com/Vatsalya2003/self_checkout_system/tree/pipeline-v2/reports/perf/contaminated-thermal) and
 labelled, not deleted.
 
 **One change at a time.** Each phase was measured on its own, and one was
@@ -870,7 +870,7 @@ Every table has exactly one writer. This is enforced at three levels:
    every reset. The database itself now refuses a write from the wrong service. For
    example, `UPDATE items SET price = …` as `checkout_svc` fails with `permission denied`,
    because its UPDATE grant covers the `stock` column only
-   (`reports/service-based/roles/permission-check.txt`). Homebrew PostgreSQL uses trust
+   ([`reports/service-based/roles/permission-check.txt` on the `service-based-v1` tag](https://github.com/Vatsalya2003/self_checkout_system/tree/service-based-v1/reports/service-based/roles)). Homebrew PostgreSQL uses trust
    authentication, so the roles have no passwords: they separate privileges, not
    identities.
 
@@ -1004,10 +1004,11 @@ All runs go through the gateway with the packaged jars, after `db/reset.sh` and 
 restart of every service. Each one is followed by `check-invariant.sql` and
 `check-windows.sql`. Every run started below load 3 (1-minute average). Load rose to
 4–5 between runs because of macOS background work; it is recorded in each
-`*-summary.txt` under `reports/service-based/`.
+`*-summary.txt` under [`reports/service-based/` on the `service-based-v1` tag](https://github.com/Vatsalya2003/self_checkout_system/tree/service-based-v1/reports/service-based).
 
 **The submitted pair** (`reports/report-default-10stations-60s.json`,
-`reports/report-stress-100stations-120s.json`) is the better of two runs for each
+`reports/report-stress-100stations-120s.json` on the
+[`service-based-v1` tag](https://github.com/Vatsalya2003/self_checkout_system/tree/service-based-v1/reports)) is the better of two runs for each
 configuration. Both runs are listed:
 
 | Run | tx/s | errors | dropped scans | scan_log gapless | windows matching brute force | invariant |
@@ -1074,7 +1075,7 @@ answer to "would splitting them out let them scale independently": for this work
 there is nothing there to scale.
 
 **Restarts** (`scripts/test-service-restart.sh`, output in
-`reports/service-based/roles/restart-test/`):
+[`reports/service-based/roles/restart-test/` on the `service-based-v1` tag](https://github.com/Vatsalya2003/self_checkout_system/tree/service-based-v1/reports/service-based/roles/restart-test)):
 - Stopping catalog or inventory makes only their own route return 502; each was back
   within about 3 s.
 - While analytics was stopped for 10 s of load, checkout ran 860.7 tx/s with 0 errors
@@ -1086,8 +1087,8 @@ there is nothing there to scale.
 
 **Behaviour.** The 29-response golden diff through the gateway is identical to the
 single application, before and after the roles. All five behavioural scripts pass
-through the gateway (`reports/service-based/verification/`, and again under the roles
-in `reports/service-based/roles/`).
+through the gateway ([`reports/service-based/verification/`](https://github.com/Vatsalya2003/self_checkout_system/tree/service-based-v1/reports/service-based/verification), and again under the roles
+in [`reports/service-based/roles/`](https://github.com/Vatsalya2003/self_checkout_system/tree/service-based-v1/reports/service-based/roles), both on the `service-based-v1` tag).
 
 ### W4.9 Removed in the split
 
@@ -1313,7 +1314,7 @@ unofficial runs), but the fix is free.
 All runs go through the gateway with the packaged jars, after `db/reset.sh` and a restart
 of every service, and are followed by `scripts/check-invariant-micro.sh`. Every run
 started below load 3 (1-minute average); load rose to about 4–5 between runs. Raw runs are
-in `reports/microservices/`. The submitted pair is the better of two runs for each
+in [`reports/microservices/` on the `microservices-v1` tag](https://github.com/Vatsalya2003/self_checkout_system/tree/microservices-v1/reports/microservices). The submitted pair is the better of two runs for each
 configuration, and all four are listed:
 
 | Run | tx/s | errors | saga retries / rollbacks / ambiguous / recovered | scans dropped | cross-DB invariant |
@@ -1386,7 +1387,7 @@ about 0.1 s after its 500th scan. Batches averaged 486–551 scans per push.
 
 The day after the submitted runs, the same version was run again with the same procedure,
 4 runs. A database setting, group commit, was then tried. Raw runs, the harness and per-run
-notes are in [`reports/microservices/experiments/`](reports/microservices/experiments/README.md).
+notes are in [`reports/microservices/experiments/` on the `microservices-v1` tag](https://github.com/Vatsalya2003/self_checkout_system/tree/microservices-v1/reports/microservices/experiments).
 
 | | default, 10 st × 60 s | stress, 100 st × 120 s | errors | cross-DB invariant |
 |---|---|---|---|---|
@@ -1435,12 +1436,12 @@ Two other changes were prototyped and not measured, and are not in this version:
 ### W5.7 Correctness evidence
 
 - **Golden diff:** identical to the single application (29/29) through the gateway.
-- **Behavioural scripts:** all five pass (`reports/microservices/verification/`). Their database checks now say which service's database they read.
+- **Behavioural scripts:** all five pass ([`reports/microservices/verification/` on the `microservices-v1` tag](https://github.com/Vatsalya2003/self_checkout_system/tree/microservices-v1/reports/microservices/verification)). Their database checks now say which service's database they read.
 - **Cross-database invariant:** `scripts/check-invariant-micro.sh` passes after every load run.
   - inventory: no negative stock, and `10000 − stock = Σ applied`;
   - checkout vs inventory: identical committed lines, and no PENDING sale left;
   - analytics: a gapless `scan_log`, with every window equal to a brute-force recount.
-- **Failure tests:** `scripts/test-failures.sh`, all PASS (`reports/microservices/failure-tests.txt`).
+- **Failure tests:** `scripts/test-failures.sh`, all PASS ([`reports/microservices/failure-tests.txt` on the `microservices-v1` tag](https://github.com/Vatsalya2003/self_checkout_system/tree/microservices-v1/reports/microservices/failure-tests.txt)).
 
 | Case | What happened |
 |---|---|
@@ -1704,9 +1705,11 @@ How the runs were made:
   `-summary.txt`).
 - **Fair comparison:** the Week 5 build (`microservices`, RabbitMQ stopped) was re-run straight
   after the Week 6 runs, on the same machine, the same day.
-- **Where the files are:** `reports/event-driven/` (Week 6) and
-  `reports/event-driven/baseline-week5-rerun/` (Week 5). The harness is in
-  `reports/event-driven/harness/`.
+- **Power:** ran on battery at 71 %, 11:53–12:32, same conditions for both builds.
+- **Where the files are:** the two graded reports in [`reports/`](reports/); every raw run in
+  [`docs/perf/week6-raw/`](docs/perf/week6-raw/) (Week 6) and
+  [`docs/perf/week6-raw/baseline-week5-rerun/`](docs/perf/week6-raw/baseline-week5-rerun/) (Week 5). The harness is in
+  [`docs/perf/week6-raw/harness/`](docs/perf/week6-raw/harness/).
 
 | Run | tx/s | errors | `COMPLETE` p50 / p95 / p99 ms | stock step mean | lock wait / held | invariant | DLQ |
 |---|---|---|---|---|---|---|---|
@@ -1782,11 +1785,11 @@ the lock holder, and that cost is paid inside the critical section.
 
 - **Golden diff:** identical to the single application (29/29) through the gateway.
 - **Unit and ArchUnit tests:** 52 pass.
-- **The five behavioural scripts:** all pass (`reports/event-driven/verification/`). The
+- **The five behavioural scripts:** all pass (`docs/perf/week6-raw/verification/`). The
   invariant flags only the one SKU that two of them set up directly with SQL, as in Week 5.
 - **Cross-database invariant:** passes after every load run, with 0 dead-lettered messages.
 - **Failure tests:** `scripts/test-failures.sh`, all PASS, 62 checks
-  (`reports/event-driven/failure-tests.txt`):
+  (`docs/perf/week6-raw/failure-tests.txt`):
 
 | Case | What happened |
 |---|---|

@@ -28,7 +28,7 @@
 set -u
 R="$(cd "$(dirname "$0")/.." && pwd)"; cd "$R"
 export PATH=/opt/homebrew/bin:/opt/homebrew/sbin:$PATH
-OUT=${1:-reports/event-driven/failure-tests}; mkdir -p "$OUT"; OUT=$(cd "$OUT" && pwd)
+OUT=${1:-docs/perf/week6-raw/failure-tests}; mkdir -p "$OUT"; OUT=$(cd "$OUT" && pwd)
 CLIENT=$HOME/Desktop/ADV_SOFT_DEV/CS6510-2026/load-client
 JAVA="$(/usr/libexec/java_home -v 21)/bin/java"
 RMQ="${RABBITMQ_SBIN:-/opt/homebrew/sbin}/rabbitmqctl"

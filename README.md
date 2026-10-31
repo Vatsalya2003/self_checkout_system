@@ -18,7 +18,7 @@ RabbitMQ 4.4.0, Java 21, PostgreSQL 16, nginx.
 >   - [`report-stress-100stations-120s.json`](reports/report-stress-100stations-120s.json): 100 stations, 120 s, **653.6 tx/s, 0 errors**
 > - **Architecture diagram (microservices + event broker):** [`docs/diagrams/architecture-events.svg`](docs/diagrams/architecture-events.svg), shown [below](#architecture)
 > - **The broker, the events and the saga over events:** [EVENTS.md](EVENTS.md)
-> - Every raw run, check output and failure test is in [`reports/event-driven/`](reports/event-driven/).
+> - Every raw run, check output and failure test is in [`docs/perf/week6-raw/`](docs/perf/week6-raw/).
 
 ---
 
@@ -137,7 +137,7 @@ Interactive versions for local viewing are in [`docs/diagrams/interactive/`](doc
 | no publisher confirm in time, or no reply (e.g. inventory down) | **503** after about 3–5 s | the request may be, or is, in a durable queue, so the basket stays closed and a retry gets **409**. The sale **completes in the background** once inventory processes it, and `GET /transactions/{id}` shows COMPLETED. |
 
 All of these are tested in [`scripts/test-failures.sh`](scripts/test-failures.sh). The
-results are in [`reports/event-driven/failure-tests.txt`](reports/event-driven/failure-tests.txt):
+results are in [`docs/perf/week6-raw/failure-tests.txt`](docs/perf/week6-raw/failure-tests.txt):
 - the broker stopped under load;
 - inventory down;
 - checkout crashing between inventory's commit and tx B;
@@ -363,14 +363,14 @@ Reset and restart before every load run:
 
 Performance runs use the packaged jars (`java -jar`, which is what `start-all.sh` does).
 The harness used for every run is in
-[`reports/event-driven/harness/`](reports/event-driven/harness/).
+[`docs/perf/week6-raw/harness/`](docs/perf/week6-raw/harness/).
 
 Other checks:
 - `./mvnw test`: unit and ArchUnit tests (52).
 - `scripts/test-*.py`: the five behavioural scripts.
 - `scripts/test-failures.sh`: the failure tests (A–H).
 - `scripts/test-service-restart.sh`: stops and restarts each service.
-- `python3 scripts/golden.py diff reports/golden/single-app.txt`: 29 responses, identical to
+- `python3 scripts/golden.py diff scripts/golden/single-app.txt`: 29 responses, identical to
   the single application.
 - `rabbitmqctl list_queues name messages consumers`: queue depths and consumers. The broker's
   web UI is at http://localhost:15672.

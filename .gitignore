@@ -25,3 +25,10 @@ __pycache__/
 *.pyc
 logs/
 gateway/run/
+
+# reports/ holds ONLY the two graded load-test reports. Raw runs go to
+# docs/perf/week6-raw/ (pass it as the output folder); anything else a run
+# drops into reports/ is ignored so it cannot be committed by accident.
+reports/*
+!reports/report-default-10stations-60s.json
+!reports/report-stress-100stations-120s.json

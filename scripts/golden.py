@@ -10,8 +10,8 @@ Everything else -- status codes, field names, field order, error codes, numbers,
 receipt line order -- is kept exactly as the server sent it.
 
 Usage:
-    python3 scripts/golden.py capture reports/golden/single-app.txt [base_url]
-    python3 scripts/golden.py diff    reports/golden/single-app.txt [base_url]
+    python3 scripts/golden.py capture scripts/golden/single-app.txt [base_url]
+    python3 scripts/golden.py diff    scripts/golden/single-app.txt [base_url]
 
 Needs a freshly reset database (stock at 10,000, no transactions), because the
 low-stock and popular-items answers depend on what has been sold and scanned.
