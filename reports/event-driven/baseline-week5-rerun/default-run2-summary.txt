@@ -1,0 +1,21 @@
+label=default-run2 stations=10 duration=60
+load before: { 3.41 5.97 6.58 }   (idle gate used: 1-min load < 3.0)
+load after:  { 5.45 6.09 6.58 }
+cpu analytics-service      17.9 %  (of one core, avg over 61 s)
+cpu catalog-service         0.1 %  (of one core, avg over 61 s)
+cpu checkout-service      126.2 %  (of one core, avg over 61 s)
+cpu inventory-service      34.6 %  (of one core, avg over 61 s)
+cpu nginx                  32.5 %  (of one core, avg over 61 s)
+cpu postgres              156.2 %  (of one core, avg over 61 s)
+cpu rabbitmq                0.0 %  (of one core, avg over 61 s)
+2026-10-31T12:28:46.865-07:00  INFO 16763 --- [checkout-service] [scanlog-metrics] c.s.s.scanlog.ScanLogPublisher           : scan-log publisher | accepted=531899 written=531899 dropped=0 lost=0 | batches=994 avgBatch=535 | queue depth=0 max=161 cap=65536 | lastSeq=531899 | writeErrors=0 resyncs=0 synced=true
+2026-10-31T12:28:46.862-07:00  INFO 16763 --- [checkout-service] [   saga-metrics] c.s.s.transactions.SagaCounters          : saga | payments=50719 stockRetries=0 replayed=0 rolledBack=0 ambiguous=0 resolved=0 recovered=0 finishRetries=0 | stock call mean=8045us max=181ms | haltHook=off
+2026-10-31T12:28:47.664-07:00  INFO 16769 --- [analytics-service] [ipeline-metrics] c.s.s.a.pipeline.AnalyticsPipeline       : analytics lag | lastSeq=531899 | behind scan_log now=0 max=672 mean=219 scans | read lag mean=67 max=146 ms | gapStalls=0
+broker queues after the run (name messages consumers):
+  tx/s=845.2 tx=50719 items=531899 wall=60.0s
+  START_TRANSACTION      ok=50719 err=0 mean=0.193 p50=0.160 p95=0.340 p99=0.659 max=14.5 ms
+  SCAN_ITEM              ok=531899 err=0 mean=0.170 p50=0.145 p95=0.290 p99=0.515 max=11.0 ms
+  COMPLETE_TRANSACTION   ok=50719 err=0 mean=9.852 p50=7.523 p95=23.658 p99=35.657 max=187.7 ms
+  stock commit timings | commits=50719 | mean lockWait=6518us criticalSection=1209us | implied ceiling if 66% of baskets share the hottest SKU: 1253 tx/s
+postgres: commit_delay=0 commit_siblings=5 fsync=on synchronous_commit=on
+disk free after: 8 GB

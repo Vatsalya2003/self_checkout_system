@@ -1,0 +1,21 @@
+label=stress-run1 stations=100 duration=120
+load before: { 3.27 5.28 6.29 }   (idle gate used: 1-min load < 3.0)
+load after:  { 10.83 8.14 7.34 }
+cpu analytics-service      12.4 %  (of one core, avg over 121 s)
+cpu catalog-service         0.1 %  (of one core, avg over 121 s)
+cpu checkout-service      121.7 %  (of one core, avg over 121 s)
+cpu inventory-service      33.3 %  (of one core, avg over 121 s)
+cpu nginx                  32.6 %  (of one core, avg over 121 s)
+cpu postgres              189.0 %  (of one core, avg over 121 s)
+cpu rabbitmq                0.0 %  (of one core, avg over 121 s)
+2026-10-31T12:25:19.091-07:00  INFO 15986 --- [checkout-service] [scanlog-metrics] c.s.s.scanlog.ScanLogPublisher           : scan-log publisher | accepted=1013272 written=1013272 dropped=0 lost=0 | batches=1991 avgBatch=508 | queue depth=0 max=649 cap=65536 | lastSeq=1013272 | writeErrors=0 resyncs=0 synced=true
+2026-10-31T12:25:19.078-07:00  INFO 15986 --- [checkout-service] [   saga-metrics] c.s.s.transactions.SagaCounters          : saga | payments=96508 stockRetries=0 replayed=0 rolledBack=0 ambiguous=0 resolved=0 recovered=0 finishRetries=0 | stock call mean=119483us max=1693ms | haltHook=off
+2026-10-31T12:25:19.959-07:00  INFO 15992 --- [analytics-service] [ipeline-metrics] c.s.s.a.pipeline.AnalyticsPipeline       : analytics lag | lastSeq=1013272 | behind scan_log now=0 max=651 mean=225 scans | read lag mean=66 max=362 ms | gapStalls=0
+broker queues after the run (name messages consumers):
+  tx/s=803.6 tx=96508 items=1013272 wall=120.1s
+  START_TRANSACTION      ok=96508 err=0 mean=0.271 p50=0.181 p95=0.339 p99=0.560 max=193.2 ms
+  SCAN_ITEM              ok=1013272 err=0 mean=0.201 p50=0.162 p95=0.300 p99=0.440 max=164.0 ms
+  COMPLETE_TRANSACTION   ok=96508 err=0 mean=122.008 p50=98.171 p95=250.140 p99=378.170 max=1699.0 ms
+  stock commit timings | commits=96508 | mean lockWait=117873us criticalSection=1284us | implied ceiling if 66% of baskets share the hottest SKU: 1180 tx/s
+postgres: commit_delay=0 commit_siblings=5 fsync=on synchronous_commit=on
+disk free after: 7 GB
