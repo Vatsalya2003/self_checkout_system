@@ -1,1 +1,1 @@
-{"error":"SERVICE_UNAVAILABLE","message":"Inventory did not answer; the payment for transaction 5c36f485-f331-4f4b-9912-764e0b4f58c8 will complete shortly, check GET /transactions/5c36f485-f331-4f4b-9912-764e0b4f58c8"}
+{"error":"SERVICE_UNAVAILABLE","message":"Inventory did not answer; the payment for transaction e9051c2d-bf27-4f5c-9d3d-409c3c53577c will complete shortly, check GET /transactions/e9051c2d-bf27-4f5c-9d3d-409c3c53577c"}

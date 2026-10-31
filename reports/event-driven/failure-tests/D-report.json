@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-31T07:29:18.747686Z",
+  "generatedAt": "2026-10-31T19:36:00.206550Z",
   "config": {
     "baseUrl": "http://localhost:8080",
     "stations": 10,
@@ -7,50 +7,51 @@
     "minItems": 1,
     "maxItems": 20
   },
-  "wallClockSeconds": 15.018409292,
-  "totalTransactions": 4031,
-  "totalItemsScanned": 42623,
-  "transactionsPerSecond": 268.4039249181491,
-  "itemsPerSecond": 2838.0502336358886,
+  "wallClockSeconds": 15.011481333,
+  "totalTransactions": 7678,
+  "totalItemsScanned": 81054,
+  "transactionsPerSecond": 511.47517221510435,
+  "itemsPerSecond": 5399.467127992064,
   "operations": [
     {
       "operation": "START_TRANSACTION",
-      "successCount": 4051,
-      "errorCount": 1,
-      "errorRate": 2.4679170779861795E-4,
-      "meanMs": 0.8096145882498148,
-      "p50Ms": 0.283417,
-      "p95Ms": 1.831125,
-      "p99Ms": 4.455333,
-      "minMs": 0.11425,
-      "maxMs": 69.898875
+      "successCount": 7678,
+      "errorCount": 0,
+      "errorRate": 0.0,
+      "meanMs": 0.3666468252148997,
+      "p50Ms": 0.249166,
+      "p95Ms": 0.628917,
+      "p99Ms": 1.942708,
+      "minMs": 0.102792,
+      "maxMs": 34.81325
     },
     {
       "operation": "SCAN_ITEM",
-      "successCount": 42623,
-      "errorCount": 4,
-      "errorRate": 9.383723930841955E-5,
-      "meanMs": 0.42488500896229736,
-      "p50Ms": 0.2165,
-      "p95Ms": 1.398083,
-      "p99Ms": 2.629,
-      "minMs": 0.087125,
-      "maxMs": 75.955625
+      "successCount": 81054,
+      "errorCount": 0,
+      "errorRate": 0.0,
+      "meanMs": 0.26436239240506326,
+      "p50Ms": 0.208209,
+      "p95Ms": 0.483875,
+      "p99Ms": 1.495667,
+      "minMs": 0.076208,
+      "maxMs": 12.042
     },
     {
       "operation": "COMPLETE_TRANSACTION",
-      "successCount": 4031,
-      "errorCount": 16,
-      "errorRate": 0.003953545836422041,
-      "meanMs": 30.906497856363185,
-      "p50Ms": 18.191625,
-      "p95Ms": 100.740208,
-      "p99Ms": 211.184958,
-      "minMs": 2.421333,
-      "maxMs": 753.302209
+      "successCount": 7678,
+      "errorCount": 0,
+      "errorRate": 0.0,
+      "meanMs": 16.374973070330814,
+      "p50Ms": 13.127666,
+      "p95Ms": 38.393167,
+      "p99Ms": 67.911,
+      "minMs": 1.730708,
+      "maxMs": 165.633
     }
   ],
   "lowStockAlerts": [
+    {"sku": "SKU-000001", "name": "Item 1", "currentStock": 0, "threshold": 50}
   ],
   "popularItems": [
   ]

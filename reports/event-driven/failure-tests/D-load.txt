@@ -3,34 +3,6 @@ Self-Checkout Load Client starting...
 Fetching catalog...
 Catalog loaded: 2000 items.
 Starting 10 simulated station(s) for 15s...
-[station-004] transaction failed: Transport error calling http://localhost:8080/transactions/1a1a2f6c-7b59-41da-ac70-ca91d2944feb/complete: request timed out
-[station-005] transaction failed: Unexpected status 504 from http://localhost:8080/transactions/75f63263-9d2b-4631-839c-993a8286af42/complete: <html>
-<head><title>504 Gateway Time-out</title></head>
-<body>
-<center><h1>504 Gateway Time-out</h1></center>
-<hr><center>nginx/1.31.6</center>
-</body>
-</html>
-
-[station-003] transaction failed: Transport error calling http://localhost:8080/transactions/494720f7-921d-43d2-aad3-0aede809f14e/complete: request timed out
-[station-008] transaction failed: Transport error calling http://localhost:8080/transactions/4a404637-d831-478d-8cd3-1a25b62c85a0/complete: request timed out
-[station-006] transaction failed: Transport error calling http://localhost:8080/transactions/f8490086-f212-4105-978b-e253eceee332/complete: request timed out
-[station-007] transaction failed: Transport error calling http://localhost:8080/transactions/3eaf91da-e512-432d-b7bf-a590123ddf44/complete: request timed out
-[station-010] transaction failed: Transport error calling http://localhost:8080/transactions/942b94ad-bab9-4851-a2c7-79d116eb4b3c/complete: request timed out
-[station-001] transaction failed: Transport error calling http://localhost:8080/transactions/d72119cf-84cf-498f-8f2e-e20a21e42db3/complete: request timed out
-[station-002] transaction failed: Transport error calling http://localhost:8080/transactions/94adfae9-11da-47c6-aeb5-60a713590fbd/items: request timed out
-[station-004] transaction failed: Transport error calling http://localhost:8080/transactions: HTTP/1.1 header parser received no bytes
-[station-009] transaction failed: Transport error calling http://localhost:8080/transactions/640327ea-641a-47f3-9651-c55377e03d53/items: request timed out
-[station-007] transaction failed: Transport error calling http://localhost:8080/transactions/f3add13c-0222-4b10-9824-65b9131e8d5d/complete: request timed out
-[station-002] transaction failed: Transport error calling http://localhost:8080/transactions/9b12bad9-c5dc-457a-a824-b97f2bf9c684/complete: request timed out
-[station-005] transaction failed: Transport error calling http://localhost:8080/transactions/cbe5f3e7-1325-4b81-90b6-f743d62e2fdf/complete: request timed out
-[station-006] transaction failed: Transport error calling http://localhost:8080/transactions/7252e1e2-342b-4916-9e2d-53f18d6dec22/complete: request timed out
-[station-001] transaction failed: Transport error calling http://localhost:8080/transactions/26211e0f-b2b9-4a7e-8376-cfe91cc76054/complete: request timed out
-[station-003] transaction failed: Transport error calling http://localhost:8080/transactions/a8ef3916-5d79-4098-bf0a-2e7c0b1b450b/complete: request timed out
-[station-010] transaction failed: Transport error calling http://localhost:8080/transactions/33004f72-0583-44a6-b166-6ada1a2c24da/complete: request timed out
-[station-008] transaction failed: Transport error calling http://localhost:8080/transactions/88cef784-71e8-4419-935f-f81f4a38a88f/complete: request timed out
-[station-004] transaction failed: Transport error calling http://localhost:8080/transactions/9ae7d250-0a40-4311-bcee-e0a476122417/items: request timed out
-[station-009] transaction failed: Transport error calling http://localhost:8080/transactions/2ff374eb-6809-496e-aa7a-9a8ea7b2812c/items: request timed out
 Duration elapsed, waiting for in-flight transactions to finish...
 Fetching low-stock alerts and popular items...
 Could not fetch popular items: Unexpected status 502 from http://localhost:8080/analytics/popular-items?limit=10: <html>
@@ -46,19 +18,19 @@ Could not fetch popular items: Unexpected status 502 from http://localhost:8080/
 Base URL:        http://localhost:8080
 Stations:        10
 Duration:        15.0s (requested 15s)
-Transactions:    4031 (268.4/sec)
-Items scanned:   42623 (2838.1/sec)
+Transactions:    7678 (511.5/sec)
+Items scanned:   81054 (5399.5/sec)
 
 Operation                    OK   Errors   Mean(ms)    P50(ms)    P95(ms)    P99(ms)    Max(ms)     Err%
-START_TRANSACTION          4051        1       0.81       0.28       1.83       4.46      69.90    0.02%
-SCAN_ITEM                 42623        4       0.42       0.22       1.40       2.63      75.96    0.01%
-COMPLETE_TRANSACTION       4031       16      30.91      18.19     100.74     211.18     753.30    0.40%
+START_TRANSACTION          7678        0       0.37       0.25       0.63       1.94      34.81    0.00%
+SCAN_ITEM                 81054        0       0.26       0.21       0.48       1.50      12.04    0.00%
+COMPLETE_TRANSACTION       7678        0      16.37      13.13      38.39      67.91     165.63    0.00%
 
-Low-stock alerts (0):
-  (none)
+Low-stock alerts (1):
+  SKU-000001   Item 1                         stock=0      threshold=50
 
 Most popular items (top 0):
   (none)
 ===================================================
 
-JSON report written to: /Users/rohitdabhi/Desktop/ADV_SOFT_DEV/self-checkout/reports/event-driven/failure-tests/report-20261031-002918.json
+JSON report written to: /Users/rohitdabhi/Desktop/ADV_SOFT_DEV/self-checkout/reports/event-driven/failure-tests/report-20261031-123600.json

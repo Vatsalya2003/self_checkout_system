@@ -1,31 +1,31 @@
 == A  the broker stops and restarts during load (10 stations, 30 s)
      broker stopped at t=6 s
      broker started again after 7.5 s
-  load over 30 s: 8527 payments ok, errors start/scan/complete = 0/0/47
+  load over 30 s: 9206 payments ok, errors start/scan/complete = 0/0/43
   ok    client errors that were not a clean 503: 0
   ok    payments resumed after the broker came back (sales after restart > 0): 1
   ok    every unfinished payment was resolved (PENDING = 0)
-  publisher | accepted=90098 written=90098 dropped=0 lost=0 | batches=358 avgBatch=251 | queue depth=0 max=435 cap=65536 | writeErrors=8
-  ok    every accepted scan reached analytics (dropped=0 counted): 90098
-  stock-commit client | published=8831 notDelivered=264 unconfirmed=7 noReply=13 | replies=8560 stray=13 waiting=0
-  saga | payments=8527 stockRetries=237 replayed=13 rolledBack=27 ambiguous=20 resolved=20 recovered=0 finishRetries=0 | stock call mean=16065us max=2371ms | haltHook=off
+  publisher | accepted=97012 written=97012 dropped=0 lost=0 | batches=363 avgBatch=267 | queue depth=0 max=318 cap=65536 | writeErrors=8
+  ok    every accepted scan reached analytics (dropped=0 counted): 97012
+  stock-commit client | published=9476 notDelivered=234 unconfirmed=1 noReply=17 | replies=9242 stray=18 waiting=0
+  saga | payments=9206 stockRetries=209 replayed=17 rolledBack=25 ambiguous=18 resolved=18 recovered=0 finishRetries=0 | stock call mean=15270us max=2367ms | haltHook=off
   ok    cross-database invariant: PASS
   ok    dead-lettered messages (all DLQs): 0
 == B  inventory down during a payment
   ok    complete while inventory is down: 503
-     (answered after 5.1 s) message: Inventory did not answer; the payment for transaction 5c36f485-f331-4f4b-9912-764e0b4f58c8 will complete shortly, check GET /transactions/5c36f485-f331-4f4b-9912-764e0b4f58c8
+     (answered after 5.2 s) message: Inventory did not answer; the payment for transaction e9051c2d-bf27-4f5c-9d3d-409c3c53577c will complete shortly, check GET /transactions/e9051c2d-bf27-4f5c-9d3d-409c3c53577c
   ok    the request is waiting in the queue: yes
   ok    sale saved as PENDING (checkout_db): PENDING
   ok    a retry of complete meanwhile: 409
   ok    basket NOT reopened: a scan is refused: 409
   ok    stock untouched while inventory is down: 10000
   ok    after inventory returns, GET shows the real outcome: COMPLETED
-     (completed 0.6 s after inventory was started)
+     (completed 0.1 s after inventory was started)
   ok    stock commits for this transaction (inventory_db): 1
   ok    SKU-000020 taken exactly once: 9999
   ok    a retry now: 409
   stock-commit listener | requests=3 committed=1 replayed=2 rejected=0 dbRetries=0 replyRetries=0
-  saga | payments=0 stockRetries=1 replayed=0 rolledBack=0 ambiguous=1 resolved=1 recovered=0 finishRetries=0 | stock call mean=1997612us max=1997ms | haltHook=off
+  saga | payments=0 stockRetries=1 replayed=1 rolledBack=0 ambiguous=1 resolved=1 recovered=0 finishRetries=0 | stock call mean=2094635us max=2094ms | haltHook=off
   ok    cross-database invariant: PASS
   ok    dead-lettered messages (all DLQs): 0
 == C  checkout crashes after inventory's commit, before its own write
@@ -37,17 +37,18 @@
   ok    after restart, recovery finished the sale: COMPLETED
   ok    applied quantities recorded: SKU-000030=2,SKU-000031=1
   ok    still exactly one stock commit: 1
-  log: recovery: 1 payment(s) were in progress when the previous process stopped: [730d0e39-54f7-4508-8381-5a5081ce9f47]
-  saga | payments=0 stockRetries=0 replayed=1 rolledBack=0 ambiguous=0 resolved=1 recovered=1 finishRetries=0 | stock call mean=17481us max=17ms | haltHook=off
+  log: recovery: 1 payment(s) were in progress when the previous process stopped: [e6fd299f-c138-4d68-90ff-896c724ea479]
+  saga | payments=0 stockRetries=0 replayed=1 rolledBack=0 ambiguous=0 resolved=1 recovered=1 finishRetries=0 | stock call mean=21703us max=21ms | haltHook=off
   ok    cross-database invariant: PASS
   ok    dead-lettered messages (all DLQs): 0
 == D  analytics down under load (10 stations, 15 s)
-  load without analytics: 268.4 tx/s, 21 errors on start/scan/complete
-     waiting in analytics.scans: 252 batches; scan_log rows: 0
-  publisher | accepted=42623 written=42623 dropped=0 lost=0 | batches=252 avgBatch=169 | queue depth=0 max=102 cap=65536 | writeErrors=0
-  ok    every accepted scan reached analytics (dropped=0 counted): 42623
+  load without analytics: 511.5 tx/s, 0 errors on start/scan/complete
+  ok    client errors while analytics is down (checkout must be unaffected): 0
+     waiting in analytics.scans: 289 batches; scan_log rows: 0
+  publisher | accepted=81054 written=81054 dropped=0 lost=0 | batches=289 avgBatch=280 | queue depth=0 max=42 cap=65536 | writeErrors=0
+  ok    every accepted scan reached analytics (dropped=0 counted): 81054
   ok    scan_log gapless: 0
-  scan ingest | batches=252 stored=42623 duplicates=0 rejected=0 dbRetries=0 lastSeq=42623
+  scan ingest | batches=289 stored=81054 duplicates=0 rejected=0 dbRetries=0 lastSeq=81054
   ok    cross-database invariant: PASS
   ok    dead-lettered messages (all DLQs): 0
 == E  a duplicated message is harmless
@@ -72,16 +73,16 @@
 == F  publisher confirm times out (broker blocks publishers: disk alarm)
      disk alarm raised: the broker accepts connections but stops reading published messages
   ok    complete while the broker gives no confirm: 503
-     (answered after 3.3 s) message: Inventory did not answer; the payment for transaction 6fd3f8aa-1933-466b-9a84-fc7f3c114223 will complete shortly, check GET /transactions/6fd3f8aa-1933-466b-9a84-fc7f3c114223
+     (answered after 3.3 s) message: Inventory did not answer; the payment for transaction 03aa6ff6-381f-465a-afe5-bf4048005cfd will complete shortly, check GET /transactions/03aa6ff6-381f-465a-afe5-bf4048005cfd
   ok    sale PENDING: possibly delivered, so not undone: PENDING
   ok    basket NOT reopened: a scan is refused: 409
   client | published=3 notDelivered=0 unconfirmed=2 noReply=0 | replies=0 stray=0 waiting=1
   ok    attempts classified as unconfirmed (no confirm), not as not-delivered: yes
   ok    after the alarm clears, the resolver finished the sale: COMPLETED
-     (completed 0.6 s after the alarm cleared)
+     (completed 0.7 s after the alarm cleared)
   ok    stock taken exactly once: 9999
   ok    one stock commit: 1
-  saga | payments=0 stockRetries=8 replayed=1 rolledBack=0 ambiguous=1 resolved=1 recovered=0 finishRetries=0 | stock call mean=604499us max=604ms | haltHook=off
+  saga | payments=0 stockRetries=8 replayed=1 rolledBack=0 ambiguous=1 resolved=1 recovered=0 finishRetries=0 | stock call mean=546324us max=546ms | haltHook=off
   ok    cross-database invariant: PASS
   ok    dead-lettered messages (all DLQs): 0
 == G  internal endpoints are gone
@@ -91,10 +92,10 @@
   ok    ...and directly on analytics' port: 404
   ok    GET /internal/scans/max-seq on analytics' port: 404
 == H  no service-to-service HTTP (after 5 s of load)
-  catalog-service    postgres=1   rabbitmq=1   inbound-on-:8081=2   other=none
+  catalog-service    postgres=1   rabbitmq=1   inbound-on-:8081=1   other=none
   checkout-service   postgres=10  rabbitmq=1   inbound-on-:8082=10  other=none
-  inventory-service  postgres=15  rabbitmq=1   inbound-on-:8083=1   other=none
-  analytics-service  postgres=3   rabbitmq=1   inbound-on-:8084=1   other=none
+  inventory-service  postgres=16  rabbitmq=1   inbound-on-:8083=1   other=none
+  analytics-service  postgres=2   rabbitmq=1   inbound-on-:8084=1   other=none
   PASS: every service connects only to its database and the broker
   ok    check-connections.sh: PASS
 

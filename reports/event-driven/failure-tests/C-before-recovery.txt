@@ -8,8 +8,8 @@
   ok    sale lines with no matching stock-commit line                  0
   FAIL  stock-commit lines with no matching sale line                  2 (expected 0)
   first differences (< checkout only, > inventory only):
-    > 730d0e39-54f7-4508-8381-5a5081ce9f47|SKU-000030|2|2
-    > 730d0e39-54f7-4508-8381-5a5081ce9f47|SKU-000031|1|1
+    > e6fd299f-c138-4d68-90ff-896c724ea479|SKU-000030|2|2
+    > e6fd299f-c138-4d68-90ff-896c724ea479|SKU-000031|1|1
      (lines compared: 0 in checkout, 2 in inventory)
 == popularity windows (analytics_db)
   ok    scan_log gaps (max(seq) - count)                               0
