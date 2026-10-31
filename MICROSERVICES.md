@@ -1,5 +1,9 @@
 # Microservices (Week 5)
 
+> **Since Week 6** the services, their databases and the saga's steps are unchanged, but the
+> services no longer call each other over HTTP: every cross-service message goes through
+> RabbitMQ. See [EVENTS.md](EVENTS.md). The HTTP calls below describe Week 5.
+
 The self-checkout system is four **independently deployable microservices**:
 - **Own database:** each service has its own database, which only its own PostgreSQL role can open.
 - **Own process:** each service is its own Spring Boot jar, JVM process and port.
@@ -19,7 +23,7 @@ The OpenAPI contract and the load client are unchanged. The 29-response golden d
 
 The four databases are on one PostgreSQL server. `db/reset.sh` creates them, revokes `CONNECT` from `PUBLIC`, and grants each one to a single role (`catalog_svc`, `checkout_svc`, `inventory_svc`, `analytics_svc`). A service cannot even open another service's database, so no service can read another's tables.
 
-## How the services communicate
+## How the services communicate (Week 5; replaced by events in Week 6)
 
 A service gets data it doesn't own by asking the owner over HTTP, directly on the owner's port:
 

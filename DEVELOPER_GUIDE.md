@@ -1,4 +1,4 @@
-# Developer Guide — Self-Checkout: Microservices, Each With Its Own Database
+# Developer Guide — Self-Checkout: Event-Driven Microservices
 
 A walkthrough of the whole project: what it does, how it is built, why each
 decision was made, and how to run and explain it.
@@ -17,9 +17,132 @@ numbers — it explains the *machinery* that produced them.
 
 ---
 
+## Week 6: every cross-service message through RabbitMQ
+
+**Read this first.** Since Week 6 the four microservices **never call each other over HTTP**.
+Everything one service says to another is a message through **RabbitMQ**. Each service
+still has its own database, and nginx on `:8080` still gives the load client one base URL.
+[EVENTS.md](EVENTS.md) is the one-page summary.
+
+The Week 5 section below still describes the data each service owns and the payment saga's
+steps. What changed is the **transport** between the services, and this section covers it.
+
+### What moved where (Week 5 → Week 6)
+
+| Communication | Week 5 (direct HTTP) | Week 6 (RabbitMQ) |
+|---|---|---|
+| catalog for prices and names | `GET /items` on catalog, at startup (`HttpCatalogCache`) | `CatalogRequested` → `catalog.requests`; catalog broadcasts `CatalogPublished` on the `catalog.snapshots` fanout (`BrokerCatalogCache`) |
+| the saga's pivot | `POST /internal/stock/commit` (`HttpInventoryClient`) | `StockCommitRequested` → `inventory.stock-commit` (`BrokerInventoryClient`); inventory's `StockCommitListener` answers `StockCommitted` / `StockCommitRejected` on `checkout.stock-replies` |
+| scans | checkout numbered them and `POST /internal/scans` (`HttpScanSink`) | `ScansRecorded {batchId}` → `analytics.scans` (`BrokerScanSink`); analytics' `ScanBatchListener` **numbers** them as it stores them |
+| where numbering continues | `GET /internal/scans/max-seq` | gone: analytics owns the numbering |
+| `/internal/**` endpoints | three, blocked at nginx | **none**; nginx still blocks the path |
+
+### Repository layout (changes only)
+
+```
+messaging/                 NEW library: Events (the records), Topology (queue names),
+                           MessagingConfig (queues, DLQs, JSON converter),
+                           ConfirmedPublisher, DeadLetterMonitor
+catalog-client/            BrokerCatalogCache replaces HttpCatalogCache
+catalog-service/           api/CatalogEventsListener: answers CatalogRequested
+checkout-service/          remote/BrokerInventoryClient, remote/BrokerScanSink
+inventory-service/         api/StockCommitListener replaces InternalStockController
+analytics-service/         api/ScanBatchListener replaces InternalScanController;
+                           db/analytics/schema.sql adds scan_batches
+scripts/                   check-connections.sh (no service-to-service HTTP),
+                           test-failures.sh rewritten for the broker
+```
+
+### File tour
+
+| Module | Files worth opening first |
+|---|---|
+| **messaging** | `ConfirmedPublisher`: publish, wait for the confirm, and sort the result into *confirmed / not delivered / uncertain*, the saga's safety in one class. `MessagingConfig`: every queue, its DLQ, the JSON converter. `Events`: the six message types. |
+| **checkout-service** | `remote/BrokerInventoryClient`: one attempt at the pivot (publish, confirm, wait for the reply under the transaction id) and how each outcome maps onto Week 5's `StockCommitOutcome`. `scanlog/ScanLogPublisher`: batches with a fixed `batchId`, re-sent until confirmed. `TransactionService`, `PaymentSaga` and `SagaResolver` are unchanged apart from comments. |
+| **inventory-service** | `api/StockCommitListener`: commit (the unchanged `StockCommitService`), publish the reply, *then* ack. |
+| **analytics-service** | `api/ScanBatchListener` (one consumer, retries database errors forever), `analytics/ScanIngestService` (numbering under an advisory lock, `batchId` dedupe), `persistence/JdbcScanStore`. |
+| **catalog** | `catalog-service/api/CatalogEventsListener`, `catalog-client/remote/BrokerCatalogCache`. |
+
+### One payment over events
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant S as Station (via nginx)
+    participant C as checkout-service
+    participant CD as checkout_db
+    participant Q as RabbitMQ
+    participant I as inventory-service
+    participant ID as inventory_db
+    S->>C: POST /transactions/{id}/complete
+    C->>C: claim basket OPEN -> COMPLETING (memory)
+    C->>CD: tx A: INSERT transactions (PENDING) + transaction_items
+    C->>Q: StockCommitRequested -> inventory.stock-commit (persistent)
+    Q-->>C: publisher confirm
+    Q->>I: deliver (one of 32 consumers)
+    I->>ID: claim id, lock in SKU order, clamp, decrement, record lines + alerts, COMMIT
+    I->>Q: StockCommitted -> checkout.stock-replies (confirmed)
+    I-->>Q: ack the request (only now)
+    Q->>C: deliver the reply; completes the waiting future
+    C->>CD: tx B: applied_quantity, status COMPLETED
+    C-->>S: 200 receipt
+```
+
+What happens when the pivot fails depends on what checkout knows (`ConfirmedPublisher`,
+`BrokerInventoryClient`):
+
+| The request... | Checkout does | Client sees |
+|---|---|---|
+| certainly never reached a queue (no broker connection, nack, unroutable) | deletes the PENDING rows, reopens the basket | **503**, `Retry-After: 1`; can pay again |
+| may be in the queue (no confirm in time), or is in it but no reply came (e.g. inventory down) | keeps the basket closed; `SagaResolver` re-sends the same request until inventory answers, then runs tx B | **503**, then **409** on a retry; `GET` shows **COMPLETED** once resolved |
+| was answered, but checkout died before tx B | (on restart) `SagaResolver` re-sends it for the PENDING row; inventory replays its stored answer | the sale appears as COMPLETED |
+
+### One scan over events
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant S as Station
+    participant C as checkout-service
+    participant W as queue + writer thread (checkout)
+    participant Q as RabbitMQ analytics.scans
+    participant A as analytics-service (1 consumer)
+    participant L as analytics_db
+    S->>C: POST /transactions/{id}/items
+    C->>W: offer(sku), at most 10 ms (drop + count if full)
+    C-->>S: 200 (never waits for analytics or the broker)
+    W->>W: collect up to 1,000 or 50 ms; fixed batchId
+    W->>Q: ScansRecorded {batchId, scans} (re-sent until confirmed)
+    Q->>A: deliver, in publish order
+    A->>L: lock numbering; claim batchId in scan_batches; INSERT scan_log seq = MAX+1..; COMMIT
+    A-->>Q: ack (only after commit)
+    Note over A,L: ScanLogPoller -> window -> rank -> sink, unchanged
+```
+
+### Running it
+
+```bash
+brew services start rabbitmq        # once; start-all.sh also starts it if it is down
+db/reset.sh                         # all four databases AND the broker's queues
+scripts/start-all.sh --build        # broker check, catalog, the others, then nginx
+# ... load client against http://localhost:8080 ...
+scripts/check-invariant-micro.sh    # stock, both databases agree, gapless scans, windows
+scripts/check-connections.sh        # each service talks only to its database and the broker
+scripts/stop-all.sh
+```
+
+**What to watch in the logs during a run:**
+- **checkout:** `stock-commit client | published= notDelivered= unconfirmed= noReply= | replies= stray=` and `scan-log publisher | …`;
+- **inventory:** `stock-commit listener | requests= committed= replayed= …`;
+- **analytics:** `scan ingest | batches= stored= duplicates= …`;
+- **every service:** `dead letters | <queue>.dlq=0`;
+- **the broker itself:** `rabbitmqctl list_queues name messages consumers`.
+
+---
+
 ## Week 5: four microservices, four databases
 
-**Read this first.** Since Week 5 the system is **four microservices**. Each has its own
+*(Week 5: until Week 6 the services reached each other over direct HTTP, as described here; the transport is now RabbitMQ, see above.)* Since Week 5 the system is **four microservices**. Each has its own
 Maven module, jar, process, port and **its own database**, which only its own PostgreSQL role
 can open. An nginx gateway on `:8080` gives clients one base URL.
 [MICROSERVICES.md](MICROSERVICES.md) is the one-page summary.
