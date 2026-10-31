@@ -1,0 +1,421 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Self-Checkout: Event-Driven Microservices",
+    "locale": "en",
+    "quality_profile": "standard",
+    "viewBox": [
+      1460,
+      910
+    ]
+  },
+  "components": [
+    {
+      "id": "client",
+      "type": "external",
+      "label": "Load client",
+      "sublabel": "one base URL",
+      "pos": [
+        1330,
+        520
+      ],
+      "size": [
+        110,
+        64
+      ]
+    },
+    {
+      "id": "gateway",
+      "type": "cloud",
+      "label": "nginx gateway",
+      "sublabel": ":8080 · /internal/** = 404",
+      "pos": [
+        1130,
+        520
+      ],
+      "size": [
+        160,
+        64
+      ]
+    },
+    {
+      "id": "catalog",
+      "type": "backend",
+      "label": "catalog-service",
+      "sublabel": ":8081 · GET /items",
+      "pos": [
+        820,
+        60
+      ],
+      "size": [
+        220,
+        64
+      ]
+    },
+    {
+      "id": "inventory",
+      "type": "backend",
+      "label": "inventory-service",
+      "sublabel": ":8083 · /inventory/low-stock",
+      "pos": [
+        820,
+        270
+      ],
+      "size": [
+        220,
+        64
+      ]
+    },
+    {
+      "id": "checkout",
+      "type": "backend",
+      "label": "checkout-service",
+      "sublabel": ":8082 · /transactions/**",
+      "pos": [
+        820,
+        500
+      ],
+      "size": [
+        220,
+        100
+      ],
+      "tag": "saga orchestrator"
+    },
+    {
+      "id": "analytics",
+      "type": "backend",
+      "label": "analytics-service",
+      "sublabel": ":8084 · /analytics/popular-items",
+      "pos": [
+        820,
+        750
+      ],
+      "size": [
+        220,
+        64
+      ]
+    },
+    {
+      "id": "catdb",
+      "type": "database",
+      "label": "catalog_db",
+      "sublabel": "items",
+      "pos": [
+        840,
+        150
+      ],
+      "size": [
+        180,
+        44
+      ]
+    },
+    {
+      "id": "invdb",
+      "type": "database",
+      "label": "inventory_db",
+      "sublabel": "stock · alerts · commits",
+      "pos": [
+        840,
+        360
+      ],
+      "size": [
+        180,
+        44
+      ]
+    },
+    {
+      "id": "codb",
+      "type": "database",
+      "label": "checkout_db",
+      "sublabel": "transactions · lines",
+      "pos": [
+        840,
+        626
+      ],
+      "size": [
+        180,
+        44
+      ]
+    },
+    {
+      "id": "andb",
+      "type": "database",
+      "label": "analytics_db",
+      "sublabel": "scan_log · scan_batches",
+      "pos": [
+        840,
+        840
+      ],
+      "size": [
+        180,
+        44
+      ]
+    },
+    {
+      "id": "qreq",
+      "type": "messagebus",
+      "label": "catalog.requests",
+      "sublabel": "queue",
+      "pos": [
+        60,
+        90
+      ],
+      "size": [
+        210,
+        56
+      ]
+    },
+    {
+      "id": "xsnap",
+      "type": "messagebus",
+      "label": "catalog.snapshots",
+      "sublabel": "fanout exchange",
+      "pos": [
+        400,
+        90
+      ],
+      "size": [
+        220,
+        56
+      ]
+    },
+    {
+      "id": "qstock",
+      "type": "messagebus",
+      "label": "inventory.stock-commit",
+      "sublabel": "queue · 32 consumers",
+      "pos": [
+        340,
+        380
+      ],
+      "size": [
+        220,
+        50
+      ]
+    },
+    {
+      "id": "qreply",
+      "type": "messagebus",
+      "label": "checkout.stock-replies",
+      "sublabel": "queue",
+      "pos": [
+        340,
+        450
+      ],
+      "size": [
+        220,
+        50
+      ]
+    },
+    {
+      "id": "qscans",
+      "type": "messagebus",
+      "label": "analytics.scans",
+      "sublabel": "queue · 1 consumer",
+      "pos": [
+        340,
+        665
+      ],
+      "size": [
+        220,
+        50
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "RabbitMQ :5672 (durable queues, persistent messages)",
+      "wraps": [
+        "qreq",
+        "xsnap",
+        "qstock",
+        "qreply",
+        "qscans"
+      ],
+      "pad": 20
+    }
+  ],
+  "connections": [
+    {
+      "id": "client-gw",
+      "from": "client",
+      "to": "gateway",
+      "label": "HTTP",
+      "variant": "emphasis"
+    },
+    {
+      "id": "gw-catalog",
+      "from": "gateway",
+      "to": "catalog"
+    },
+    {
+      "id": "gw-inventory",
+      "from": "gateway",
+      "to": "inventory"
+    },
+    {
+      "id": "gw-checkout",
+      "from": "gateway",
+      "to": "checkout",
+      "variant": "emphasis"
+    },
+    {
+      "id": "gw-analytics",
+      "from": "gateway",
+      "to": "analytics"
+    },
+    {
+      "id": "catalog-db",
+      "from": "catalog",
+      "to": "catdb",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "inventory-db",
+      "from": "inventory",
+      "to": "invdb",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "checkout-db",
+      "from": "checkout",
+      "to": "codb",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "analytics-db",
+      "from": "analytics",
+      "to": "andb",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "pub-stock",
+      "from": "checkout",
+      "to": "qstock",
+      "label": "StockCommitRequested",
+      "variant": "emphasis",
+      "labelAt": [
+        640,
+        398
+      ]
+    },
+    {
+      "id": "sub-stock",
+      "from": "qstock",
+      "to": "inventory"
+    },
+    {
+      "id": "pub-reply",
+      "from": "inventory",
+      "to": "qreply",
+      "label": "StockCommitted / Rejected"
+    },
+    {
+      "id": "sub-reply",
+      "from": "qreply",
+      "to": "checkout"
+    },
+    {
+      "id": "pub-scans",
+      "from": "checkout",
+      "to": "qscans",
+      "label": "ScansRecorded"
+    },
+    {
+      "id": "sub-scans",
+      "from": "qscans",
+      "to": "analytics"
+    },
+    {
+      "id": "req-co",
+      "from": "checkout",
+      "to": "qreq",
+      "label": "CatalogRequested",
+      "variant": "dashed"
+    },
+    {
+      "id": "req-in",
+      "from": "inventory",
+      "to": "qreq",
+      "variant": "dashed"
+    },
+    {
+      "id": "req-an",
+      "from": "analytics",
+      "to": "qreq",
+      "variant": "dashed"
+    },
+    {
+      "id": "sub-req",
+      "from": "qreq",
+      "to": "catalog",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "top"
+    },
+    {
+      "id": "pub-snap",
+      "from": "catalog",
+      "to": "xsnap",
+      "label": "CatalogPublished",
+      "variant": "dashed"
+    },
+    {
+      "id": "snap-co",
+      "from": "xsnap",
+      "to": "checkout",
+      "variant": "dashed"
+    },
+    {
+      "id": "snap-in",
+      "from": "xsnap",
+      "to": "inventory",
+      "variant": "dashed"
+    },
+    {
+      "id": "snap-an",
+      "from": "xsnap",
+      "to": "analytics",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Own data store each",
+      "items": [
+        "four databases on one PostgreSQL server",
+        "a role can open its own database only",
+        "no service calls another: only the broker"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Events through RabbitMQ",
+      "items": [
+        "payment: StockCommitRequested -> StockCommitted",
+        "scans: ScansRecorded batches, numbered by analytics",
+        "startup: CatalogRequested -> CatalogPublished (fanout)"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Saga over events",
+      "items": [
+        "checkout orchestrates; ack only after commit + reply",
+        "idempotent on transaction id and batch id",
+        "not queued: 503 + reopen; maybe queued: resolver"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,302 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Scan Hand-off Over Events: checkout → RabbitMQ → analytics",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1340,
+      560
+    ]
+  },
+  "components": [
+    {
+      "id": "scan",
+      "type": "external",
+      "label": "Scan",
+      "sublabel": "POST …/items",
+      "pos": [
+        20,
+        110
+      ],
+      "size": [
+        130,
+        64
+      ]
+    },
+    {
+      "id": "writer",
+      "type": "backend",
+      "label": "Batching writer",
+      "sublabel": "fixed batchId, one thread",
+      "pos": [
+        230,
+        110
+      ],
+      "size": [
+        180,
+        64
+      ],
+      "tag": "queue 65,536"
+    },
+    {
+      "id": "ingest",
+      "type": "backend",
+      "label": "Scan ingest",
+      "sublabel": "numbers seq = MAX+1",
+      "pos": [
+        720,
+        110
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "scanlog",
+      "type": "database",
+      "label": "scan_log",
+      "sublabel": "analytics_db · seq 1..K",
+      "pos": [
+        930,
+        110
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "poller",
+      "type": "backend",
+      "label": "ScanLogPoller",
+      "sublabel": "stalls on a gap",
+      "pos": [
+        1150,
+        110
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "window",
+      "type": "backend",
+      "label": "Window",
+      "sublabel": "last 1,000 scans",
+      "pos": [
+        1150,
+        360
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "rank",
+      "type": "backend",
+      "label": "Rank",
+      "sublabel": "top 10, ties by SKU",
+      "pos": [
+        930,
+        360
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "sink",
+      "type": "backend",
+      "label": "Sink",
+      "sublabel": "batched writes",
+      "pos": [
+        720,
+        360
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "snapshots",
+      "type": "database",
+      "label": "popular_snapshots",
+      "sublabel": "analytics_db",
+      "pos": [
+        460,
+        360
+      ],
+      "size": [
+        190,
+        64
+      ]
+    },
+    {
+      "id": "reader",
+      "type": "external",
+      "label": "GET /analytics/popular-items",
+      "sublabel": "via the gateway",
+      "pos": [
+        10,
+        470
+      ],
+      "size": [
+        230,
+        56
+      ]
+    },
+    {
+      "id": "queue",
+      "type": "messagebus",
+      "label": "analytics.scans",
+      "sublabel": "RabbitMQ · 1 consumer",
+      "pos": [
+        480,
+        110
+      ],
+      "size": [
+        180,
+        64
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "checkout-service :8082",
+      "wraps": [
+        "writer"
+      ],
+      "pad": 22
+    },
+    {
+      "kind": "region",
+      "label": "analytics-service :8084",
+      "wraps": [
+        "ingest",
+        "scanlog",
+        "poller",
+        "window",
+        "rank",
+        "sink"
+      ],
+      "pad": 22
+    }
+  ],
+  "connections": [
+    {
+      "id": "scan-writer",
+      "from": "scan",
+      "to": "writer",
+      "label": "offer ≤10 ms",
+      "variant": "emphasis"
+    },
+    {
+      "id": "writer-queue",
+      "from": "writer",
+      "to": "queue",
+      "label": "ScansRecorded (confirmed)",
+      "variant": "emphasis",
+      "labelAt": [
+        445,
+        198
+      ]
+    },
+    {
+      "id": "queue-ingest",
+      "from": "queue",
+      "to": "ingest",
+      "label": "deliver in order",
+      "labelAt": [
+        690,
+        198
+      ]
+    },
+    {
+      "id": "ingest-log",
+      "from": "ingest",
+      "to": "scanlog",
+      "label": "INSERT",
+      "variant": "emphasis"
+    },
+    {
+      "id": "log-poller",
+      "from": "scanlog",
+      "to": "poller",
+      "label": "seq > last"
+    },
+    {
+      "id": "poller-window",
+      "from": "poller",
+      "to": "window",
+      "label": "in seq order",
+      "labelAt": [
+        1225,
+        267
+      ]
+    },
+    {
+      "id": "window-rank",
+      "from": "window",
+      "to": "rank",
+      "label": "every 500th"
+    },
+    {
+      "id": "rank-sink",
+      "from": "rank",
+      "to": "sink",
+      "label": "top 10"
+    },
+    {
+      "id": "sink-snap",
+      "from": "sink",
+      "to": "snapshots",
+      "label": "INSERT"
+    },
+    {
+      "id": "snap-reader",
+      "from": "snapshots",
+      "to": "reader",
+      "label": "latest",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "right"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Gapless, no duplicates",
+      "items": [
+        "analytics numbers seq in the same transaction",
+        "a redelivered batch hits its batchId and is skipped",
+        "acked only after the commit"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Never blocks a customer",
+      "items": [
+        "the scan only offers to a bounded queue",
+        "full queue: dropped and counted",
+        "broker or analytics down: checkout keeps serving"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Restart-safe",
+      "items": [
+        "unconfirmed batch re-sent with the same batchId",
+        "batches wait in the durable queue",
+        "analytics reloads its window from scan_log"
+      ]
+    }
+  ]
+}

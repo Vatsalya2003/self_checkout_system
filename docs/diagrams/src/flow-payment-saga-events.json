@@ -1,0 +1,220 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Paying: a Saga Over Events",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "viewBox": [
+      1080,
+      800
+    ],
+    "legend": {
+      "mode": "hidden"
+    }
+  },
+  "participants": [
+    {
+      "id": "station",
+      "type": "external",
+      "label": "Station",
+      "sublabel": "via nginx :8080"
+    },
+    {
+      "id": "checkout",
+      "type": "backend",
+      "label": "checkout-service",
+      "sublabel": "orchestrator"
+    },
+    {
+      "id": "codb",
+      "type": "database",
+      "label": "checkout_db",
+      "sublabel": "sales"
+    },
+    {
+      "id": "broker",
+      "type": "messagebus",
+      "label": "RabbitMQ",
+      "sublabel": "durable queues"
+    },
+    {
+      "id": "inventory",
+      "type": "backend",
+      "label": "inventory-service",
+      "sublabel": "32 consumers"
+    },
+    {
+      "id": "invdb",
+      "type": "database",
+      "label": "inventory_db",
+      "sublabel": "stock"
+    }
+  ],
+  "segments": [
+    {
+      "from": 176,
+      "to": 252,
+      "label": "Before the pivot: nothing irreversible"
+    },
+    {
+      "from": 290,
+      "to": 578,
+      "label": "The pivot: a request event, inventory's own transaction, a reply event"
+    },
+    {
+      "from": 616,
+      "to": 706,
+      "label": "After the pivot: forward only"
+    }
+  ],
+  "messages": [
+    {
+      "id": "pay",
+      "from": "station",
+      "to": "checkout",
+      "y": 196,
+      "label": "POST …/complete (basket claimed in memory)",
+      "variant": "emphasis"
+    },
+    {
+      "id": "txa",
+      "from": "checkout",
+      "to": "codb",
+      "y": 224,
+      "label": "tx A: INSERT sale PENDING + lines"
+    },
+    {
+      "id": "req",
+      "from": "checkout",
+      "to": "broker",
+      "y": 310,
+      "label": "StockCommitRequested → inventory.stock-commit",
+      "variant": "emphasis"
+    },
+    {
+      "id": "conf",
+      "from": "broker",
+      "to": "checkout",
+      "y": 338,
+      "label": "publisher confirm",
+      "variant": "return"
+    },
+    {
+      "id": "deliver",
+      "from": "broker",
+      "to": "inventory",
+      "y": 366,
+      "label": "deliver"
+    },
+    {
+      "id": "claim",
+      "from": "inventory",
+      "to": "invdb",
+      "y": 394,
+      "label": "claim transaction id"
+    },
+    {
+      "id": "lock",
+      "from": "inventory",
+      "to": "invdb",
+      "y": 422,
+      "label": "SELECT … FOR NO KEY UPDATE",
+      "variant": "security"
+    },
+    {
+      "id": "dec",
+      "from": "inventory",
+      "to": "invdb",
+      "y": 450,
+      "label": "clamp, decrement"
+    },
+    {
+      "id": "rec",
+      "from": "inventory",
+      "to": "invdb",
+      "y": 478,
+      "label": "record lines + low-stock alerts, COMMIT"
+    },
+    {
+      "id": "reply",
+      "from": "inventory",
+      "to": "broker",
+      "y": 506,
+      "label": "StockCommitted → checkout.stock-replies",
+      "variant": "emphasis"
+    },
+    {
+      "id": "ack",
+      "from": "inventory",
+      "to": "broker",
+      "y": 534,
+      "label": "ack the request (only now)",
+      "variant": "dashed"
+    },
+    {
+      "id": "back",
+      "from": "broker",
+      "to": "checkout",
+      "y": 562,
+      "label": "reply, matched by transactionId",
+      "variant": "return"
+    },
+    {
+      "id": "txb",
+      "from": "checkout",
+      "to": "codb",
+      "y": 636,
+      "label": "tx B: applied quantities, COMPLETED"
+    },
+    {
+      "id": "receipt",
+      "from": "checkout",
+      "to": "station",
+      "y": 664,
+      "label": "200 receipt",
+      "variant": "return"
+    },
+    {
+      "id": "unknown",
+      "from": "checkout",
+      "to": "station",
+      "y": 692,
+      "label": "or 503 if not queued / no reply",
+      "variant": "dashed"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "checkout",
+      "from": 196,
+      "to": 698,
+      "type": "backend"
+    },
+    {
+      "participant": "codb",
+      "from": 219,
+      "to": 230,
+      "type": "database"
+    },
+    {
+      "participant": "inventory",
+      "from": 366,
+      "to": 540,
+      "type": "backend"
+    },
+    {
+      "participant": "invdb",
+      "from": 389,
+      "to": 484,
+      "type": "database"
+    },
+    {
+      "participant": "codb",
+      "from": 631,
+      "to": 642,
+      "type": "database"
+    }
+  ]
+}
