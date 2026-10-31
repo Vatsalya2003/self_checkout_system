@@ -32,6 +32,7 @@
 	<packaging>pom</packaging>
 
 	<modules>
+		<module>messaging</module>
 		<module>catalog-client</module>
 		<module>shared-web</module>
 		<module>catalog-service</module>
@@ -52,6 +53,11 @@
 			<dependency>
 				<groupId>com.selfcheckout</groupId>
 				<artifactId>catalog-client</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.selfcheckout</groupId>
+				<artifactId>messaging</artifactId>
 				<version>${project.version}</version>
 			</dependency>
 			<dependency>
