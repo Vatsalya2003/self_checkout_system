@@ -1,0 +1,84 @@
+Self-Checkout Load Client starting...
+  baseUrl=http://localhost:8080 stations=10 duration=30s basket=[1..20]
+Fetching catalog...
+Catalog loaded: 2000 items.
+Starting 10 simulated station(s) for 30s...
+[station-001] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/a9344a3b-3f9d-40d2-8fc3-3100c6c09114/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory did not answer; the payment for transaction a9344a3b-3f9d-40d2-8fc3-3100c6c09114 will complete shortly, check GET /transactions/a9344a3b-3f9d-40d2-8fc3-3100c6c09114"}
+[station-008] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/76fb0f37-dd32-499a-beb3-ada29ea088cf/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory did not answer; the payment for transaction 76fb0f37-dd32-499a-beb3-ada29ea088cf will complete shortly, check GET /transactions/76fb0f37-dd32-499a-beb3-ada29ea088cf"}
+[station-002] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/b0767b56-ef09-4c33-a966-812cfe9d6d36/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory did not answer; the payment for transaction b0767b56-ef09-4c33-a966-812cfe9d6d36 will complete shortly, check GET /transactions/b0767b56-ef09-4c33-a966-812cfe9d6d36"}
+[station-003] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/ccd2fc31-cbdd-43d3-95fe-58c5500d220c/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory did not answer; the payment for transaction ccd2fc31-cbdd-43d3-95fe-58c5500d220c will complete shortly, check GET /transactions/ccd2fc31-cbdd-43d3-95fe-58c5500d220c"}
+[station-004] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/fc8f4019-6192-4ce8-91c4-dba5bcb288cf/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory did not answer; the payment for transaction fc8f4019-6192-4ce8-91c4-dba5bcb288cf will complete shortly, check GET /transactions/fc8f4019-6192-4ce8-91c4-dba5bcb288cf"}
+[station-007] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/942b1340-e680-4c93-82a7-cb9e57fc91d0/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory did not answer; the payment for transaction 942b1340-e680-4c93-82a7-cb9e57fc91d0 will complete shortly, check GET /transactions/942b1340-e680-4c93-82a7-cb9e57fc91d0"}
+[station-005] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/7b461c08-2c0e-4870-82f1-eb97ebb4bc17/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory did not answer; the payment for transaction 7b461c08-2c0e-4870-82f1-eb97ebb4bc17 will complete shortly, check GET /transactions/7b461c08-2c0e-4870-82f1-eb97ebb4bc17"}
+[station-009] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/28829d8d-d9ca-470a-83a0-9084ec515827/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory did not answer; the payment for transaction 28829d8d-d9ca-470a-83a0-9084ec515827 will complete shortly, check GET /transactions/28829d8d-d9ca-470a-83a0-9084ec515827"}
+[station-010] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/68e8f15c-722e-4240-a61d-d614a6cba055/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory did not answer; the payment for transaction 68e8f15c-722e-4240-a61d-d614a6cba055 will complete shortly, check GET /transactions/68e8f15c-722e-4240-a61d-d614a6cba055"}
+[station-006] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/61d3de1b-e30f-4e03-bf3c-5f06c309fb37/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory did not answer; the payment for transaction 61d3de1b-e30f-4e03-bf3c-5f06c309fb37 will complete shortly, check GET /transactions/61d3de1b-e30f-4e03-bf3c-5f06c309fb37"}
+[station-007] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/dbc026a7-f06b-45f9-af63-49f64dc8a964/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory is unavailable; the basket is still open, please try again"}
+[station-001] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/668498c8-4c87-4397-b596-c3f7a47b7839/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory is unavailable; the basket is still open, please try again"}
+[station-004] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/d5a5f2ba-5f17-44a3-ac79-3cc471cf2fe7/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory is unavailable; the basket is still open, please try again"}
+[station-002] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/774e2888-9936-445f-896a-50af4b92ad4f/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory is unavailable; the basket is still open, please try again"}
+[station-008] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/c24dddb7-0026-4855-bae1-1043a52ca488/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory is unavailable; the basket is still open, please try again"}
+[station-005] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/f4671e77-05e8-4d7a-a264-2695d2e5d5c9/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory is unavailable; the basket is still open, please try again"}
+[station-003] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/0652cdc4-b146-4090-99b5-86e971ad9d05/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory is unavailable; the basket is still open, please try again"}
+[station-009] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/2e9030a1-9b01-4e51-ae3c-1eccf4469264/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory is unavailable; the basket is still open, please try again"}
+[station-010] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/9742cbd9-cbf5-4eef-819d-0c8041ba1ba0/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory is unavailable; the basket is still open, please try again"}
+[station-006] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/f2b69863-a5f9-4fe6-8a2d-a729dc4ab73d/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory is unavailable; the basket is still open, please try again"}
+[station-001] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/1bb124e8-68dd-4c95-a5c3-89e86a1e375d/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory is unavailable; the basket is still open, please try again"}
+[station-003] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/757b3637-2ad3-4072-872f-4961a0d4c937/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory is unavailable; the basket is still open, please try again"}
+[station-004] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/7ce8c1ef-ec57-4a82-87a1-834ea04a7478/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory is unavailable; the basket is still open, please try again"}
+[station-008] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/95e889a7-3b96-4b38-bc5a-5a016a6dc7d7/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory is unavailable; the basket is still open, please try again"}
+[station-002] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/109b577b-a761-4e47-a0f6-1098ed86ab26/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory is unavailable; the basket is still open, please try again"}
+[station-005] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/117bdc74-fa35-46ac-931f-a07664f301da/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory is unavailable; the basket is still open, please try again"}
+[station-007] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/6da070d9-932f-48b2-a6ee-3663e2d4a286/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory is unavailable; the basket is still open, please try again"}
+[station-010] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/3f4ef675-f1aa-4baa-be7b-4093b684b550/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory is unavailable; the basket is still open, please try again"}
+[station-009] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/58ea9746-a7b3-4d19-b8c4-bede2a56012c/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory is unavailable; the basket is still open, please try again"}
+[station-006] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/7cf0aeb0-419f-48c1-ac97-57a89a09bfcb/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory is unavailable; the basket is still open, please try again"}
+[station-002] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/71786211-317b-439b-8794-47c0151083dc/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory is unavailable; the basket is still open, please try again"}
+[station-001] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/7ccf40b0-0bb9-419e-8105-173a84c42e7c/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory is unavailable; the basket is still open, please try again"}
+[station-007] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/18141150-9e9a-46b2-b746-9a3683471200/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory is unavailable; the basket is still open, please try again"}
+[station-003] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/fcbbe905-7eba-4468-b1c6-8a41a8c7031b/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory is unavailable; the basket is still open, please try again"}
+[station-004] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/51b2583e-4957-4aec-8495-c255b790ad8b/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory is unavailable; the basket is still open, please try again"}
+[station-005] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/b240ba4e-a222-4620-99b6-7739763fc5e6/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory is unavailable; the basket is still open, please try again"}
+[station-008] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/90622d3c-115a-4940-be98-558be9d7a571/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory is unavailable; the basket is still open, please try again"}
+[station-006] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/9bffd6c2-d598-4385-aead-c63304dadcc9/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory did not answer; the payment for transaction 9bffd6c2-d598-4385-aead-c63304dadcc9 will complete shortly, check GET /transactions/9bffd6c2-d598-4385-aead-c63304dadcc9"}
+[station-010] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/9131f6d9-f458-4d74-8455-00a56287ce67/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory did not answer; the payment for transaction 9131f6d9-f458-4d74-8455-00a56287ce67 will complete shortly, check GET /transactions/9131f6d9-f458-4d74-8455-00a56287ce67"}
+[station-009] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/d2daeb22-8323-4dfc-bb4a-3795d5460d13/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory did not answer; the payment for transaction d2daeb22-8323-4dfc-bb4a-3795d5460d13 will complete shortly, check GET /transactions/d2daeb22-8323-4dfc-bb4a-3795d5460d13"}
+[station-004] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/543aaa0e-01b3-4ba8-a030-a485edcc02cf/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory did not answer; the payment for transaction 543aaa0e-01b3-4ba8-a030-a485edcc02cf will complete shortly, check GET /transactions/543aaa0e-01b3-4ba8-a030-a485edcc02cf"}
+[station-007] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/37c84228-bbb6-4afc-b745-8dd91cba411d/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory did not answer; the payment for transaction 37c84228-bbb6-4afc-b745-8dd91cba411d will complete shortly, check GET /transactions/37c84228-bbb6-4afc-b745-8dd91cba411d"}
+[station-001] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/6827e10e-78d5-4c12-a986-35b6b301fbdc/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory did not answer; the payment for transaction 6827e10e-78d5-4c12-a986-35b6b301fbdc will complete shortly, check GET /transactions/6827e10e-78d5-4c12-a986-35b6b301fbdc"}
+[station-003] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/b36a269f-07b0-4225-b542-5948f7b88d01/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory did not answer; the payment for transaction b36a269f-07b0-4225-b542-5948f7b88d01 will complete shortly, check GET /transactions/b36a269f-07b0-4225-b542-5948f7b88d01"}
+[station-008] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/be5794a3-4bf5-4ba3-9300-3b63c343369d/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory did not answer; the payment for transaction be5794a3-4bf5-4ba3-9300-3b63c343369d will complete shortly, check GET /transactions/be5794a3-4bf5-4ba3-9300-3b63c343369d"}
+[station-005] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/922e71fd-6774-42cc-a0e8-2edaf102d87c/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory did not answer; the payment for transaction 922e71fd-6774-42cc-a0e8-2edaf102d87c will complete shortly, check GET /transactions/922e71fd-6774-42cc-a0e8-2edaf102d87c"}
+[station-002] transaction failed: Unexpected status 503 from http://localhost:8080/transactions/9f893bf4-2518-4000-9154-b768d4d7d3fe/complete: {"error":"SERVICE_UNAVAILABLE","message":"Inventory did not answer; the payment for transaction 9f893bf4-2518-4000-9154-b768d4d7d3fe will complete shortly, check GET /transactions/9f893bf4-2518-4000-9154-b768d4d7d3fe"}
+Duration elapsed, waiting for in-flight transactions to finish...
+Fetching low-stock alerts and popular items...
+
+================ LOAD TEST REPORT ================
+Base URL:        http://localhost:8080
+Stations:        10
+Duration:        30.0s (requested 30s)
+Transactions:    8527 (284.1/sec)
+Items scanned:   90098 (3001.9/sec)
+
+Operation                    OK   Errors   Mean(ms)    P50(ms)    P95(ms)    P99(ms)    Max(ms)     Err%
+START_TRANSACTION          8574        0       0.37       0.24       0.80       2.65      25.87    0.00%
+SCAN_ITEM                 90098        0       0.27       0.20       0.53       1.56      25.31    0.00%
+COMPLETE_TRANSACTION       8527       47      19.80      14.15      50.54      92.51    1043.42    0.55%
+
+Low-stock alerts (1):
+  SKU-000001   Item 1                         stock=0      threshold=50
+
+Most popular items (top 10):
+  #1   SKU-000001   Item 1                         scans=132
+  #2   SKU-000002   Item 2                         scans=63
+  #3   SKU-000003   Item 3                         scans=39
+  #4   SKU-000004   Item 4                         scans=29
+  #5   SKU-000005   Item 5                         scans=25
+  #6   SKU-000011   Item 11                        scans=22
+  #7   SKU-000006   Item 6                         scans=17
+  #8   SKU-000007   Item 7                         scans=17
+  #9   SKU-000009   Item 9                         scans=16
+  #10  SKU-000008   Item 8                         scans=11
+===================================================
+
+JSON report written to: /Users/rohitdabhi/Desktop/ADV_SOFT_DEV/self-checkout/reports/event-driven/failure-tests/report-20261031-000000.json

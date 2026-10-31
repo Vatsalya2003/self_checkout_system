@@ -1,0 +1,41 @@
+== warm-up load 10 s
+Operation                    OK   Errors   Mean(ms)    P50(ms)    P95(ms)    P99(ms)    Max(ms)     Err%
+  scan_log: 44581 rows, max seq 44581, gaps 0
+  via :8080  items=200  start-tx=201  low-stock=200  popular=200
+== stop catalog-service
+  via :8080  items=502  start-tx=201  low-stock=200  popular=200
+  catalog-service back up after 1.6 s
+  via :8080  items=200  start-tx=201  low-stock=200  popular=200
+== stop inventory-service
+  via :8080  items=200  start-tx=201  low-stock=502  popular=200
+  inventory-service back up after 1.5 s
+  via :8080  items=200  start-tx=201  low-stock=200  popular=200
+== stop analytics-service, keep scanning for 10 s without it
+Operation                    OK   Errors   Mean(ms)    P50(ms)    P95(ms)    P99(ms)    Max(ms)     Err%
+  via :8080  items=200  start-tx=201  low-stock=200  popular=502
+  scan_log: 44581 rows, max seq 44581, gaps 0; last stored window_end before restart: 44500
+  waiting in the broker: 190 scan batches in analytics.scans
+  analytics-service back up after 3.0 s
+  caught up: last window_end 108000
+2026-10-31T00:52:55.639-07:00  INFO 96584 --- [analytics-service] [           main] c.s.s.a.pipeline.AnalyticsPipeline       : restored the window from scan_log: 1000 rows in (43500, 44500]
+  via :8080  items=200  start-tx=201  low-stock=200  popular=200
+== checkout-service restart with an open basket
+  open basket 9aa4af33-37c8-4d61-b3d9-5234b9df8bfd before restart: {"transactionId":"9aa4af33-37c8-4d61-b3d9-5234b9df8bfd","stationId":"restart-probe","status":"OPEN","itemCount":1,"runningTotal":1.37,"startedAt":"2026-10-31T07:52:57.103890Z"}
+  via :8080  items=200  start-tx=502  low-stock=200  popular=200
+  checkout-service back up after 2.8 s
+  same basket after restart:  404 {"error":"TRANSACTION_NOT_FOUND","message":"Transaction 9aa4af33-37c8-4d61-b3d9-5234b9df8bfd not found"}
+  scan into it after restart: 404
+  scan-log publisher started: batches of up to 1000 scans or 50 ms, published to analytics.scans
+  max seq before stop: 108381
+Operation                    OK   Errors   Mean(ms)    P50(ms)    P95(ms)    P99(ms)    Max(ms)     Err%
+  scan_log: 157480 rows, max seq 157480, gaps 0
+  via :8080  items=200  start-tx=201  low-stock=200  popular=200
+  rows  | min_seq | max_seq | gaps 
+ 157480 |       1 |  157480 |    0
+(1 row)
+ windows_checked | mismatched_entries 
+             314 |                  0
+(1 row)
+== totals
+     sales 14962, units taken 148542, units short (sold out) 8937, low-stock alerts 1, scans 157480, windows 314
+PASS

@@ -1,0 +1,9 @@
+build: branch event-driven @ 6985f92 (the jars these runs used were built from exactly this code)
+mvnw test                                PASS (52 tests)
+golden diff                              PASS: IDENTICAL: all 29 responses match reports/golden/single-app.txt
+test-concurrent-completions              PASS; invariant PASS (0 failing check(s))
+test-oversell-and-double-complete        PASS; invariant FAIL (1 failing check(s))
+test-low-stock                           PASS; invariant FAIL (1 failing check(s))
+test-popular-window                      PASS; invariant PASS (0 failing check(s))
+test-scan-complete-race                  PASS; invariant PASS (0 failing check(s))
+test-service-restart.sh                  final invariant: PASS

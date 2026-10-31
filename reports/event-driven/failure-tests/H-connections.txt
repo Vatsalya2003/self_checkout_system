@@ -1,0 +1,5 @@
+catalog-service    postgres=1   rabbitmq=1   inbound-on-:8081=2   other=none
+checkout-service   postgres=10  rabbitmq=1   inbound-on-:8082=10  other=none
+inventory-service  postgres=15  rabbitmq=1   inbound-on-:8083=1   other=none
+analytics-service  postgres=3   rabbitmq=1   inbound-on-:8084=1   other=none
+PASS: every service connects only to its database and the broker

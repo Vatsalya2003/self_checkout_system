@@ -1,0 +1,438 @@
+[INFO] Scanning for projects...
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Build Order:
+[INFO] 
+[INFO] self-checkout                                                      [pom]
+[INFO] messaging                                                          [jar]
+[INFO] shared-web                                                         [jar]
+[INFO] catalog-client                                                     [jar]
+[INFO] catalog-service                                                    [jar]
+[INFO] checkout-service                                                   [jar]
+[INFO] inventory-service                                                  [jar]
+[INFO] analytics-service                                                  [jar]
+[INFO] 
+[INFO] -------------------< com.selfcheckout:self-checkout >-------------------
+[INFO] Building self-checkout 0.0.1-SNAPSHOT                              [1/8]
+[INFO]   from pom.xml
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO] 
+[INFO] ---------------------< com.selfcheckout:messaging >---------------------
+[INFO] Building messaging 0.0.1-SNAPSHOT                                  [2/8]
+[INFO]   from messaging/pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.5.0:resources (default-resources) @ messaging ---
+[INFO] skip non existing resourceDirectory /Users/rohitdabhi/Desktop/ADV_SOFT_DEV/self-checkout/messaging/src/main/resources
+[INFO] skip non existing resourceDirectory /Users/rohitdabhi/Desktop/ADV_SOFT_DEV/self-checkout/messaging/src/main/resources
+[INFO] 
+[INFO] --- compiler:3.15.0:compile (default-compile) @ messaging ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.5.0:testResources (default-testResources) @ messaging ---
+[INFO] skip non existing resourceDirectory /Users/rohitdabhi/Desktop/ADV_SOFT_DEV/self-checkout/messaging/src/test/resources
+[INFO] 
+[INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ messaging ---
+[INFO] No sources to compile
+[INFO] 
+[INFO] --- surefire:3.5.6:test (default-test) @ messaging ---
+[INFO] No tests to run.
+[INFO] 
+[INFO] --------------------< com.selfcheckout:shared-web >---------------------
+[INFO] Building shared-web 0.0.1-SNAPSHOT                                 [3/8]
+[INFO]   from shared-web/pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.5.0:resources (default-resources) @ shared-web ---
+[INFO] skip non existing resourceDirectory /Users/rohitdabhi/Desktop/ADV_SOFT_DEV/self-checkout/shared-web/src/main/resources
+[INFO] skip non existing resourceDirectory /Users/rohitdabhi/Desktop/ADV_SOFT_DEV/self-checkout/shared-web/src/main/resources
+[INFO] 
+[INFO] --- compiler:3.15.0:compile (default-compile) @ shared-web ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.5.0:testResources (default-testResources) @ shared-web ---
+[INFO] skip non existing resourceDirectory /Users/rohitdabhi/Desktop/ADV_SOFT_DEV/self-checkout/shared-web/src/test/resources
+[INFO] 
+[INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ shared-web ---
+[INFO] No sources to compile
+[INFO] 
+[INFO] --- surefire:3.5.6:test (default-test) @ shared-web ---
+[INFO] No tests to run.
+[INFO] 
+[INFO] ------------------< com.selfcheckout:catalog-client >-------------------
+[INFO] Building catalog-client 0.0.1-SNAPSHOT                             [4/8]
+[INFO]   from catalog-client/pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.5.0:resources (default-resources) @ catalog-client ---
+[INFO] skip non existing resourceDirectory /Users/rohitdabhi/Desktop/ADV_SOFT_DEV/self-checkout/catalog-client/src/main/resources
+[INFO] skip non existing resourceDirectory /Users/rohitdabhi/Desktop/ADV_SOFT_DEV/self-checkout/catalog-client/src/main/resources
+[INFO] 
+[INFO] --- compiler:3.15.0:compile (default-compile) @ catalog-client ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.5.0:testResources (default-testResources) @ catalog-client ---
+[INFO] skip non existing resourceDirectory /Users/rohitdabhi/Desktop/ADV_SOFT_DEV/self-checkout/catalog-client/src/test/resources
+[INFO] 
+[INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ catalog-client ---
+[INFO] No sources to compile
+[INFO] 
+[INFO] --- surefire:3.5.6:test (default-test) @ catalog-client ---
+[INFO] No tests to run.
+[INFO] 
+[INFO] ------------------< com.selfcheckout:catalog-service >------------------
+[INFO] Building catalog-service 0.0.1-SNAPSHOT                            [5/8]
+[INFO]   from catalog-service/pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.5.0:resources (default-resources) @ catalog-service ---
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] Copying 0 resource from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.15.0:compile (default-compile) @ catalog-service ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.5.0:testResources (default-testResources) @ catalog-service ---
+[INFO] skip non existing resourceDirectory /Users/rohitdabhi/Desktop/ADV_SOFT_DEV/self-checkout/catalog-service/src/test/resources
+[INFO] 
+[INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ catalog-service ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.5.6:test (default-test) @ catalog-service ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.selfcheckout.self_checkout.CatalogServiceApplicationTests
+00:50:05.257 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.selfcheckout.self_checkout.CatalogServiceApplicationTests]: CatalogServiceApplicationTests does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+00:50:05.310 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.selfcheckout.self_checkout.CatalogServiceApplication for test class com.selfcheckout.self_checkout.CatalogServiceApplicationTests
+00:50:05.349 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.selfcheckout.self_checkout.CatalogServiceApplicationTests]: CatalogServiceApplicationTests does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+00:50:05.350 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.selfcheckout.self_checkout.CatalogServiceApplication for test class com.selfcheckout.self_checkout.CatalogServiceApplicationTests
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v4.1.1)
+
+2026-10-31T00:50:05.498-07:00  INFO 90275 --- [catalog-service] [           main] c.s.s.CatalogServiceApplicationTests     : Starting CatalogServiceApplicationTests using Java 21.0.10 with PID 90275 (started by rohitdabhi in /Users/rohitdabhi/Desktop/ADV_SOFT_DEV/self-checkout/catalog-service)
+2026-10-31T00:50:05.498-07:00  INFO 90275 --- [catalog-service] [           main] c.s.s.CatalogServiceApplicationTests     : No active profile set, falling back to 1 default profile: "default"
+2026-10-31T00:50:06.228-07:00  INFO 90275 --- [catalog-service] [           main] o.s.a.r.c.CachingConnectionFactory       : Attempting to connect to: [localhost:5672]
+2026-10-31T00:50:06.272-07:00  INFO 90275 --- [catalog-service] [           main] o.s.a.r.c.CachingConnectionFactory       : Created new connection: rabbitConnectionFactory#4fea840f:0/SimpleConnection@63c99f7 [delegate=amqp://guest@127.0.0.1:5672/, localPort=57641]
+2026-10-31T00:50:06.302-07:00  INFO 90275 --- [catalog-service] [           main] c.s.s.CatalogServiceApplicationTests     : Started CatalogServiceApplicationTests in 0.923 seconds (process running for 1.506)
+2026-10-31T00:50:06.304-07:00  INFO 90275 --- [catalog-service] [           main] com.zaxxer.hikari.HikariDataSource       : catalog-pool - Starting...
+2026-10-31T00:50:06.350-07:00  INFO 90275 --- [catalog-service] [           main] com.zaxxer.hikari.pool.HikariPool        : catalog-pool - Added connection org.postgresql.jdbc.PgConnection@11228bee
+2026-10-31T00:50:06.350-07:00  INFO 90275 --- [catalog-service] [           main] com.zaxxer.hikari.HikariDataSource       : catalog-pool - Start completed.
+2026-10-31T00:50:06.391-07:00  INFO 90275 --- [catalog-service] [           main] c.s.s.api.CatalogEventsListener          : catalog broadcast on catalog.snapshots: 2000 items
+Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build as described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/latest/org.mockito/org/mockito/Mockito.html#0.3
+WARNING: A Java agent has been loaded dynamically (/Users/rohitdabhi/.m2/repository/net/bytebuddy/byte-buddy-agent/1.18.11/byte-buddy-agent-1.18.11.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.615 s -- in com.selfcheckout.self_checkout.CatalogServiceApplicationTests
+[INFO] Running com.selfcheckout.self_checkout.architecture.OwnershipTest
+2026-10-31T00:50:06.827-07:00  INFO 90275 --- [catalog-service] [           main] com.tngtech.archunit.core.PluginLoader   : Detected Java version 21.0.10
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.062 s -- in com.selfcheckout.self_checkout.architecture.OwnershipTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] 
+[INFO] -----------------< com.selfcheckout:checkout-service >------------------
+[INFO] Building checkout-service 0.0.1-SNAPSHOT                           [6/8]
+[INFO]   from checkout-service/pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.5.0:resources (default-resources) @ checkout-service ---
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] Copying 0 resource from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.15.0:compile (default-compile) @ checkout-service ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.5.0:testResources (default-testResources) @ checkout-service ---
+[INFO] skip non existing resourceDirectory /Users/rohitdabhi/Desktop/ADV_SOFT_DEV/self-checkout/checkout-service/src/test/resources
+[INFO] 
+[INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ checkout-service ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.5.6:test (default-test) @ checkout-service ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.selfcheckout.self_checkout.scanlog.ScanLogPublisherTest
+00:50:09.160 [main] WARN com.selfcheckout.self_checkout.scanlog.ScanLogPublisher -- scan batch b34bed13-6e30-4875-aca0-f6a575564df0 (2 scans) not published; retrying the same batch: java.lang.IllegalStateException: broker unavailable
+00:50:09.267 [main] WARN com.selfcheckout.self_checkout.scanlog.ScanLogPublisher -- scan batch b34bed13-6e30-4875-aca0-f6a575564df0 (2 scans) not published; retrying the same batch: java.lang.IllegalStateException: broker unavailable
+00:50:09.472 [main] WARN com.selfcheckout.self_checkout.scanlog.ScanLogPublisher -- scan batch b34bed13-6e30-4875-aca0-f6a575564df0 (2 scans) not published; retrying the same batch: java.lang.IllegalStateException: broker unavailable
+00:50:09.883 [main] WARN com.selfcheckout.self_checkout.scanlog.ScanLogPublisher -- scan-log queue full (2 deep) -- 1 scan event(s) dropped so far; checkout is unaffected, analytics will miss them
+00:50:09.888 [main] WARN com.selfcheckout.self_checkout.scanlog.ScanLogPublisher -- scan batch 1b7091d9-1060-4919-a4b1-e861043c13cd (2 scans) not published; retrying the same batch: java.lang.IllegalStateException: broker unavailable
+00:50:09.989 [main] WARN com.selfcheckout.self_checkout.scanlog.ScanLogPublisher -- scan batch 1b7091d9-1060-4919-a4b1-e861043c13cd (2 scans) not published; retrying the same batch: java.lang.IllegalStateException: broker unavailable
+00:50:10.208 [main] WARN com.selfcheckout.self_checkout.scanlog.ScanLogPublisher -- scan-log queue full (2 deep) -- 1 scan event(s) dropped so far; checkout is unaffected, analytics will miss them
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.333 s -- in com.selfcheckout.self_checkout.scanlog.ScanLogPublisherTest
+[INFO] Running com.selfcheckout.self_checkout.CheckoutServiceApplicationTests
+00:50:10.294 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.selfcheckout.self_checkout.CheckoutServiceApplicationTests]: CheckoutServiceApplicationTests does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+00:50:10.338 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.selfcheckout.self_checkout.CheckoutServiceApplication for test class com.selfcheckout.self_checkout.CheckoutServiceApplicationTests
+00:50:10.372 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.selfcheckout.self_checkout.CheckoutServiceApplicationTests]: CheckoutServiceApplicationTests does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+00:50:10.373 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.selfcheckout.self_checkout.CheckoutServiceApplication for test class com.selfcheckout.self_checkout.CheckoutServiceApplicationTests
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v4.1.1)
+
+2026-10-31T00:50:10.519-07:00  INFO 90296 --- [checkout-service] [           main] c.s.s.CheckoutServiceApplicationTests    : Starting CheckoutServiceApplicationTests using Java 21.0.10 with PID 90296 (started by rohitdabhi in /Users/rohitdabhi/Desktop/ADV_SOFT_DEV/self-checkout/checkout-service)
+2026-10-31T00:50:10.520-07:00  INFO 90296 --- [checkout-service] [           main] c.s.s.CheckoutServiceApplicationTests    : No active profile set, falling back to 1 default profile: "default"
+2026-10-31T00:50:10.800-07:00  INFO 90296 --- [checkout-service] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-10-31T00:50:10.830-07:00  INFO 90296 --- [checkout-service] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 25 ms. Found 1 JPA repository interface.
+2026-10-31T00:50:11.022-07:00  INFO 90296 --- [checkout-service] [           main] org.hibernate.orm.jpa                    : HHH008540: Processing PersistenceUnitInfo [name: default]
+2026-10-31T00:50:11.068-07:00  INFO 90296 --- [checkout-service] [           main] org.hibernate.orm.core                   : HHH000001: Hibernate ORM core version 7.4.5.Final
+2026-10-31T00:50:11.250-07:00  INFO 90296 --- [checkout-service] [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-10-31T00:50:11.266-07:00  INFO 90296 --- [checkout-service] [           main] com.zaxxer.hikari.HikariDataSource       : checkout-pool - Starting...
+2026-10-31T00:50:11.313-07:00  INFO 90296 --- [checkout-service] [           main] com.zaxxer.hikari.pool.HikariPool        : checkout-pool - Added connection org.postgresql.jdbc.PgConnection@3d4b45b
+2026-10-31T00:50:11.314-07:00  INFO 90296 --- [checkout-service] [           main] com.zaxxer.hikari.HikariDataSource       : checkout-pool - Start completed.
+2026-10-31T00:50:11.356-07:00  INFO 90296 --- [checkout-service] [           main] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
+	Database JDBC URL [jdbc:postgresql://localhost:5432/checkout_db]
+	Database driver: PostgreSQL JDBC Driver
+	Database dialect: PostgreSQLDialect
+	Database version: 16.15
+	Default catalog/schema: checkout_db/public
+	Autocommit mode: undefined/unknown
+	Isolation level: READ_COMMITTED [default READ_COMMITTED]
+	JDBC fetch size: none
+	Pool: DataSourceConnectionProvider
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2026-10-31T00:50:11.756-07:00  INFO 90296 --- [checkout-service] [           main] org.hibernate.orm.core                   : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-10-31T00:50:11.760-07:00  INFO 90296 --- [checkout-service] [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-10-31T00:50:11.885-07:00  INFO 90296 --- [checkout-service] [catalog-warm-up] o.s.a.r.c.CachingConnectionFactory       : Attempting to connect to: [localhost:5672]
+2026-10-31T00:50:11.905-07:00  INFO 90296 --- [checkout-service] [           main] o.s.d.j.r.query.QueryEnhancerFactories   : Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-10-31T00:50:11.913-07:00  INFO 90296 --- [checkout-service] [catalog-warm-up] o.s.a.r.c.CachingConnectionFactory       : Created new connection: rabbitConnectionFactory#518ed9b4:0/SimpleConnection@3b3ee003 [delegate=amqp://guest@127.0.0.1:5672/, localPort=57655]
+2026-10-31T00:50:11.969-07:00  INFO 90296 --- [checkout-service] [           main] c.s.s.transactions.PaymentSaga           : test hook halt-after-stock-commit is off
+2026-10-31T00:50:11.972-07:00  INFO 90296 --- [checkout-service] [           main] c.s.s.scanlog.ScanLogPublisher           : scan-log publisher started: batches of up to 1000 scans or 50 ms, published to analytics.scans
+2026-10-31T00:50:11.985-07:00  INFO 90296 --- [checkout-service] [           main] o.s.amqp.rabbit.core.RabbitAdmin         : Auto-declaring a non-durable, auto-delete, or exclusive Queue (spring.gen-FFPMDrbXSt6jz5M4pJzjcQ) durable:false, auto-delete:true, exclusive:true. It will be redeclared if the broker stops and is restarted while the connection factory is alive, but all messages will be lost.
+2026-10-31T00:50:12.202-07:00  INFO 90296 --- [checkout-service] [           main] c.s.s.CheckoutServiceApplicationTests    : Started CheckoutServiceApplicationTests in 1.806 seconds (process running for 3.621)
+2026-10-31T00:50:12.209-07:00  INFO 90296 --- [checkout-service] [           main] c.s.s.transactions.SagaResolver          : recovery: no unfinished payments
+Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build as described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/latest/org.mockito/org/mockito/Mockito.html#0.3
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+WARNING: A Java agent has been loaded dynamically (/Users/rohitdabhi/.m2/repository/net/bytebuddy/byte-buddy-agent/1.18.11/byte-buddy-agent-1.18.11.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.206 s -- in com.selfcheckout.self_checkout.CheckoutServiceApplicationTests
+[INFO] Running com.selfcheckout.self_checkout.transactions.OpenBasketTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s -- in com.selfcheckout.self_checkout.transactions.OpenBasketTest
+[INFO] Running com.selfcheckout.self_checkout.architecture.LayeredArchitectureTest
+2026-10-31T00:50:12.459-07:00  INFO 90296 --- [checkout-service] [           main] com.tngtech.archunit.core.PluginLoader   : Detected Java version 21.0.10
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.569 s -- in com.selfcheckout.self_checkout.architecture.LayeredArchitectureTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 20, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] 
+[INFO] -----------------< com.selfcheckout:inventory-service >-----------------
+[INFO] Building inventory-service 0.0.1-SNAPSHOT                          [7/8]
+[INFO]   from inventory-service/pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.5.0:resources (default-resources) @ inventory-service ---
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] Copying 0 resource from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.15.0:compile (default-compile) @ inventory-service ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.5.0:testResources (default-testResources) @ inventory-service ---
+[INFO] skip non existing resourceDirectory /Users/rohitdabhi/Desktop/ADV_SOFT_DEV/self-checkout/inventory-service/src/test/resources
+[INFO] 
+[INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ inventory-service ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.5.6:test (default-test) @ inventory-service ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.selfcheckout.self_checkout.InventoryServiceApplicationTests
+00:50:14.679 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.selfcheckout.self_checkout.InventoryServiceApplicationTests]: InventoryServiceApplicationTests does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+00:50:14.719 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.selfcheckout.self_checkout.InventoryServiceApplication for test class com.selfcheckout.self_checkout.InventoryServiceApplicationTests
+00:50:14.749 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.selfcheckout.self_checkout.InventoryServiceApplicationTests]: InventoryServiceApplicationTests does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+00:50:14.750 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.selfcheckout.self_checkout.InventoryServiceApplication for test class com.selfcheckout.self_checkout.InventoryServiceApplicationTests
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v4.1.1)
+
+2026-10-31T00:50:14.867-07:00  INFO 90337 --- [inventory-service] [           main] c.s.s.InventoryServiceApplicationTests   : Starting InventoryServiceApplicationTests using Java 21.0.10 with PID 90337 (started by rohitdabhi in /Users/rohitdabhi/Desktop/ADV_SOFT_DEV/self-checkout/inventory-service)
+2026-10-31T00:50:14.868-07:00  INFO 90337 --- [inventory-service] [           main] c.s.s.InventoryServiceApplicationTests   : No active profile set, falling back to 1 default profile: "default"
+2026-10-31T00:50:15.320-07:00  INFO 90337 --- [inventory-service] [catalog-warm-up] o.s.a.r.c.CachingConnectionFactory       : Attempting to connect to: [localhost:5672]
+2026-10-31T00:50:15.354-07:00  INFO 90337 --- [inventory-service] [catalog-warm-up] o.s.a.r.c.CachingConnectionFactory       : Created new connection: rabbitConnectionFactory#31ab1e67:0/SimpleConnection@72d54e34 [delegate=amqp://guest@127.0.0.1:5672/, localPort=57656]
+2026-10-31T00:50:15.356-07:00  INFO 90337 --- [inventory-service] [catalog-warm-up] o.s.amqp.rabbit.core.RabbitAdmin         : Auto-declaring a non-durable, auto-delete, or exclusive Queue (spring.gen-pPbRrwTvSm6HwXRRl89Qhw) durable:false, auto-delete:true, exclusive:true. It will be redeclared if the broker stops and is restarted while the connection factory is alive, but all messages will be lost.
+2026-10-31T00:50:15.513-07:00  INFO 90337 --- [inventory-service] [           main] c.s.s.InventoryServiceApplicationTests   : Started InventoryServiceApplicationTests in 0.742 seconds (process running for 1.163)
+Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build as described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/latest/org.mockito/org/mockito/Mockito.html#0.3
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+WARNING: A Java agent has been loaded dynamically (/Users/rohitdabhi/.m2/repository/net/bytebuddy/byte-buddy-agent/1.18.11/byte-buddy-agent-1.18.11.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.213 s -- in com.selfcheckout.self_checkout.InventoryServiceApplicationTests
+[INFO] Running com.selfcheckout.self_checkout.architecture.OwnershipTest
+2026-10-31T00:50:15.854-07:00  INFO 90337 --- [inventory-service] [           main] com.tngtech.archunit.core.PluginLoader   : Detected Java version 21.0.10
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.038 s -- in com.selfcheckout.self_checkout.architecture.OwnershipTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] 
+[INFO] -----------------< com.selfcheckout:analytics-service >-----------------
+[INFO] Building analytics-service 0.0.1-SNAPSHOT                          [8/8]
+[INFO]   from analytics-service/pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.5.0:resources (default-resources) @ analytics-service ---
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] Copying 0 resource from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.15.0:compile (default-compile) @ analytics-service ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.5.0:testResources (default-testResources) @ analytics-service ---
+[INFO] skip non existing resourceDirectory /Users/rohitdabhi/Desktop/ADV_SOFT_DEV/self-checkout/analytics-service/src/test/resources
+[INFO] 
+[INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ analytics-service ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.5.6:test (default-test) @ analytics-service ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.selfcheckout.self_checkout.AnalyticsServiceApplicationTests
+00:50:17.993 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.selfcheckout.self_checkout.AnalyticsServiceApplicationTests]: AnalyticsServiceApplicationTests does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+00:50:18.034 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.selfcheckout.self_checkout.AnalyticsServiceApplication for test class com.selfcheckout.self_checkout.AnalyticsServiceApplicationTests
+00:50:18.066 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.selfcheckout.self_checkout.AnalyticsServiceApplicationTests]: AnalyticsServiceApplicationTests does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+00:50:18.067 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.selfcheckout.self_checkout.AnalyticsServiceApplication for test class com.selfcheckout.self_checkout.AnalyticsServiceApplicationTests
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v4.1.1)
+
+2026-10-31T00:50:18.184-07:00  INFO 90347 --- [analytics-service] [           main] c.s.s.AnalyticsServiceApplicationTests   : Starting AnalyticsServiceApplicationTests using Java 21.0.10 with PID 90347 (started by rohitdabhi in /Users/rohitdabhi/Desktop/ADV_SOFT_DEV/self-checkout/analytics-service)
+2026-10-31T00:50:18.184-07:00  INFO 90347 --- [analytics-service] [           main] c.s.s.AnalyticsServiceApplicationTests   : No active profile set, falling back to 1 default profile: "default"
+2026-10-31T00:50:18.415-07:00  INFO 90347 --- [analytics-service] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-10-31T00:50:18.438-07:00  INFO 90347 --- [analytics-service] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 19 ms. Found 1 JPA repository interface.
+2026-10-31T00:50:18.597-07:00  INFO 90347 --- [analytics-service] [           main] org.hibernate.orm.jpa                    : HHH008540: Processing PersistenceUnitInfo [name: default]
+2026-10-31T00:50:18.621-07:00  INFO 90347 --- [analytics-service] [           main] org.hibernate.orm.core                   : HHH000001: Hibernate ORM core version 7.4.5.Final
+2026-10-31T00:50:18.769-07:00  INFO 90347 --- [analytics-service] [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-10-31T00:50:18.786-07:00  INFO 90347 --- [analytics-service] [           main] com.zaxxer.hikari.HikariDataSource       : analytics-pool - Starting...
+2026-10-31T00:50:18.836-07:00  INFO 90347 --- [analytics-service] [           main] com.zaxxer.hikari.pool.HikariPool        : analytics-pool - Added connection org.postgresql.jdbc.PgConnection@254513e8
+2026-10-31T00:50:18.837-07:00  INFO 90347 --- [analytics-service] [           main] com.zaxxer.hikari.HikariDataSource       : analytics-pool - Start completed.
+2026-10-31T00:50:18.870-07:00  INFO 90347 --- [analytics-service] [           main] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
+	Database JDBC URL [jdbc:postgresql://localhost:5432/analytics_db]
+	Database driver: PostgreSQL JDBC Driver
+	Database dialect: PostgreSQLDialect
+	Database version: 16.15
+	Default catalog/schema: analytics_db/public
+	Autocommit mode: undefined/unknown
+	Isolation level: READ_COMMITTED [default READ_COMMITTED]
+	JDBC fetch size: none
+	Pool: DataSourceConnectionProvider
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2026-10-31T00:50:19.276-07:00  INFO 90347 --- [analytics-service] [           main] org.hibernate.orm.core                   : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-10-31T00:50:19.279-07:00  INFO 90347 --- [analytics-service] [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-10-31T00:50:19.314-07:00  INFO 90347 --- [analytics-service] [           main] o.s.d.j.r.query.QueryEnhancerFactories   : Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-10-31T00:50:19.544-07:00  INFO 90347 --- [analytics-service] [catalog-warm-up] o.s.a.r.c.CachingConnectionFactory       : Attempting to connect to: [localhost:5672]
+2026-10-31T00:50:19.569-07:00  INFO 90347 --- [analytics-service] [catalog-warm-up] o.s.a.r.c.CachingConnectionFactory       : Created new connection: rabbitConnectionFactory#59d6a4d1:0/SimpleConnection@7710edf2 [delegate=amqp://guest@127.0.0.1:5672/, localPort=57662]
+2026-10-31T00:50:19.866-07:00  INFO 90347 --- [analytics-service] [           main] c.s.s.a.pipeline.AnalyticsPipeline       : restored the window from scan_log: 1000 rows in (11500, 12500]
+2026-10-31T00:50:19.866-07:00  INFO 90347 --- [analytics-service] [pipeline-poller] c.s.s.analytics.pipeline.ScanLogPoller   : pipeline stage 'poller' started after seq 12500
+2026-10-31T00:50:19.867-07:00  INFO 90347 --- [analytics-service] [pipeline-window] c.s.s.analytics.pipeline.FilterLoop      : pipeline stage 'window' started
+2026-10-31T00:50:19.867-07:00  INFO 90347 --- [analytics-service] [  pipeline-rank] c.s.s.analytics.pipeline.FilterLoop      : pipeline stage 'rank' started
+2026-10-31T00:50:19.867-07:00  INFO 90347 --- [analytics-service] [  pipeline-sink] c.s.s.analytics.pipeline.BatchingLoop    : pipeline stage 'sink' started (max batch 512)
+2026-10-31T00:50:19.867-07:00  INFO 90347 --- [analytics-service] [           main] c.s.s.a.pipeline.AnalyticsPipeline       : analytics pipeline started: poller -> window -> rank -> sink, reading scan_log after seq 12500
+2026-10-31T00:50:19.881-07:00  INFO 90347 --- [analytics-service] [           main] o.s.amqp.rabbit.core.RabbitAdmin         : Auto-declaring a non-durable, auto-delete, or exclusive Queue (spring.gen-Jp8umOFVR7qTfGcWpLdbAQ) durable:false, auto-delete:true, exclusive:true. It will be redeclared if the broker stops and is restarted while the connection factory is alive, but all messages will be lost.
+2026-10-31T00:50:20.096-07:00  INFO 90347 --- [analytics-service] [           main] c.s.s.AnalyticsServiceApplicationTests   : Started AnalyticsServiceApplicationTests in 2.008 seconds (process running for 2.46)
+Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build as described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/latest/org.mockito/org/mockito/Mockito.html#0.3
+WARNING: A Java agent has been loaded dynamically (/Users/rohitdabhi/.m2/repository/net/bytebuddy/byte-buddy-agent/1.18.11/byte-buddy-agent-1.18.11.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.417 s -- in com.selfcheckout.self_checkout.AnalyticsServiceApplicationTests
+[INFO] Running com.selfcheckout.self_checkout.architecture.OwnershipTest
+2026-10-31T00:50:20.372-07:00  INFO 90347 --- [analytics-service] [           main] com.tngtech.archunit.core.PluginLoader   : Detected Java version 21.0.10
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.119 s -- in com.selfcheckout.self_checkout.architecture.OwnershipTest
+[INFO] Running com.selfcheckout.self_checkout.analytics.pipeline.WindowFilterTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.009 s -- in com.selfcheckout.self_checkout.analytics.pipeline.WindowFilterTest
+[INFO] Running com.selfcheckout.self_checkout.analytics.pipeline.RankFilterTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s -- in com.selfcheckout.self_checkout.analytics.pipeline.RankFilterTest
+[INFO] Running com.selfcheckout.self_checkout.analytics.pipeline.PipelineEndToEndTest
+2026-10-31T00:50:21.501-07:00  INFO 90347 --- [analytics-service] [       Thread-2] c.s.s.analytics.pipeline.FilterLoop      : pipeline stage 'sink' started
+2026-10-31T00:50:21.501-07:00  WARN 90347 --- [analytics-service] [       Thread-2] c.s.s.analytics.pipeline.FilterLoop      : pipeline stage 'sink' failed on RankedWindow[windowStart=0, windowEnd=1000, computedAt=1970-01-01T00:00:00Z, items=[]]
+
+java.lang.IllegalStateException: boom
+	at com.selfcheckout.self_checkout.analytics.pipeline.PipelineEndToEndTest.lambda$oneBadMessageDoesNotKillAStage$8(PipelineEndToEndTest.java:175) ~[test-classes/:na]
+	at com.selfcheckout.self_checkout.analytics.pipeline.FilterLoop.run(FilterLoop.java:55) ~[classes/:na]
+	at java.base/java.lang.Thread.run(Thread.java:1583) ~[na:na]
+
+2026-10-31T00:50:21.609-07:00  INFO 90347 --- [analytics-service] [       Thread-2] c.s.s.analytics.pipeline.FilterLoop      : pipeline stage 'sink' stopped
+2026-10-31T00:50:21.611-07:00  INFO 90347 --- [analytics-service] [       t-window] c.s.s.analytics.pipeline.FilterLoop      : pipeline stage 'window' started
+2026-10-31T00:50:21.611-07:00  INFO 90347 --- [analytics-service] [       t-poller] c.s.s.analytics.pipeline.ScanLogPoller   : pipeline stage 'poller' started after seq 0
+2026-10-31T00:50:21.611-07:00  INFO 90347 --- [analytics-service] [         t-rank] c.s.s.analytics.pipeline.FilterLoop      : pipeline stage 'rank' started
+2026-10-31T00:50:21.611-07:00  INFO 90347 --- [analytics-service] [         t-sink] c.s.s.analytics.pipeline.FilterLoop      : pipeline stage 'sink' started
+2026-10-31T00:50:21.719-07:00  INFO 90347 --- [analytics-service] [       t-poller] c.s.s.analytics.pipeline.ScanLogPoller   : pipeline stage 'poller' stopped at seq 2600
+2026-10-31T00:50:21.771-07:00  INFO 90347 --- [analytics-service] [       t-window] c.s.s.analytics.pipeline.FilterLoop      : pipeline stage 'window' stopped
+2026-10-31T00:50:21.771-07:00  INFO 90347 --- [analytics-service] [         t-sink] c.s.s.analytics.pipeline.FilterLoop      : pipeline stage 'sink' stopped
+2026-10-31T00:50:21.771-07:00  INFO 90347 --- [analytics-service] [         t-rank] c.s.s.analytics.pipeline.FilterLoop      : pipeline stage 'rank' stopped
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.280 s -- in com.selfcheckout.self_checkout.analytics.pipeline.PipelineEndToEndTest
+[INFO] Running com.selfcheckout.self_checkout.analytics.pipeline.BlockingQueuePipeTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.018 s -- in com.selfcheckout.self_checkout.analytics.pipeline.BlockingQueuePipeTest
+[INFO] Running com.selfcheckout.self_checkout.analytics.pipeline.ScanLogPollerTest
+2026-10-31T00:50:21.804-07:00  WARN 90347 --- [analytics-service] [           main] c.s.s.analytics.pipeline.ScanLogPoller   : scan_log gap: expected seq 3 but next row is 4; holding at 2 until it appears
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s -- in com.selfcheckout.self_checkout.analytics.pipeline.ScanLogPollerTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 24, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Summary for self-checkout 0.0.1-SNAPSHOT:
+[INFO] 
+[INFO] self-checkout ...................................... SUCCESS [  0.001 s]
+[INFO] messaging .......................................... SUCCESS [  0.377 s]
+[INFO] shared-web ......................................... SUCCESS [  0.029 s]
+[INFO] catalog-client ..................................... SUCCESS [  0.030 s]
+[INFO] catalog-service .................................... SUCCESS [  3.865 s]
+[INFO] checkout-service ................................... SUCCESS [  5.844 s]
+[INFO] inventory-service .................................. SUCCESS [  3.281 s]
+[INFO] analytics-service .................................. SUCCESS [  4.751 s]
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  18.349 s
+[INFO] Finished at: 2026-10-31T00:50:22-07:00
+[INFO] ------------------------------------------------------------------------
