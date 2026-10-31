@@ -176,6 +176,8 @@ import json,sys; r=json.load(open(sys.argv[1]))
 e=sum(o['errorCount'] for o in r['operations'])
 print(f"  load without analytics: {r['transactionsPerSecond']:.1f} tx/s, {e} errors on start/scan/complete")
 PY
+expect "client errors while analytics is down (checkout must be unaffected)" \
+       "$(python3 -c "import json;print(sum(o['errorCount'] for o in json.load(open('$OUT/D-report.json'))['operations']))")" 0
 sleep 2
 say "     waiting in analytics.scans: $(depth analytics.scans) batches; scan_log rows: $(q analytics_db 'SELECT count(*) FROM scan_log')"
 start1 analytics-service 8084 512m
