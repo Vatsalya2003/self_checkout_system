@@ -1,0 +1,39 @@
+Self-Checkout Load Client starting...
+  baseUrl=http://localhost:8080 stations=10 duration=60s basket=[1..20]
+Fetching catalog...
+Catalog loaded: 2000 items.
+Starting 10 simulated station(s) for 60s...
+Duration elapsed, waiting for in-flight transactions to finish...
+Fetching low-stock alerts and popular items...
+
+================ LOAD TEST REPORT ================
+Base URL:        http://localhost:8080
+Stations:        10
+Duration:        60.0s (requested 60s)
+Transactions:    29584 (492.9/sec)
+Items scanned:   308832 (5146.0/sec)
+
+Operation                    OK   Errors   Mean(ms)    P50(ms)    P95(ms)    P99(ms)    Max(ms)     Err%
+START_TRANSACTION         29584        0       0.31       0.20       0.64       1.64      57.44    0.00%
+SCAN_ITEM                308832        0       0.25       0.18       0.48       1.30      91.23    0.00%
+COMPLETE_TRANSACTION      29584        0      17.37      10.94      48.01     117.78    1055.64    0.00%
+
+Low-stock alerts (3):
+  SKU-000001   Item 1                         stock=0      threshold=50
+  SKU-000002   Item 2                         stock=0      threshold=50
+  SKU-000003   Item 3                         stock=0      threshold=50
+
+Most popular items (top 10):
+  #1   SKU-000001   Item 1                         scans=141
+  #2   SKU-000002   Item 2                         scans=63
+  #3   SKU-000003   Item 3                         scans=35
+  #4   SKU-000005   Item 5                         scans=23
+  #5   SKU-000004   Item 4                         scans=22
+  #6   SKU-000007   Item 7                         scans=16
+  #7   SKU-000008   Item 8                         scans=15
+  #8   SKU-000006   Item 6                         scans=13
+  #9   SKU-000010   Item 10                        scans=12
+  #10  SKU-000009   Item 9                         scans=11
+===================================================
+
+JSON report written to: /Users/rohitdabhi/Desktop/ADV_SOFT_DEV/self-checkout/reports/event-driven/baseline-week5/report-20261030-220405.json
