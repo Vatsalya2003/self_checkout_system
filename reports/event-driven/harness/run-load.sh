@@ -13,12 +13,18 @@ mkdir -p "$OUT"; OUT=$(cd "$OUT" && pwd)
 free_gb() { df -g /System/Volumes/Data | awk 'NR==2{print $4}'; }
 [ "$(free_gb)" -ge 3 ] || { echo "ABORT: only $(free_gb) GB free" >&2; exit 2; }
 
-# idle: 1-minute load below 3.0 (up to 6 min), and settle after the previous run
-for i in $(seq 120); do
+# idle: wait up to 10 min for a 1-minute load below 3.0; if it does not settle,
+# accept below 4.0 (waiting up to 10 more min), else abort. The load before
+# each run is recorded in its summary either way.
+gate=3.0
+for i in $(seq 240); do
   l1=$(sysctl -n vm.loadavg | awk '{print $2}')
-  awk "BEGIN{exit !($l1 < 3.0)}" && break; sleep 5
+  awk "BEGIN{exit !($l1 < $gate)}" && break
+  [ $i = 120 ] && gate=4.0
+  sleep 5
 done
-awk "BEGIN{exit !($l1 < 3.0)}" || { echo "ABORT: machine not idle (1-min load $l1)" >&2; exit 3; }
+awk "BEGIN{exit !($l1 < $gate)}" || { echo "ABORT: machine not idle (1-min load $l1)" >&2; exit 3; }
+echo "$LABEL: started at 1-min load $l1 (gate $gate)" >&2
 
 scripts/stop-all.sh >/dev/null 2>&1
 db/reset.sh >/dev/null || { echo "reset failed" >&2; exit 1; }
@@ -40,7 +46,7 @@ mv "$(ls -t "$OUT"/report-*.json | head -1)" "$OUT/$LABEL-report.json"
 sleep 11   # let every service print its next metrics line
 {
   echo "label=$LABEL stations=$ST duration=$DUR"
-  echo "load before: $lb"; echo "load after:  $la"
+  echo "load before: $lb   (idle gate used: 1-min load < $gate)"; echo "load after:  $la"
   join <(echo "$before" | sort) <(echo "$after" | sort) | while read n a b; do
     awk -v n="$n" -v a="$a" -v b="$b" -v w=$((t1 - t0)) 'BEGIN{printf "cpu %-20s %6.1f %%  (of one core, avg over %d s)\n", n, (b-a)*100/w, w}'
   done

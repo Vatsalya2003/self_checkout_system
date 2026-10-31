@@ -1,0 +1,37 @@
+label=default-run1 stations=10 duration=60
+load before: { 3.69 5.81 6.81 }   (idle gate used: 1-min load < 3.0)
+load after:  { 10.65 7.46 7.36 }
+cpu analytics-service      16.3 %  (of one core, avg over 61 s)
+cpu catalog-service         0.3 %  (of one core, avg over 61 s)
+cpu checkout-service      106.1 %  (of one core, avg over 61 s)
+cpu inventory-service      34.4 %  (of one core, avg over 61 s)
+cpu nginx                  25.7 %  (of one core, avg over 61 s)
+cpu postgres               96.4 %  (of one core, avg over 61 s)
+cpu rabbitmq               81.5 %  (of one core, avg over 61 s)
+2026-10-31T12:00:54.420-07:00  INFO 6350 --- [checkout-service] [scanlog-metrics] c.s.s.scanlog.ScanLogPublisher           : scan-log publisher | accepted=331316 written=331316 dropped=0 lost=0 | batches=1088 avgBatch=304 | queue depth=0 max=73 cap=65536 | writeErrors=0
+2026-10-31T12:00:54.408-07:00  INFO 6350 --- [checkout-service] [   saga-metrics] c.s.s.transactions.SagaCounters          : saga | payments=31531 stockRetries=0 replayed=0 rolledBack=0 ambiguous=0 resolved=0 recovered=0 finishRetries=0 | stock call mean=12984us max=927ms | haltHook=off
+2026-10-31T12:00:55.394-07:00  INFO 6356 --- [analytics-service] [ipeline-metrics] c.s.s.a.pipeline.AnalyticsPipeline       : analytics lag | lastSeq=331316 | behind scan_log now=0 max=487 mean=131 scans | read lag mean=63 max=852 ms | gapStalls=0
+2026-10-31T12:00:54.408-07:00  INFO 6350 --- [checkout-service] [-client-metrics] c.s.s.remote.BrokerInventoryClient       : stock-commit client | published=31531 notDelivered=0 unconfirmed=0 noReply=0 | replies=31531 stray=0 waiting=0
+2026-10-31T12:00:52.729-07:00  INFO 6353 --- [inventory-service] [-commit-metrics] c.s.s.api.StockCommitListener            : stock-commit listener | requests=31531 committed=31531 replayed=0 rejected=0 dbRetries=0 replyRetries=0
+2026-10-31T12:00:55.016-07:00  INFO 6356 --- [analytics-service] [-ingest-metrics] c.s.self_checkout.api.ScanBatchListener  : scan ingest | batches=1088 stored=331316 duplicates=0 rejected=0 dbRetries=0 lastSeq=331316
+  dead letters | catalog.requests.dlq=0
+  dead letters | checkout.stock-replies.dlq=0
+  dead letters | inventory.stock-commit.dlq=0
+  dead letters | analytics.scans.dlq=0
+broker queues after the run (name messages consumers):
+    name	messages	consumers
+    checkout.stock-replies	0	4
+    catalog.requests.dlq	0	0
+    inventory.stock-commit.dlq	0	0
+    analytics.scans	0	1
+    analytics.scans.dlq	0	0
+    catalog.requests	0	1
+    inventory.stock-commit	0	32
+    checkout.stock-replies.dlq	0	0
+  tx/s=525.4 tx=31531 items=331316 wall=60.0s
+  START_TRANSACTION      ok=31531 err=0 mean=0.285 p50=0.211 p95=0.540 p99=1.369 max=39.5 ms
+  SCAN_ITEM              ok=331316 err=0 mean=0.232 p50=0.187 p95=0.412 p99=0.893 max=123.6 ms
+  COMPLETE_TRANSACTION   ok=31531 err=0 mean=16.305 p50=11.270 p95=39.998 p99=91.490 max=932.6 ms
+  stock commit timings | commits=31531 | mean lockWait=8756us criticalSection=1918us | implied ceiling if 66% of baskets share the hottest SKU: 789 tx/s
+postgres: commit_delay=0 commit_siblings=5 fsync=on synchronous_commit=on
+disk free after: 6 GB
