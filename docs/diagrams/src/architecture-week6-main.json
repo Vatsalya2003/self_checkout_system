@@ -1,0 +1,542 @@
+{
+ "schema_version": 1,
+ "diagram_type": "architecture",
+ "meta": {
+  "title": "Week 6: Event-Driven Self-Checkout",
+  "locale": "en",
+  "quality_profile": "standard",
+  "viewBox": [
+   1580,
+   1090
+  ]
+ },
+ "components": [
+  {
+   "id": "client",
+   "type": "external",
+   "label": "Load client",
+   "sublabel": "10 or 100 stations",
+   "pos": [
+    420,
+    40
+   ],
+   "size": [
+    160,
+    60
+   ]
+  },
+  {
+   "id": "gateway",
+   "type": "cloud",
+   "label": "nginx gateway",
+   "sublabel": ":8080 \u00b7 the only HTTP entry",
+   "pos": [
+    640,
+    36
+   ],
+   "size": [
+    260,
+    68
+   ]
+  },
+  {
+   "id": "inventory",
+   "type": "backend",
+   "label": "inventory-service",
+   "sublabel": ":8083",
+   "pos": [
+    60,
+    230
+   ],
+   "size": [
+    190,
+    76
+   ]
+  },
+  {
+   "id": "checkout",
+   "type": "backend",
+   "label": "checkout-service",
+   "sublabel": ":8082",
+   "pos": [
+    700,
+    230
+   ],
+   "size": [
+    190,
+    76
+   ],
+   "tag": "saga orchestrator"
+  },
+  {
+   "id": "analytics",
+   "type": "backend",
+   "label": "analytics-service",
+   "sublabel": ":8084",
+   "pos": [
+    1120,
+    230
+   ],
+   "size": [
+    190,
+    76
+   ]
+  },
+  {
+   "id": "invdb",
+   "type": "database",
+   "label": "inventory_db",
+   "sublabel": "Postgres",
+   "pos": [
+    280,
+    246
+   ],
+   "size": [
+    130,
+    44
+   ]
+  },
+  {
+   "id": "codb",
+   "type": "database",
+   "label": "checkout_db",
+   "sublabel": "Postgres",
+   "pos": [
+    530,
+    246
+   ],
+   "size": [
+    120,
+    44
+   ]
+  },
+  {
+   "id": "andb",
+   "type": "database",
+   "label": "analytics_db",
+   "sublabel": "Postgres",
+   "pos": [
+    1340,
+    246
+   ],
+   "size": [
+    130,
+    44
+   ]
+  },
+  {
+   "id": "qstock",
+   "type": "messagebus",
+   "label": "inventory.stock-commit",
+   "sublabel": "queue \u00b7 32 consumers",
+   "pos": [
+    330,
+    380
+   ],
+   "size": [
+    200,
+    56
+   ]
+  },
+  {
+   "id": "qreply",
+   "type": "messagebus",
+   "label": "checkout.stock-replies",
+   "sublabel": "queue \u00b7 4 consumers",
+   "pos": [
+    330,
+    480
+   ],
+   "size": [
+    200,
+    56
+   ]
+  },
+  {
+   "id": "qscans",
+   "type": "messagebus",
+   "label": "analytics.scans",
+   "sublabel": "queue \u00b7 1 consumer",
+   "pos": [
+    930,
+    380
+   ],
+   "size": [
+    160,
+    56
+   ]
+  },
+  {
+   "id": "qcatreq",
+   "type": "messagebus",
+   "label": "catalog.requests",
+   "sublabel": "queue",
+   "pos": [
+    300,
+    720
+   ],
+   "size": [
+    210,
+    60
+   ]
+  },
+  {
+   "id": "xsnap",
+   "type": "messagebus",
+   "label": "catalog.snapshots",
+   "sublabel": "fanout exchange",
+   "pos": [
+    1100,
+    720
+   ],
+   "size": [
+    230,
+    60
+   ]
+  },
+  {
+   "id": "catalog",
+   "type": "backend",
+   "label": "catalog-service",
+   "sublabel": ":8081",
+   "pos": [
+    680,
+    880
+   ],
+   "size": [
+    200,
+    76
+   ]
+  },
+  {
+   "id": "catdb",
+   "type": "database",
+   "label": "catalog_db",
+   "sublabel": "Postgres",
+   "pos": [
+    490,
+    896
+   ],
+   "size": [
+    130,
+    44
+   ]
+  }
+ ],
+ "boundaries": [
+  {
+   "kind": "region",
+   "label": "RabbitMQ :5672 \u00b7 durable classic queues \u00b7 persistent messages \u00b7 publisher confirms",
+   "wraps": [
+    "qstock",
+    "qreply",
+    "qscans",
+    "qcatreq",
+    "xsnap"
+   ]
+  }
+ ],
+ "connections": [
+  {
+   "id": "client-gateway",
+   "from": "client",
+   "to": "gateway",
+   "label": "HTTP",
+   "variant": "default",
+   "fromSide": "right",
+   "toSide": "left"
+  },
+  {
+   "id": "gateway-inventory",
+   "from": "gateway",
+   "to": "inventory",
+   "label": "HTTP /inventory/**",
+   "variant": "default",
+   "fromSide": "bottom",
+   "toSide": "top"
+  },
+  {
+   "id": "gateway-checkout",
+   "from": "gateway",
+   "to": "checkout",
+   "label": "HTTP /transactions/**",
+   "variant": "default",
+   "fromSide": "bottom",
+   "toSide": "top"
+  },
+  {
+   "id": "gateway-analytics",
+   "from": "gateway",
+   "to": "analytics",
+   "label": "HTTP /analytics/**",
+   "variant": "default",
+   "fromSide": "bottom",
+   "toSide": "top"
+  },
+  {
+   "id": "gateway-catalog",
+   "from": "gateway",
+   "to": "catalog",
+   "label": "HTTP /items",
+   "variant": "default",
+   "fromSide": "right",
+   "toSide": "right",
+   "via": [
+    [
+     1530,
+     70
+    ],
+    [
+     1530,
+     918
+    ]
+   ]
+  },
+  {
+   "id": "inventory-invdb",
+   "from": "inventory",
+   "to": "invdb",
+   "label": "SQL",
+   "variant": "default",
+   "fromSide": "right",
+   "toSide": "left"
+  },
+  {
+   "id": "checkout-codb",
+   "from": "checkout",
+   "to": "codb",
+   "label": "SQL",
+   "variant": "default",
+   "fromSide": "left",
+   "toSide": "right"
+  },
+  {
+   "id": "analytics-andb",
+   "from": "analytics",
+   "to": "andb",
+   "label": "SQL",
+   "variant": "default",
+   "fromSide": "right",
+   "toSide": "left"
+  },
+  {
+   "id": "catalog-catdb",
+   "from": "catalog",
+   "to": "catdb",
+   "label": "SQL",
+   "variant": "default",
+   "fromSide": "left",
+   "toSide": "right"
+  },
+  {
+   "id": "checkout-qstock",
+   "from": "checkout",
+   "to": "qstock",
+   "label": "StockCommitRequested",
+   "variant": "emphasis",
+   "fromSide": "bottom",
+   "toSide": "right"
+  },
+  {
+   "id": "qstock-inventory",
+   "from": "qstock",
+   "to": "inventory",
+   "label": "StockCommitRequested",
+   "variant": "emphasis",
+   "fromSide": "left",
+   "toSide": "bottom"
+  },
+  {
+   "id": "inventory-qreply",
+   "from": "inventory",
+   "to": "qreply",
+   "label": "StockCommitted / Rejected",
+   "variant": "emphasis",
+   "fromSide": "bottom",
+   "toSide": "left"
+  },
+  {
+   "id": "qreply-checkout",
+   "from": "qreply",
+   "to": "checkout",
+   "label": "StockCommitted / Rejected",
+   "variant": "emphasis",
+   "fromSide": "right",
+   "toSide": "bottom"
+  },
+  {
+   "id": "checkout-qscans",
+   "from": "checkout",
+   "to": "qscans",
+   "label": "ScansRecorded",
+   "variant": "default",
+   "fromSide": "bottom",
+   "toSide": "top"
+  },
+  {
+   "id": "qscans-analytics",
+   "from": "qscans",
+   "to": "analytics",
+   "label": "ScansRecorded",
+   "variant": "default",
+   "fromSide": "top",
+   "toSide": "bottom"
+  },
+  {
+   "id": "inventory-qcatreq",
+   "from": "inventory",
+   "to": "qcatreq",
+   "label": "CatalogRequested",
+   "variant": "dashed",
+   "fromSide": "left",
+   "toSide": "left",
+   "via": [
+    [
+     40,
+     268
+    ],
+    [
+     40,
+     750
+    ]
+   ],
+   "labelSegment": 2
+  },
+  {
+   "id": "checkout-qcatreq",
+   "from": "checkout",
+   "to": "qcatreq",
+   "label": "CatalogRequested",
+   "variant": "dashed",
+   "fromSide": "right",
+   "toSide": "top",
+   "via": [
+    [
+     910,
+     268
+    ],
+    [
+     910,
+     640
+    ],
+    [
+     405,
+     640
+    ]
+   ],
+   "labelSegment": 2
+  },
+  {
+   "id": "analytics-qcatreq",
+   "from": "analytics",
+   "to": "qcatreq",
+   "label": "CatalogRequested",
+   "variant": "dashed",
+   "fromSide": "left",
+   "toSide": "right",
+   "via": [
+    [
+     1104,
+     268
+    ],
+    [
+     1104,
+     600
+    ],
+    [
+     560,
+     600
+    ],
+    [
+     560,
+     750
+    ]
+   ],
+   "labelSegment": 2
+  },
+  {
+   "id": "qcatreq-catalog",
+   "from": "qcatreq",
+   "to": "catalog",
+   "label": "CatalogRequested",
+   "variant": "dashed",
+   "fromSide": "bottom",
+   "toSide": "top"
+  },
+  {
+   "id": "catalog-xsnap",
+   "from": "catalog",
+   "to": "xsnap",
+   "label": "CatalogPublished",
+   "variant": "dashed",
+   "fromSide": "top",
+   "toSide": "bottom"
+  },
+  {
+   "id": "xsnap-inventory",
+   "from": "xsnap",
+   "to": "inventory",
+   "label": "CatalogPublished",
+   "variant": "dashed",
+   "fromSide": "right",
+   "toSide": "bottom",
+   "via": [
+    [
+     1410,
+     750
+    ],
+    [
+     1410,
+     990
+    ],
+    [
+     155,
+     990
+    ]
+   ]
+  },
+  {
+   "id": "xsnap-checkout",
+   "from": "xsnap",
+   "to": "checkout",
+   "label": "CatalogPublished",
+   "variant": "dashed",
+   "fromSide": "left",
+   "toSide": "bottom"
+  },
+  {
+   "id": "xsnap-analytics",
+   "from": "xsnap",
+   "to": "analytics",
+   "label": "CatalogPublished",
+   "variant": "dashed",
+   "fromSide": "top",
+   "toSide": "bottom"
+  }
+ ],
+ "cards": [
+  {
+   "dot": "emerald",
+   "title": "HTTP only at the edge",
+   "items": [
+    "Client \u2192 gateway \u2192 one service is the only HTTP.",
+    "Services never call each other: every cross-service step is a message through RabbitMQ."
+   ]
+  },
+  {
+   "dot": "orange",
+   "title": "Payment saga (bold)",
+   "items": [
+    "checkout publishes StockCommitRequested; inventory commits, then replies.",
+    "Messages are acked only after the database commit."
+   ]
+  },
+  {
+   "dot": "violet",
+   "title": "Catalog at startup (dashed)",
+   "items": [
+    "Each service sends CatalogRequested; catalog broadcasts CatalogPublished to all three."
+   ]
+  }
+ ]
+}
