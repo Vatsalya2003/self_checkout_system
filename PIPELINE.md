@@ -21,6 +21,13 @@
 > thread **pushes** the same numbered batches to analytics-service (`POST /internal/scans`).
 > Analytics stores them in its own `scan_log`, and the poller, window, rank and sink are
 > unchanged.
+>
+> **Week 6 update (events, see [EVENTS.md](EVENTS.md); the current build).** The batches now
+> travel as `ScansRecorded` messages through RabbitMQ's `analytics.scans` queue instead of
+> `POST /internal/scans`, and **analytics numbers the scans** as it stores them (checkout no
+> longer does). From `scan_log` on, the poller, window, rank and sink are unchanged.
+>
+> Everything below this box is the Week 3 description, kept as history.
 
 The **windowed analytics** of the self-checkout system are built as **filters
 connected by pipes**. Checkout itself (start / scan / complete, row locking,

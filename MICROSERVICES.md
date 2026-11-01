@@ -1,8 +1,11 @@
 # Microservices (Week 5)
 
-> **Since Week 6** the services, their databases and the saga's steps are unchanged, but the
-> services no longer call each other over HTTP: every cross-service message goes through
-> RabbitMQ. See [EVENTS.md](EVENTS.md). The HTTP calls below describe Week 5.
+> **History: Week 5 document (tag `microservices-v1`).** In Week 6, the current build, the
+> services, their databases and the saga's steps are unchanged, but the services no longer
+> call each other over HTTP: every cross-service message goes through RabbitMQ. See
+> [EVENTS.md](EVENTS.md) and the
+> [main Week 6 diagram](docs/diagrams/architecture-week6-main.svg). The HTTP calls, the
+> "inventory down" behaviour and the scan push below describe Week 5.
 
 The self-checkout system is four **independently deployable microservices**:
 - **Own database:** each service has its own database, which only its own PostgreSQL role can open.
@@ -72,4 +75,7 @@ Paying changes two databases owned by two services: stock in `inventory_db` and 
 
 ## Results
 
-See [README.md](README.md#results) and [ARCHITECTURE.md § Week 5](ARCHITECTURE.md#week-5-microservices).
+Week 5 results: [ARCHITECTURE.md § Week 5](ARCHITECTURE.md#week-5-microservices) (submitted
+852.4 / 806.0 tx/s, reports on the
+[`microservices-v1` tag](https://github.com/Vatsalya2003/self_checkout_system/tree/microservices-v1/reports)).
+The current Week 6 results are in [README.md](README.md#results).

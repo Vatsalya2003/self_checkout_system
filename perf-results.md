@@ -1,5 +1,9 @@
 # Performance results
 
+> **History: Week 3 performance work** (single application, tag `pipeline-v2`). These are
+> not the current numbers. Week 6 results are in [README.md](README.md#results) and
+> [ARCHITECTURE.md § W6.8](ARCHITECTURE.md#w68-results).
+
 Every number here comes from a real run on this laptop (8 cores, PostgreSQL 16
 via Homebrew, server and load client on the same machine). Raw reports are kept
 under `reports/perf/<phase>/` on the [`pipeline-v2` tag](https://github.com/Vatsalya2003/self_checkout_system/tree/pipeline-v2/reports/perf). Nothing is hand-written or rounded up, and no run

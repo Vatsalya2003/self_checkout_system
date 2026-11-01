@@ -3,13 +3,16 @@
 A walkthrough of the whole project: what it does, how it is built, why each
 decision was made, and how to run and explain it.
 
-The code is organized into **four layers** — `api`, `transactions`,
-`analytics`, `persistence` — with the dependency rules between them enforced by
-an automated test. §3 and §4.5 cover how they talk to each other.
-
-Inside the analytics layer, the windowed analytics run as a **pipeline of five
-filters connected by bounded queues** — see §4.6 and
-[PIPELINE.md](PIPELINE.md).
+**How this guide is ordered.** The newest week comes first:
+- **Week 6 (current):** four services that talk to each other only through RabbitMQ. Start
+  with the section right below.
+- **Week 5:** the four services, the database each one owns, and the payment saga's steps.
+  Still true; only the transport between services changed in Week 6.
+- **§1–§12:** written for the single application of Weeks 1–3, and kept as history. The
+  explanations of locking, the clamp, in-memory baskets and the analytics filters
+  (window → rank → sink, [PIPELINE.md](PIPELINE.md)) still hold *inside* the services.
+  The run instructions in §9 are for that single application; for Week 6, use
+  [Running it](#running-it) below or the [README](README.md#how-to-run).
 
 For **measured results and architectural trade-offs**, see
 [ARCHITECTURE.md](ARCHITECTURE.md). This guide deliberately does not repeat the
@@ -23,6 +26,11 @@ numbers — it explains the *machinery* that produced them.
 Everything one service says to another is a message through **RabbitMQ**. Each service
 still has its own database, and nginx on `:8080` still gives the load client one base URL.
 [EVENTS.md](EVENTS.md) is the one-page summary.
+
+[![Main Week 6 architecture: the load client sends HTTP to the nginx gateway, which forwards HTTP to the four services, each with its own Postgres database. Services never call each other; every cross-service message goes through RabbitMQ: StockCommitRequested and StockCommitted / Rejected (payment saga), ScansRecorded (scans), CatalogRequested and CatalogPublished (catalog at startup).](docs/diagrams/architecture-week6-main.svg)](docs/diagrams/architecture-week6-main.png)
+
+Grey arrows are HTTP and SQL; coloured arrows are messages through RabbitMQ, labelled with the
+event name and pointing from publisher to queue to consumer.
 
 The Week 5 section below still describes the data each service owns and the payment saga's
 steps. What changed is the **transport** between the services, and this section covers it.
@@ -264,7 +272,11 @@ scripts/stop-all.sh
 
 ## Table of contents
 
-0. [Week 5: four microservices, four databases](#week-5-four-microservices-four-databases)
+- [Week 6: every cross-service message through RabbitMQ](#week-6-every-cross-service-message-through-rabbitmq) (current)
+- [Week 5: four microservices, four databases](#week-5-four-microservices-four-databases)
+
+*§1–§12: the single application of Weeks 1–3, kept as history.*
+
 1. [What the system does](#1-what-the-system-does)
 2. [Tech stack, and why each piece](#2-tech-stack-and-why-each-piece)
 3. [Architecture](#3-architecture)
@@ -1355,6 +1367,12 @@ them, and because with raw scan persistence switched on the writer does
 
 ## 9. How to run everything
 
+> **History: Weeks 1–3, the single application.** These commands start the old single
+> application (`createdb self_checkout`, `./mvnw spring-boot:run`) and no longer apply to this
+> branch. To run Week 6, use [Running it](#running-it) above or the
+> [README](README.md#how-to-run): PostgreSQL, RabbitMQ, `db/reset.sh`, then
+> `scripts/start-all.sh`.
+
 ### Prerequisites
 
 - A full **JDK 21** (not just a JRE — the load client needs `javac`)
@@ -1580,11 +1598,14 @@ itself was starved — that's a host problem, not a code problem.
 
 ## 12. Where the results live
 
-This guide covers *how it works*. For **what it measured** — the two load runs,
-the latency percentiles, the lock-order A/B, the prioritized architectural
-characteristics and their trade-offs — see:
+This guide covers *how it works*. For **what it measured**, week by week (Week 6 in
+[§ W6.8](ARCHITECTURE.md#w68-results) and [§ W6.9](ARCHITECTURE.md#w69-why-it-is-about-2025--slower)),
+and the architectural trade-offs, see:
 
 ### → [ARCHITECTURE.md](ARCHITECTURE.md)
 
-Raw data: [`reports/report-default-10stations-60s.json`](reports/report-default-10stations-60s.json)
-and [`reports/report-stress-100stations-120s.json`](reports/report-stress-100stations-120s.json).
+Raw data for Week 6: the two graded reports,
+[`reports/report-default-10stations-60s.json`](reports/report-default-10stations-60s.json)
+(667.2 tx/s) and [`reports/report-stress-100stations-120s.json`](reports/report-stress-100stations-120s.json)
+(653.6 tx/s), and every raw run in [`docs/perf/week6-raw/`](docs/perf/week6-raw/). Earlier
+weeks' reports are on their tags.

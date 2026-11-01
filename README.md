@@ -11,12 +11,20 @@ keep their own database, but they no longer call each other over HTTP: **all cro
 communication is events through a RabbitMQ broker.** Spring Boot 4.1.1, Spring AMQP 4.1.1,
 RabbitMQ 4.4.0, Java 21, PostgreSQL 16, nginx.
 
+[![Main Week 6 architecture. The load client sends HTTP to the nginx gateway on :8080, which forwards HTTP to inventory-service :8083, checkout-service :8082, analytics-service :8084 and catalog-service :8081; each has its own Postgres database. Services never call each other: inside RabbitMQ :5672, checkout publishes StockCommitRequested to the inventory.stock-commit queue, which inventory consumes; inventory publishes StockCommitted or StockCommitRejected to checkout.stock-replies, which checkout consumes; checkout publishes ScansRecorded to analytics.scans, which analytics consumes. At startup inventory, checkout and analytics each send CatalogRequested to catalog.requests, which catalog consumes; catalog publishes CatalogPublished to the catalog.snapshots fanout exchange, which delivers a copy to all three.](docs/diagrams/architecture-week6-main.svg)](docs/diagrams/architecture-week6-main.png)
+
+*The Week 6 system.* Grey arrows are HTTP (only load client → gateway → one service) and SQL
+(each service to its own database). Coloured arrows are messages through RabbitMQ, labelled
+with the event name: **bold green** is the payment saga, **grey** is scans, **dashed purple**
+is loading the catalog at startup. No arrow goes from one service to another.
+[How to read it, step by step](#architecture).
+
 > ## Week 6 submission
 >
 > - **Load-test reports** in [`reports/`](reports/):
 >   - [`report-default-10stations-60s.json`](reports/report-default-10stations-60s.json): 10 stations, 60 s, **667.2 tx/s, 0 errors**
 >   - [`report-stress-100stations-120s.json`](reports/report-stress-100stations-120s.json): 100 stations, 120 s, **653.6 tx/s, 0 errors**
-> - **Architecture diagram (microservices + event broker):** [`docs/diagrams/architecture-events.svg`](docs/diagrams/architecture-events.svg), shown [below](#architecture)
+> - **Architecture diagram (services + RabbitMQ, every event):** [`docs/diagrams/architecture-week6-main.svg`](docs/diagrams/architecture-week6-main.svg) ([PNG](docs/diagrams/architecture-week6-main.png)), shown above
 > - **The broker, the events and the saga over events:** [EVENTS.md](EVENTS.md)
 > - Every raw run, check output and failure test is in [`docs/perf/week6-raw/`](docs/perf/week6-raw/).
 
@@ -24,7 +32,21 @@ RabbitMQ 4.4.0, Java 21, PostgreSQL 16, nginx.
 
 ## Architecture
 
-[![Load client to the nginx gateway on :8080, which routes to four services: catalog :8081, inventory :8083, checkout :8082 and analytics :8084, each with its own database. Inside RabbitMQ :5672: checkout publishes StockCommitRequested to the inventory.stock-commit queue, consumed by inventory; inventory publishes StockCommitted or StockCommitRejected to checkout.stock-replies, consumed by checkout; checkout publishes ScansRecorded to analytics.scans, consumed by analytics. At startup, inventory, checkout and analytics send CatalogRequested to catalog.requests, consumed by catalog, which publishes CatalogPublished on the catalog.snapshots fanout exchange to all three.](docs/diagrams/architecture-events.svg)](docs/diagrams/architecture-events.png)
+The diagram at the top is the whole system. In words:
+- **HTTP only at the edge.** The load client sends every request to the nginx gateway on
+  `:8080`, which forwards it to the one service that owns that path. Services never call
+  each other.
+- **Each service has its own Postgres database**, which only that service's role can open.
+- **Everything between services is a message through RabbitMQ:**
+  - **payment:** checkout → `StockCommitRequested` → inventory, and inventory →
+    `StockCommitted` / `StockCommitRejected` → checkout ([below](#paying-a-saga-over-events));
+  - **scans:** checkout → `ScansRecorded` → analytics ([below](#scans-to-analytics-over-events));
+  - **catalog at startup:** checkout, inventory and analytics → `CatalogRequested` → catalog,
+    and catalog → `CatalogPublished` (fanout) → all three.
+
+Each arrow was checked against the code: queue names in `messaging/…/Topology.java`, the
+publishers, and the `@RabbitListener` consumers. A full walkthrough is in
+[ARCHITECTURE.md § W6.2](ARCHITECTURE.md#w62-how-the-system-works).
 
 <details>
 <summary>Text version (Mermaid), if the image does not load</summary>
@@ -65,7 +87,7 @@ flowchart LR
 
 </details>
 
-Interactive versions for local viewing are in [`docs/diagrams/interactive/`](docs/diagrams/interactive/); click an image for its high-resolution PNG.
+Interactive versions for local viewing are in [`docs/diagrams/interactive/`](docs/diagrams/interactive/) (the main one is [`architecture-week6-main.html`](docs/diagrams/interactive/architecture-week6-main.html)); click an image for its high-resolution PNG. The earlier, denser Week 6 diagram is [`architecture-events.svg`](docs/diagrams/architecture-events.svg).
 
 ---
 
@@ -244,23 +266,37 @@ The submitted reports are the better of two runs of each kind (default 525.4 and
 stress 575.0 and **653.6**). The same-day Week 5 numbers match last week's submitted ones
 (852.4 / 806.0), so the machine was comparable.
 
-**Where the ~20 % went.**
-- **The bottleneck is unchanged:** the hottest SKU's row lock in inventory. Throughput is
-  roughly 1 ÷ (time the lock is held × share of baskets holding that SKU).
-- **The broker makes that lock slower to release:** RabbitMQ used about one CPU core (82–109 %)
-  on a laptop that is already CPU-bound, with Postgres, the services and the 100-thread load
-  client on 8 cores. As a result, inventory held the lock longer, about 1.6 ms per commit
-  instead of 1.2–1.3 ms.
-- **That accounts for the drop:** 1.21 ms → 1.56 ms is ×1.29, so throughput should fall to
-  about 0.77× — measured 0.79×.
-- **Under stress, payments now queue in a different place:** they wait in the broker queue
-  (`inventory.stock-commit`, with 32 consumers) instead of on the row lock. Lock wait fell from
-  118 ms to 45 ms, but the whole stock step rose from 119 ms to 147 ms.
+Week 6 is **about 20–25 % slower** (19–21 % comparing best runs, 24–26 % comparing means).
+All runs were on battery at 71 %, 11:53–12:32, same conditions for both builds.
 
-Full tables (per run, and CPU per process) are in
-[ARCHITECTURE.md § W6.8](ARCHITECTURE.md#w68-results). The Phase 1 prediction was 5–15 %
-lower; the measured 19–21 % is worse than predicted, because the broker's CPU competes with the
-lock holder.
+**Why it's slower.** At 10 stations, throughput = 10 ÷ time per transaction (each station
+waits for one to finish before starting the next). I profiled one default run on a separate
+local branch, `perf-investigation` (639.8 tx/s, invariant PASS, not a graded run). Time per
+transaction went from 11.8 ms to 15.6 ms:
+
+| Extra time per transaction | ms |
+|---|---|
+| messages travelling through the broker, there and back | +1.5 |
+| checkout's own database work and the start/scan requests, slower because the CPU is shared with RabbitMQ (about one core) | +1.4 |
+| waiting for the hottest row's lock | +0.5 |
+| holding that lock longer | +0.4 |
+
+- **The broker round trip is the biggest cost.**
+- **CPU contention is next.** The laptop was 95.6 % busy across 8 cores.
+- **The longer lock hold is only a small part.**
+
+My first explanation put it all on the lock hold (1.21 → 1.56 ms); the profile shows that
+matched the drop mostly by coincidence. It is one profiled run, compared against the graded
+Week 5 runs, so treat the split as a measurement, not a settled result.
+
+**Under stress the waiting moved:** payments now wait in the broker queue
+(`inventory.stock-commit`, 32 consumers) instead of on the row lock. Lock wait fell from
+118 ms to 45 ms, but the whole stock step rose from 119 ms to 147 ms.
+
+Full tables (every run, CPU per process, the profile) are in
+[ARCHITECTURE.md § W6.8](ARCHITECTURE.md#w68-results) and
+[§ W6.9](ARCHITECTURE.md#w69-why-it-is-about-2025--slower). I had predicted 5–15 % lower
+before building it; the measured drop is worse.
 
 ---
 
@@ -386,7 +422,7 @@ Other checks:
 | 3 | Pipelined analytics, then checkout performance work | [`pipeline-v1`](https://github.com/Vatsalya2003/self_checkout_system/tree/pipeline-v1) / [`pipeline-v2`](https://github.com/Vatsalya2003/self_checkout_system/tree/pipeline-v2) |
 | 4 | Service-based, one shared database | [`service-based-v1`](https://github.com/Vatsalya2003/self_checkout_system/tree/service-based-v1) |
 | 5 | Microservices, a database each, payment saga | [`microservices-v1`](https://github.com/Vatsalya2003/self_checkout_system/tree/microservices-v1) |
-| 6 | Event-based: all cross-service communication through RabbitMQ (this branch) | `event-driven-v1` |
+| 6 | Event-based: all cross-service communication through RabbitMQ (this branch) | [`event-driven-v1`](https://github.com/Vatsalya2003/self_checkout_system/tree/event-driven-v1) (submitted), `event-driven-v2` (same code and reports, rewritten docs and the main diagram) |
 
 ---
 

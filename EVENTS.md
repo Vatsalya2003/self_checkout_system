@@ -5,6 +5,12 @@ cross-service communication is a message through RabbitMQ.** The load client sti
 HTTP to the nginx gateway on `:8080`; that's client traffic, not service-to-service traffic.
 Each service still owns its own database.
 
+[![Main Week 6 architecture: the load client sends HTTP to the nginx gateway, which forwards HTTP to the four services, each with its own Postgres database. Services never call each other; every cross-service message goes through RabbitMQ: StockCommitRequested and StockCommitted / Rejected (payment saga), ScansRecorded (scans), CatalogRequested and CatalogPublished (catalog at startup).](docs/diagrams/architecture-week6-main.svg)](docs/diagrams/architecture-week6-main.png)
+
+Grey arrows are HTTP and SQL; coloured arrows are messages, labelled with the event name and
+pointing the way the message travels (publisher → queue → consumer). The walkthrough is in
+[ARCHITECTURE.md § W6.2](ARCHITECTURE.md#w62-how-the-system-works).
+
 ## The broker
 
 - **RabbitMQ 4.4.0**, one local node (Homebrew, `brew services start rabbitmq`), AMQP on `:5672`.
@@ -38,15 +44,17 @@ Each service still owns its own database.
   **persistent**, so they survive a broker restart.
 - **Publisher confirms and returns:** a message counts as sent only once the broker has
   acknowledged it.
-- **Consumer acks:** a consumer acknowledges a message only after its database commit.
+- **Consumer acks:** a consumer acknowledges a message only after its database commit
+  (Spring's `acknowledge-mode=auto`: ack when the listener returns, redeliver if it throws).
+  RabbitMQ's own auto-ack is never used.
 - **Concurrency:**
 
   | Consumer | Consumers | Prefetch |
   |---|---|---|
   | inventory | 32 competing | 1 each |
   | analytics | **1** (keeps order) | 10 |
-  | checkout's replies | 4 | — |
-  | catalog | 1 | — |
+  | checkout's replies | 4 | 50 |
+  | catalog | 1 | Spring's default (250) |
 
 - **Dead letters:** every queue has a dead-letter queue (`<queue>.dlq`). A message only goes
   there if it can never be read (not valid JSON); transient failures are retried instead.
@@ -142,9 +150,13 @@ Numbering inside the transaction that stores the scans has neither problem.
 
 ## Evidence
 
-- The two graded load-test reports are in [`reports/`](reports/); every raw run, summary and
-  invariant check is in [`docs/perf/week6-raw/`](docs/perf/week6-raw/). Ran on battery at 71 %,
-  11:53–12:32, same conditions for both builds.
+- The two graded load-test reports are in [`reports/`](reports/): **667.2 tx/s** (10
+  stations, 60 s) and **653.6 tx/s** (100 stations, 120 s), 0 errors. That is 21.1 % and
+  18.7 % below the same-day Week 5 re-run (845.2 / 803.8); the means of two runs are 25.6 %
+  and 23.6 % lower. Every raw run, summary and invariant check is in
+  [`docs/perf/week6-raw/`](docs/perf/week6-raw/). Ran on battery at 71 %, 11:53–12:32, same
+  conditions for both builds. Why it is slower is in
+  [ARCHITECTURE.md § W6.9](ARCHITECTURE.md#w69-why-it-is-about-2025--slower).
 - [`docs/perf/week6-raw/failure-tests.txt`](docs/perf/week6-raw/failure-tests.txt), all
   PASS. It tests:
   - the broker stopped under load;

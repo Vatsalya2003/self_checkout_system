@@ -10,6 +10,17 @@ database each, coordinated by a saga (Week 5, [§ Week 5](#week-5-microservices)
 finally with every cross-service call replaced by events through a message broker (Week 6,
 [§ Week 6](#week-6-event-based-architecture)).
 
+**The system as it is now (Week 6):**
+
+[![Main Week 6 architecture. The load client sends HTTP to the nginx gateway on :8080, which forwards HTTP to inventory-service, checkout-service, analytics-service and catalog-service; each has its own Postgres database. Services never call each other: every cross-service message goes through RabbitMQ — StockCommitRequested and StockCommitted / Rejected for the payment saga, ScansRecorded for scans, and CatalogRequested / CatalogPublished for loading the catalog at startup.](docs/diagrams/architecture-week6-main.svg)](docs/diagrams/architecture-week6-main.png)
+
+Grey arrows are HTTP (only client → gateway → one service) and SQL (each service to its own
+database). Coloured arrows are messages through RabbitMQ, labelled with the event name. How to
+read it and how each flow works is in [§ W6.2](#w62-how-the-system-works).
+
+The sections below are in the order the project was built, Week 2 first. Sections 1–7 describe
+the single application of Weeks 2–3 and are kept as history.
+
 Week 1 organized classes by technical type (`controller/`, `service/`,
 `repository/`). That reads like layers but nothing enforced it: HTTP types had
 already leaked into the business code, and the services built API-shaped DTOs.
@@ -17,8 +28,9 @@ In Week 2 the layers became real packages with **dependency rules enforced by a
 test that fails the build**.
 
 All numbers come from JSON reports produced by the unmodified course load
-client against the code as committed: the two graded runs in
-[`reports/`](reports/), and for the Week 3 performance work every run in
+client against the code as committed. On this branch,
+[`reports/`](reports/) holds only the two graded **Week 6** runs; each earlier week's graded
+reports are on that week's tag (linked in its section). For the Week 3 performance work every run is in
 [`reports/perf/` on the `pipeline-v2` tag](https://github.com/Vatsalya2003/self_checkout_system/tree/pipeline-v2/reports/perf) — including the ones that were reverted or taken while the
 machine was throttling, which are kept and labelled rather than dropped.
 Anything not measured is labelled a prediction.
@@ -118,9 +130,9 @@ is worth stating plainly because layering invites the opposite assumption:
 
 ---
 
-## 3. Measured results
+## 3. Measured results (Week 2)
 
-### 3.1 The two required runs
+### 3.1 The two required runs (Week 2, tag `layered-v1`)
 
 Both runs: server restarted immediately beforehand, machine idle (1-minute load
 average below 4 at start), SQL logging off.
@@ -1441,7 +1453,7 @@ Two other changes were prototyped and not measured, and are not in this version:
   - inventory: no negative stock, and `10000 − stock = Σ applied`;
   - checkout vs inventory: identical committed lines, and no PENDING sale left;
   - analytics: a gapless `scan_log`, with every window equal to a brute-force recount.
-- **Failure tests:** `scripts/test-failures.sh`, all PASS ([`reports/microservices/failure-tests.txt` on the `microservices-v1` tag](https://github.com/Vatsalya2003/self_checkout_system/tree/microservices-v1/reports/microservices/failure-tests.txt)).
+- **Failure tests:** `scripts/test-failures.sh`, all PASS ([`reports/microservices/failure-tests.txt` on the `microservices-v1` tag](https://github.com/Vatsalya2003/self_checkout_system/blob/microservices-v1/reports/microservices/failure-tests.txt)).
 
 | Case | What happened |
 |---|---|
@@ -1456,260 +1468,328 @@ Two other changes were prototyped and not measured, and are not in this version:
 
 ## Week 6: event-based architecture
 
-The four microservices and their four databases are unchanged, but **no service calls
-another any more**. Every cross-service message goes through **RabbitMQ**. The contract, the
-load client and every response body are unchanged: the 29-response golden diff through the
-gateway is identical. [EVENTS.md](EVENTS.md) is the one-page description.
+This week I kept the four microservices from Week 5, each with its own database, but I took
+away every HTTP call **between** them. When one service needs something from another, it now
+sends a message through **RabbitMQ**, a message broker: a separate program that holds messages
+in queues until the receiving service picks them up. The load client still talks HTTP to the
+nginx gateway, and the gateway still forwards HTTP to the right service. That is the only HTTP
+left in the system.
 
-### W6.1 What had to change, and why
+The API contract, the load client and every response body are unchanged. The 29-response
+golden diff through the gateway is identical to the single application's.
+[EVENTS.md](EVENTS.md) is the short reference for every event.
 
-Week 5 had four direct HTTP calls between services. Each one became an event:
+### W6.1 What changed from Week 5, and why
 
-| Week 5 (HTTP) | Week 6 (event, queue) | Kind |
+In Week 5 the services called each other directly over HTTP in four places. This week's task
+was to make all cross-service communication event-based, so I replaced each call with a
+message:
+
+| Week 5 (HTTP call) | Week 6 (message, and where it goes) | Kind |
 |---|---|---|
-| `GET /items` at startup | `CatalogRequested` → `catalog.requests`; catalog broadcasts `CatalogPublished` on the `catalog.snapshots` fanout | request → broadcast |
-| `POST /internal/stock/commit` | `StockCommitRequested` → `inventory.stock-commit` | command |
-| its response | `StockCommitted` / `StockCommitRejected` → `checkout.stock-replies` | reply, correlated by transaction id |
-| `POST /internal/scans` | `ScansRecorded {batchId}` → `analytics.scans` | event stream |
-| `GET /internal/scans/max-seq` | **removed**: analytics now numbers the scans | — |
+| checkout, inventory and analytics call `GET /items` on catalog at startup | they send `CatalogRequested` to the `catalog.requests` queue; catalog answers by broadcasting `CatalogPublished` on the `catalog.snapshots` fanout exchange | request, then broadcast |
+| checkout calls `POST /internal/stock/commit` on inventory | checkout sends `StockCommitRequested` to the `inventory.stock-commit` queue | command |
+| inventory's HTTP response | inventory sends `StockCommitted` or `StockCommitRejected` to the `checkout.stock-replies` queue | reply, matched by transaction id |
+| checkout calls `POST /internal/scans` on analytics | checkout sends `ScansRecorded` batches to the `analytics.scans` queue | stream of events |
+| checkout calls `GET /internal/scans/max-seq` on analytics | **removed**: analytics now numbers the scans itself | — |
 
-[![Load client to the nginx gateway on :8080, which routes to four services: catalog :8081, inventory :8083, checkout :8082 and analytics :8084, each with its own database. Inside RabbitMQ :5672: checkout publishes StockCommitRequested to the inventory.stock-commit queue, consumed by inventory; inventory publishes StockCommitted or StockCommitRejected to checkout.stock-replies, consumed by checkout; checkout publishes ScansRecorded to analytics.scans, consumed by analytics. At startup, inventory, checkout and analytics send CatalogRequested to catalog.requests, consumed by catalog, which publishes CatalogPublished on the catalog.snapshots fanout exchange to all three.](docs/diagrams/architecture-events.svg)](docs/diagrams/architecture-events.png)
+What I wanted from this:
+- **A service doesn't need the other one to be up right now.** With HTTP, if inventory was
+  down, checkout's call failed. Now the request waits in a queue, and inventory handles it
+  when it comes back.
+- **Scans stop piling up in checkout's memory** when analytics is down. They wait in the
+  broker instead, which writes them to disk.
+- **The services know less about each other.** Each one only knows the queue names and the
+  message formats, not the other services' ports or URLs.
 
-*Week 6 design (event-driven microservices).* Solid arrows are request traffic and the
-payment; dashed arrows are the startup catalog exchange and each service's own database.
-Event names are on the publishing arrows. The arrow from a queue to a service is that
-service consuming the event.
+The price is one more program to run, and extra time on every payment, which I measured
+(W6.8, W6.9).
 
-<details>
-<summary>Text version (Mermaid)</summary>
+### W6.2 How the system works
 
-```mermaid
-flowchart LR
-    LC["Load client<br/>one base URL"] -->|HTTP| GW["nginx :8080<br/>/internal/** = 404"]
-    GW --> CA["catalog-service :8081"]
-    GW --> IN["inventory-service :8083"]
-    GW --> CO["checkout-service :8082<br/>saga orchestrator"]
-    GW --> AN["analytics-service :8084"]
-    subgraph MQ["RabbitMQ :5672 (durable queues, persistent messages)"]
-        QR[["catalog.requests"]]
-        XS{{"catalog.snapshots (fanout)"}}
-        QS[["inventory.stock-commit"]]
-        QP[["checkout.stock-replies"]]
-        QA[["analytics.scans"]]
-    end
-    CO ==>|StockCommitRequested| QS
-    QS ==> IN
-    IN ==>|"StockCommitted / Rejected"| QP
-    QP ==> CO
-    CO -->|ScansRecorded| QA
-    QA --> AN
-    CO -.->|CatalogRequested| QR
-    IN -.->|CatalogRequested| QR
-    AN -.->|CatalogRequested| QR
-    QR -.-> CA
-    CA -.->|CatalogPublished| XS
-    XS -.-> CO
-    XS -.-> IN
-    XS -.-> AN
-    CA --- CAD[("catalog_db")]
-    IN --- IND[("inventory_db")]
-    CO --- COD[("checkout_db")]
-    AN --- AND[("analytics_db")]
-```
+[![Main Week 6 architecture. The load client sends HTTP to the nginx gateway on :8080, which forwards HTTP to inventory-service :8083, checkout-service :8082, analytics-service :8084 and catalog-service :8081; each service has its own Postgres database. Services never call each other: inside RabbitMQ :5672, checkout publishes StockCommitRequested to the inventory.stock-commit queue, which inventory consumes; inventory publishes StockCommitted or StockCommitRejected to checkout.stock-replies, which checkout consumes; checkout publishes ScansRecorded to analytics.scans, which analytics consumes. At startup inventory, checkout and analytics each send CatalogRequested to the catalog.requests queue, which catalog consumes; catalog publishes CatalogPublished to the catalog.snapshots fanout exchange, which delivers a copy to inventory, checkout and analytics.](docs/diagrams/architecture-week6-main.svg)](docs/diagrams/architecture-week6-main.png)
 
+*The main Week 6 diagram.* How to read it:
+- **Grey arrows are HTTP or SQL.** HTTP goes only from the load client to the gateway, and
+  from the gateway to one service. SQL goes only from a service to its own database.
+- **Coloured arrows are messages through RabbitMQ**, labelled with the event name. The
+  arrow points the way the message travels: from the service that publishes it into a queue,
+  and from the queue to the service that consumes it.
+  - **Bold green:** the payment saga.
+  - **Grey:** scans.
+  - **Dashed purple:** loading the catalog at startup.
+- **No arrow goes straight from one service to another.** Every cross-service path goes
+  through the RabbitMQ box.
 
-</details>
+I checked every arrow against the code. The queue and exchange names come from
+`messaging/…/Topology.java`. The publishers are `BrokerInventoryClient` and `BrokerScanSink`
+(checkout), `StockCommitListener` (inventory), `CatalogEventsListener` (catalog), and
+`BrokerCatalogCache` (in `catalog-client`, used by checkout, inventory and analytics). The
+consumers are the `@RabbitListener` methods in those same classes and in `ScanBatchListener`
+(analytics). The diagram leaves out two details, to stay readable:
+- every queue's dead-letter queue (`<queue>.dlq`, W6.7);
+- the small temporary queue each consumer of `catalog.snapshots` gets (W6.5).
 
-### W6.2 The broker: RabbitMQ
+The interactive version is
+[`docs/diagrams/interactive/architecture-week6-main.html`](docs/diagrams/interactive/architecture-week6-main.html),
+and its source is
+[`docs/diagrams/src/architecture-week6-main.json`](docs/diagrams/src/architecture-week6-main.json).
+I made it with Archify, as I did the other diagrams.
+My first Week 6 diagram, which has the same content in a denser layout, is still in
+[`docs/diagrams/architecture-events.svg`](docs/diagrams/architecture-events.svg).
 
-| | RabbitMQ 4.4.0 | Kafka 4.3.1 (KRaft) |
-|---|---|---|
-| Request with a reply (the payment must return a receipt) | built in: correlation id and a reply queue, per-message acks | possible, but awkward |
-| Ack each message after a DB commit | yes | only by committing offsets per partition |
-| Cost on this 8 GB laptop | about 150 MB; messages deleted once acked | a JVM of about 1 GB; keeps its log on disk |
-| Spring Boot 4.1.1 client | `spring-boot-starter-amqp` → Spring AMQP 4.1.1 | `spring-boot-starter-kafka` → Spring Kafka 4.1.1 |
+**The vocabulary, in plain words:**
+- **Queue:** a list of waiting messages inside RabbitMQ. A publisher adds to the end, and a
+  consumer takes from the front.
+- **Exchange:** where a message is sent. The default exchange puts each message into the
+  queue with the same name. A **fanout** exchange copies each message into every queue
+  bound to it, which is how one catalog broadcast reaches three services.
+- **Ack (acknowledgement):** the consumer telling the broker "I'm done with this message,
+  you can delete it". Until then the broker keeps it, and if the consumer dies, the broker
+  gives it to a consumer again (**redelivery**).
+- **Publisher confirm:** the broker telling the publisher "I have your message and have
+  written it to disk".
+- **Prefetch:** how many un-acked messages one consumer may hold at once.
 
-Kafka's replayable log would suit the scan stream, but nothing here needs replay: analytics
-already keeps every scan in its own `scan_log`.
-
-### W6.3 The payment saga over events
+### W6.3 One payment, step by step (the saga)
 
 [![Sequence: the station calls complete; checkout writes the sale as PENDING (tx A), publishes StockCommitRequested to RabbitMQ and gets a publisher confirm. RabbitMQ delivers it to inventory, which claims the transaction id, locks the rows, clamps and decrements, records the lines and low-stock alerts and commits, publishes StockCommitted to checkout.stock-replies, and only then acks the request. The reply reaches checkout, matched by transaction id; checkout records tx B (COMPLETED) and returns the receipt, or 503 if the request was not queued or no reply came.](docs/diagrams/flow-payment-saga-events.svg)](docs/diagrams/flow-payment-saga-events.png)
 
-*Week 6 payment saga.* It is still **orchestrated by checkout**: `complete` must return the
-receipt synchronously, so the request thread publishes the command and waits for the reply
-under the transaction id.
+Paying changes two databases: the sale in `checkout_db` and the stock in `inventory_db`. One
+database transaction can't cover both, so, as in Week 5, a payment is a **saga**: a series of
+local transactions, one per database, that are made safe to repeat. Checkout is the
+**orchestrator**: it sends the command, waits for the answer and decides the outcome. I kept
+orchestration, not choreography (services reacting to each other's events with no one in
+charge), because `POST /transactions/{id}/complete` has to return the receipt in the same
+HTTP response. One owner that waits is simpler than following a chain of reactions.
 
-<details>
-<summary>Text version (Mermaid)</summary>
+What happens on `complete`:
+1. **Checkout claims the basket** in memory (OPEN → COMPLETING). A second `complete`, or a
+   late scan, now gets 409.
+2. **Tx A in `checkout_db`** saves the sale as PENDING, with its lines. This is the saga's
+   record that a payment was started, written before anything that can't be undone.
+3. **Checkout registers a waiting slot** under the transaction id, then **publishes
+   `StockCommitRequested`** to `inventory.stock-commit`. The message is persistent, and
+   checkout waits up to 1 s for the publisher confirm.
+4. **RabbitMQ hands the message to one of inventory's 32 consumers.** Inventory runs the same
+   local transaction as in Week 5:
+   1. claim the transaction id in `stock_commits` (its primary key is the transaction id, so
+      a second claim for the same payment fails);
+   2. lock the basket's stock rows in SKU order (`FOR NO KEY UPDATE`), which prevents
+      deadlocks;
+   3. clamp: take `min(asked, in stock)`;
+   4. decrement the stock, record the lines and any low-stock alert;
+   5. commit.
+5. **Inventory publishes `StockCommitted`** to `checkout.stock-replies` and waits for its
+   publisher confirm.
+6. **Only now does inventory ack the request.** Steps 4 and 5 both have to succeed first.
+7. **Checkout's reply consumer** finds the waiting slot by transaction id and hands it the
+   answer. This must happen within 2.5 s.
+8. **Tx B in `checkout_db`** records how much inventory actually took and marks the sale
+   COMPLETED. Checkout returns the receipt (200).
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant S as Station (via nginx)
-    participant C as checkout-service
-    participant CD as checkout_db
-    participant Q as RabbitMQ
-    participant I as inventory-service
-    participant ID as inventory_db
-    S->>C: POST /transactions/{id}/complete
-    C->>C: claim basket OPEN -> COMPLETING (memory)
-    C->>CD: tx A: INSERT transactions (PENDING) + transaction_items
-    C->>Q: StockCommitRequested -> inventory.stock-commit (persistent)
-    Q-->>C: publisher confirm
-    Q->>I: deliver (one of 32 consumers)
-    I->>ID: claim id, lock in SKU order, clamp, decrement, record lines + alerts, COMMIT
-    I->>Q: StockCommitted -> checkout.stock-replies (confirmed)
-    I-->>Q: ack the request (only now)
-    Q->>C: deliver the reply; completes the waiting future
-    C->>CD: tx B: applied_quantity, status COMPLETED
-    C-->>S: 200 receipt
-```
+**Duplicates are harmless:**
+- **The same request delivered twice** (for example, inventory crashed after committing but
+  before acking): the claim in step 4.1 finds the id, so inventory takes nothing more and
+  answers from what it stored.
+- **A reply nobody is waiting for** (it arrived after checkout gave up): it is counted as
+  `stray` and dropped.
+- **Tx B runs twice:** it only changes a sale that is still PENDING.
 
-</details>
+**Failures:** every publish ends in one of three outcomes (`ConfirmedPublisher`), and checkout
+handles each one differently:
 
-The design decisions:
-- **Ack after the work.** Inventory acks a request only after its database commit and its
-  publisher-confirmed reply. A crash anywhere before that means the broker redelivers it, and
-  the commit, idempotent on transaction id since Week 5, answers from what it stored.
-  **No transactional outbox is needed**, because the reply can always be rebuilt from
-  `inventory_db`.
-- **Three outcomes, as in Week 5** (`ConfirmedPublisher`, `BrokerInventoryClient`):
+| What happened | What it means | Checkout does | Client sees |
+|---|---|---|---|
+| no broker connection, an explicit reject (nack), or no queue to route to | the request is **certainly not** queued | deletes the PENDING sale, reopens the basket | **503** + `Retry-After: 1`; can simply pay again |
+| no confirm within 1 s | it **may** be queued | keeps the basket closed; a background resolver finishes the sale later | **503**; a retry gets **409**; `GET /transactions/{id}` shows COMPLETED once resolved |
+| confirmed, but no reply within 2.5 s (e.g. inventory is down) | it **is** queued, and inventory will process it later | same as above | same as above |
+| `StockCommitted` | done | tx B | **200** with the receipt |
+| `StockCommitRejected` | inventory took nothing (e.g. an unknown SKU) | treated like "not queued" | **503** |
 
-  | Outcome | Cause | Saga does |
-  |---|---|---|
-  | *certainly not queued* | no broker connection, an explicit nack, unroutable | undo tx A, reopen the basket, 503 |
-  | *possibly or certainly queued, no reply* | no confirm in time, or no reply in 2.5 s | 503, basket stays COMPLETING, the resolver finishes it |
-  | *committed* | `StockCommitted` | tx B, receipt |
+The important rule is that **"maybe sent" is never treated as "not sent"**. If I reopened the
+basket while the request might still be in a queue, the customer could pay again and the same
+stock would be taken twice. This changes one Week 5 behaviour: when inventory was down, Week 5
+reopened the basket straight away, because a refused HTTP connection meant the request
+certainly hadn't arrived. Now the request sits safely in a durable queue, so the basket stays
+closed, the client gets a 503 after 3–5 s, and the sale completes by itself when inventory
+comes back. The waiting is bounded by a 1 s confirm and a 2.5 s reply per attempt, within a
+3 s retry budget, so the client hears back well inside its 10 s timeout.
 
-- **Inventory down is now a background case, not a reopen.** In Week 5 a refused connection
-  meant "certainly not committed". Now the request sits in a durable queue, and inventory
-  *will* process it when it returns, so reopening the basket could sell the same units twice.
-- **Bounded waiting.** One attempt is a 1 s confirm plus a 2.5 s reply, inside a 3 s retry
-  budget, so the client hears back within about 3–5 s (its timeout is 10 s). The send itself
-  runs on its own small thread pool with the same deadline. A broker that stops reading
-  during a disk alarm once hung a payment for 69 s before that change (failure test F).
-- **Duplicates are harmless:**
-  - a redelivered request is replayed from inventory's stored commit;
-  - a reply nobody is waiting for is counted (`stray`) and dropped;
-  - tx B only updates a sale that is still PENDING.
+**If checkout itself crashes** in the middle, on restart it finds the PENDING sales and sends
+their requests again. Inventory answers each one from its stored commit, and tx B finishes
+them.
 
-### W6.4 Scans over events
+### W6.4 One scan, step by step
 
 [![Data flow: a scan is offered to checkout's batching writer, which publishes ScansRecorded batches (fixed batchId, confirmed) to the RabbitMQ analytics.scans queue; analytics' single consumer delivers them in order to scan ingest, which numbers seq as MAX+1 and inserts into scan_log; the poller feeds window, rank and sink, which write popular_snapshots, served by GET /analytics/popular-items.](docs/diagrams/flow-scan-events.svg)](docs/diagrams/flow-scan-events.png)
 
-*Week 6 scan hand-off (an event stream through RabbitMQ).*
+1. **The station calls `POST /transactions/{id}/items`.** Checkout updates the basket and
+   offers the SKU to a bounded in-memory queue (65,536 entries). It waits at most 10 ms; if the
+   queue is full, the scan is dropped and counted. Then it returns 200. **A customer never
+   waits for analytics or the broker.**
+2. **One writer thread in checkout** collects up to 1,000 scans, or whatever arrived in 50 ms,
+   into a `ScansRecorded` batch with a fixed `batchId`.
+3. **It publishes the batch to `analytics.scans` and waits for the confirm.** If the confirm
+   doesn't come, it sends the **same** batch again, with the same `batchId`. Only after a
+   confirm does it build the next batch, so batches go out in order.
+4. **Analytics has exactly one consumer** on that queue, so it gets the batches in order. For
+   each batch, in one database transaction, it:
+   1. takes a numbering lock (`pg_advisory_xact_lock`);
+   2. reads `next = MAX(seq) + 1`;
+   3. inserts the `batchId` into `scan_batches`. If it is already there, this batch was
+      delivered before, so it stores nothing;
+   4. inserts the scans as `next, next + 1, …` into `scan_log`;
+   5. commits, **then** acks.
+5. **From `scan_log` onwards nothing changed since Week 3:** the poller feeds the window, rank
+   and sink filters, which write `popular_snapshots` for `GET /analytics/popular-items`.
 
-<details>
-<summary>Text version (Mermaid)</summary>
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant S as Station
-    participant C as checkout-service
-    participant W as queue + writer thread (checkout)
-    participant Q as RabbitMQ analytics.scans
-    participant A as analytics-service (1 consumer)
-    participant L as analytics_db
-    S->>C: POST /transactions/{id}/items
-    C->>W: offer(sku), at most 10 ms (drop + count if full)
-    C-->>S: 200 (never waits for analytics or the broker)
-    W->>W: collect up to 1,000 or 50 ms; fixed batchId
-    W->>Q: ScansRecorded {batchId, scans} (re-sent until confirmed)
-    Q->>A: deliver, in publish order
-    A->>L: lock numbering; claim batchId in scan_batches; INSERT scan_log seq = MAX+1..; COMMIT
-    A-->>Q: ack (only after commit)
-    Note over A,L: ScanLogPoller -> window -> rank -> sink, unchanged
-```
-
-</details>
-
-The checkout half is Week 5's publisher without the numbering. Its guarantees:
-- **the hot path is unchanged:** a bounded queue, at most a 10 ms offer, and drops counted;
-- **one writer thread** builds the batches, of up to 1,000 scans or 50 ms;
-- **batches are published one at a time** with confirms;
-- **an unconfirmed batch is re-sent with the same `batchId`.**
-
-**Analytics numbers the scans**, as the one consumer of `analytics.scans`. Per batch, in one
-transaction:
-1. `pg_advisory_xact_lock`;
-2. `next = MAX(seq) + 1`;
-3. claim the `batchId` in `scan_batches`; if it is already there, this is a redelivery,
-   so store nothing;
-4. insert the scans;
-5. commit, then ack.
-
-The alternative was checkout saving its own next `seq`. It has a crash window between saving
-and publishing:
-- **saved after publishing:** the numbers get reused, and analytics drops those scans as
+Why analytics numbers the scans now: in Week 5 checkout numbered them and asked analytics for
+the last number at startup. With a broker in between, checkout would have to save its counter
+either before or after publishing, and a crash between the two breaks the sequence:
+- **saved after publishing:** numbers get reused, and analytics drops those scans as
   duplicates;
-- **saved before publishing:** a gap opens, and the window filter stalls on it forever.
+- **saved before publishing:** a number is skipped, and the window filter waits for it
+  forever.
 
-Numbering inside the storing transaction has neither problem, and it removes
-`GET /internal/scans/max-seq` entirely.
+Numbering inside the transaction that stores the scans has neither problem, and it removed
+`GET /internal/scans/max-seq`.
 
-### W6.5 Delivery settings and dead letters
+### W6.5 Loading the catalog at startup
 
-- **Durability:** durable classic queues and persistent messages. A single node gains nothing
-  from replicated quorum queues.
-- **Confirms and returns:** publisher confirms with mandatory returns on every publish that
-  matters (stock requests, replies, scan batches).
-- **Consumers:**
+Checkout, inventory and analytics need item names and prices. The catalog doesn't change
+during a run, so each keeps a copy in memory. This is how they get it:
+1. **When catalog-service starts,** it reads `catalog_db` and publishes the whole catalog
+   once as `CatalogPublished` on the `catalog.snapshots` fanout exchange.
+2. **Each of the other three** listens on its own temporary queue bound to that exchange
+   (nameless, deleted when the service stops), so each gets its own copy.
+3. RabbitMQ doesn't keep a broadcast for services that start later, so **each of the three
+   also sends `CatalogRequested`** to `catalog.requests` when it starts. It keeps asking,
+   with growing pauses, until a copy arrives.
+4. **Catalog answers every `CatalogRequested`** by broadcasting the catalog again. Every
+   listening service gets that copy too, but **each keeps only the first copy** it
+   receives, so the extra ones are ignored.
+
+If a request needs a price before the catalog has arrived, the service waits up to 2 s and
+then answers 503 instead of hanging. Once a service has the catalog, catalog-service can go
+down without affecting it.
+
+### W6.6 Why RabbitMQ, and the settings I used
+
+I compared RabbitMQ with Kafka:
+
+| | RabbitMQ 4.4.0 | Kafka 4.3.1 (KRaft) |
+|---|---|---|
+| A request that needs a reply (the payment must return a receipt) | built in: per-message acks, a reply queue, a correlation id | possible, but awkward |
+| Ack each message after a database commit | yes | only by committing offsets per partition |
+| Cost on this 8 GB laptop | about 150 MB of memory; messages deleted once acked | a JVM of about 1 GB; keeps a log on disk |
+| Spring Boot 4.1.1 client | `spring-boot-starter-amqp` → Spring AMQP 4.1.1 | `spring-boot-starter-kafka` → Spring Kafka 4.1.1 |
+
+Kafka's strength is a log you can replay. Nothing here needs that, because analytics already
+keeps every scan in its own `scan_log`. So I chose RabbitMQ, one local node.
+
+The settings, and why:
+- **Durable classic queues.** "Durable" means a queue survives a broker restart. "Classic"
+  is RabbitMQ's basic queue type. The alternative, quorum queues, copies every message to
+  several broker nodes, which buys nothing with a single node.
+- **Persistent messages.** The broker writes each message to disk, so a broker restart
+  doesn't lose it.
+- **Publisher confirms, with mandatory returns.** A publish only counts as sent when the
+  broker confirms it. "Mandatory" means the broker sends a message back if no queue would
+  receive it, instead of silently dropping it. These are on for stock requests, replies and
+  scan batches. The catalog broadcast doesn't use them, because a lost copy is simply asked
+  for again.
+- **Acks only after the work is done.** Spring's `acknowledge-mode=auto` acks a message only
+  when the listener method returns without an exception. If it throws, the message is
+  returned to the queue and redelivered. I never turned on RabbitMQ's own "auto-ack", which
+  deletes a message as soon as it is delivered.
+- **Consumers and prefetch:**
 
   | Queue | Consumers | Prefetch | Why |
   |---|---|---|---|
-  | `inventory.stock-commit` | 32 competing | 1 | matches its 32-connection pool; payment order doesn't matter, the row locks keep them correct |
-  | `analytics.scans` | **1** | 10 | order |
-  | `checkout.stock-replies` | 4 | — | |
-  | `catalog.requests` | 1 | — | |
+  | `inventory.stock-commit` | 32, competing | 1 | matches inventory's 32 database connections; each consumer holds one payment at a time, so one slow payment can't hold others back. Payment order doesn't matter; the row locks keep them correct. |
+  | `checkout.stock-replies` | 4 | 50 | replies are tiny and only wake a waiting request |
+  | `analytics.scans` | **1** | 10 | one consumer keeps batches in order, which the gapless numbering needs |
+  | `catalog.requests` | 1 | Spring's default (250) | a few messages per startup |
 
-- **Dead letters:** every queue has a `<queue>.dlq`. A message lands there only if it can
-  never be read; transient database errors are retried in place with backoff (scan batches
-  forever, as required).
-- **DLQs are never silent:**
-  - every service logs `dead letters | …` every 10 s, as a WARN if a count is not zero;
-  - every load-run summary records the counts;
-  - every failure-test section asserts they are all zero.
+### W6.7 Correctness guarantees
 
-### W6.6 Enforcement
+- **No payment takes stock twice.** RabbitMQ delivers a message **at least once**, so a
+  consumer can see the same message again. Every consumer is **idempotent**: handling a
+  message twice has the same effect as handling it once.
+  - Inventory's commit is keyed on the transaction id.
+  - A stray reply is dropped.
+  - Tx B only changes a PENDING sale.
+- **Ack only after the database commit.** Inventory and analytics ack only after their
+  commit, and inventory also waits for its reply's confirm. If either crashes before the
+  ack, the broker redelivers the message, and the idempotent handling answers from what was
+  stored. That's why I didn't need a **transactional outbox** (a table of messages to send,
+  written in the same transaction as the data): inventory can always rebuild its reply from
+  `inventory_db`.
+- **Scans: none duplicated, none skipped, in order.**
+  - A redelivered batch is caught by its `batchId`.
+  - Only the storing transaction assigns numbers, so there are no gaps.
+  - One consumer keeps the batches in order.
 
-- **No `/internal/**` endpoints exist any more.** They return 404 through the gateway and on
-  every service port (failure test G).
-- **[`scripts/check-connections.sh`](scripts/check-connections.sh)** lists each service's
-  established TCP connections under load. Each one goes only to its own database (`:5432`)
-  or the broker (`:5672`), or is inbound on its own port (failure test H).
-- **Each database is still opened by one role only** (`db/roles.sql`).
+  The one way to lose scans is to kill checkout while some are still in its in-memory queue,
+  before they are published. Analytics stays gapless even then, because it numbers only what
+  it receives.
+- **Dead letters are never silent.** Every queue has a dead-letter queue (`<queue>.dlq`). A
+  message goes there only if it can never be read (it isn't valid JSON for a known event).
+  Errors that can pass, like the database restarting, are retried instead:
+  - a payment request is retried with backoff and is never dead-lettered;
+  - a scan batch is retried until it succeeds.
 
-### W6.7 Trade-offs
-
-- **Bought:**
-  - no service needs another to be up at the moment it acts. A request waits in a queue
-    instead of failing a connection;
-  - if analytics is down, scans wait in the broker instead of checkout's memory;
-  - payments resume by themselves when inventory returns.
-- **Paid:**
-  - one more process to run and keep healthy;
-  - two persistent, confirmed messages and a broker hop per payment;
-  - the broker's CPU on the same 8-core laptop;
-  - "inventory down" now gives the slower 3–5 s ambiguous 503 instead of a fast reopen,
-    because once a request is queued, reopening would not be safe.
+  Every service logs its DLQ counts every 10 s (`dead letters | …`, WARN if any is not
+  zero). Every load run and every failure test checks they are all zero, and they were.
+- **No hidden HTTP between services.**
+  - The Week 5 `/internal/**` endpoints are deleted; nginx and every service port answer
+    404 (failure test G).
+  - [`scripts/check-connections.sh`](scripts/check-connections.sh) lists each service's TCP
+    connections under load: only to its own database (`:5432`) and the broker (`:5672`),
+    plus inbound HTTP on its own port (failure test H).
+  - Each database can still be opened by its own service's role only (`db/roles.sql`).
+- **Tests:** the golden diff is identical (29/29); 52 unit and ArchUnit tests pass; the five
+  behavioural scripts pass (`docs/perf/week6-raw/verification/`); and the cross-database
+  invariant passed after every load run.
 
 ### W6.8 Results
 
-How the runs were made:
-- **Procedure:** through the gateway with the packaged jars; `db/reset.sh` (databases and
-  broker queues) and a restart before every run; the cross-database invariant and a
-  dead-letter count after every run.
-- **Idle gate:** each run started only once the 1-minute load was below 3 (recorded in each
-  `-summary.txt`).
-- **Fair comparison:** the Week 5 build (`microservices`, RabbitMQ stopped) was re-run straight
-  after the Week 6 runs, on the same machine, the same day.
+How I made the runs:
+- **Same procedure for every run:** through the gateway with the packaged jars;
+  `db/reset.sh` (all four databases and the broker's queues) and a restart before every run;
+  the cross-database invariant and a dead-letter count after every run.
+- **Idle gate:** a run started only when the 1-minute load average was below 3 (recorded in
+  each `-summary.txt`).
+- **Fair comparison:** straight after the Week 6 runs, I re-ran the Week 5 build
+  (`microservices`, RabbitMQ stopped) on the same machine, the same day.
 - **Power:** ran on battery at 71 %, 11:53–12:32, same conditions for both builds.
-- **Where the files are:** the two graded reports in [`reports/`](reports/); every raw run in
-  [`docs/perf/week6-raw/`](docs/perf/week6-raw/) (Week 6) and
-  [`docs/perf/week6-raw/baseline-week5-rerun/`](docs/perf/week6-raw/baseline-week5-rerun/) (Week 5). The harness is in
+- **Where the files are:** the two graded reports are in [`reports/`](reports/). Every raw
+  run is in [`docs/perf/week6-raw/`](docs/perf/week6-raw/) (Week 6) and
+  [`docs/perf/week6-raw/baseline-week5-rerun/`](docs/perf/week6-raw/baseline-week5-rerun/)
+  (Week 5), and the harness I used is in
   [`docs/perf/week6-raw/harness/`](docs/perf/week6-raw/harness/).
+
+**Summary (same day, same machine):**
+
+| | Week 5 (HTTP between services) | **Week 6 (events)** | change |
+|---|---|---|---|
+| Default, 10 stations × 60 s, best of 2 | 845.2 tx/s | **667.2 tx/s** | −21.1 % |
+| Stress, 100 stations × 120 s, best of 2 | 803.8 tx/s | **653.6 tx/s** | −18.7 % |
+| Default, mean of 2 | 801.1 tx/s | 596.3 tx/s | −25.6 % |
+| Stress, mean of 2 | 803.7 tx/s | 614.3 tx/s | −23.6 % |
+| `START` / `SCAN` p50, default | 0.160 / 0.145 ms | 0.195 / 0.174 ms | |
+| `COMPLETE` p50 / p99, default (best run) | 7.5 / 35.7 ms | 10.3 / 48.1 ms | |
+| `COMPLETE` p50 / p99, stress (best run) | 98.4 / 383.1 ms | 121.1 / 477.2 ms | |
+| Errors | 0 | **0** | |
+| Cross-database invariant | PASS | **PASS** | |
+
+The submitted reports are the better run of each kind: default **667.2** (the other run
+was 525.4) and stress **653.6** (the other was 575.0). The same-day Week 5 numbers are close
+to last week's submitted ones (852.4 / 806.0), so the machine was in a comparable state.
+**Week 6 is about 20–25 % slower:** 19–21 % comparing best runs, 24–26 % comparing means.
+
+**Every run:**
 
 | Run | tx/s | errors | `COMPLETE` p50 / p95 / p99 ms | stock step mean | lock wait / held | invariant | DLQ |
 |---|---|---|---|---|---|---|---|
@@ -1722,49 +1802,18 @@ How the runs were made:
 | W5 stress 1 | 803.6 | 0 | 98.2 / 250.1 / 378.2 | 119.5 ms | 117.9 / 1.28 ms | PASS | — |
 | W5 stress 2 | 803.8 | 0 | 98.4 / 250.4 / 383.1 | 119.3 ms | 117.6 / 1.29 ms | PASS | — |
 
-The columns, explained:
-- **Stock step:** checkout's whole pivot call — HTTP in Week 5; publish, confirm, consume and
-  reply in Week 6 (the `saga |` line).
-- **Lock wait / held:** inventory's `stock commit timings` line.
-- **Every Week 6 run:** each payment was published once and got exactly one reply, with no
-  retries, no ambiguous payments, no stray replies and no dropped scans.
+What the columns mean:
+- **Stock step mean:** checkout's whole call to inventory. In Week 5 that is the HTTP call.
+  In Week 6 it is publish, confirm, inventory's work and the reply (the `saga |` log line).
+- **Lock wait / held:** from inventory's `stock commit timings` line. "Held" is the
+  **critical section**: from getting the hottest row's lock until the commit.
+- **In every Week 6 run** each payment was published once and got exactly one reply. There
+  were no retries, no ambiguous payments, no stray replies and no dropped scans.
 
-**Week 5 vs Week 6** (same day, best of two):
+The two Week 6 runs of each kind differ by 14–27 % (the first was lower both times), more
+than Week 5's (up to 12 %). That is why I report the means as well as the best runs.
 
-| | Week 5 | Week 6 | change |
-|---|---|---|---|
-| tx/s, 10 stations | 845.2 | **667.2** | −21.1 % |
-| tx/s, 100 stations | 803.8 | **653.6** | −18.7 % |
-| tx/s, mean of 2, 10 / 100 stations | 801.1 / 803.7 | 596.3 / 614.3 | −25.6 % / −23.6 % |
-| `START` / `SCAN` p50, 10 st | 0.160 / 0.145 ms | 0.195 / 0.174 ms | |
-| `COMPLETE` p50, 10 st / 100 st | 7.5 / 98.4 ms | 10.3 / 121.1 ms | +2.8 ms / +23 % |
-| errors | 0 | **0** | |
-
-**Where the time goes.**
-- **The ceiling is unchanged:** the hottest SKU's row lock, held for inventory's critical
-  section (lock granted → commit). Throughput is roughly 1 ÷ (critical section × share of
-  baskets holding that SKU).
-- **The critical section got longer:**
-
-  | Run | Week 5 | Week 6 |
-  |---|---|---|
-  | default | 1.21–1.34 ms | 1.56–1.92 ms |
-  | stress | 1.28 ms | 1.65–1.86 ms |
-
-  Inventory does the same SQL in the same order. The difference is the CPU around it: the
-  RabbitMQ node used 82–109 % of a core, on a laptop where Postgres, checkout and the load
-  client's threads already compete for 8 cores.
-- **The arithmetic matches:** ×1.29 (1.21 → 1.56 ms) predicts about 0.77× the throughput,
-  and the measured ratio is 0.79×.
-- **Where waiting happens moved.** In Week 5, under stress, every payment's HTTP request
-  queued on the row lock: lock wait 118 ms of a 119 ms call. In Week 6 only 32 requests are
-  in inventory at once (32 consumers, prefetch 1); the rest wait in the
-  `inventory.stock-commit` queue. Lock wait fell to 45–51 ms, while the whole stock step rose
-  to 147–167 ms.
-- **The two Week 6 runs of each kind differ by 14–27 %** (the first runs were lower), more
-  than Week 5's runs (up to 12 %). Both are listed, and the means are in the table.
-
-**Per-process CPU** (% of one core, mean of the two runs of each kind):
+**CPU per process** (% of one core, mean of the two runs of each kind):
 
 | | W5 default | **W6 default** | W5 stress | **W6 stress** |
 |---|---|---|---|---|
@@ -1776,31 +1825,131 @@ The columns, explained:
 | analytics-service | 17.9 % | 15.9 % | 12.4 % | 12.0 % |
 | catalog-service | 0.2 % | 0.2 % | 0.1 % | 0.2 % |
 
-**Prediction vs measurement.** In Phase 1 I predicted 5–15 % lower throughput, counting two
-persistent, confirmed messages per payment outside the lock. The measured 19–21 % (best
-runs) is worse. The prediction missed that on a CPU-bound laptop the broker's own CPU slows
-the lock holder, and that cost is paid inside the critical section.
+### W6.9 Why it is about 20–25 % slower
 
-### W6.9 Correctness evidence
+The load client is a closed loop: each station waits for one transaction (start, about 10.5
+scans, complete) to finish before it starts the next. So at 10 stations,
+**throughput = 10 ÷ time per transaction**, and anything that makes a transaction take longer
+lowers throughput.
 
-- **Golden diff:** identical to the single application (29/29) through the gateway.
-- **Unit and ArchUnit tests:** 52 pass.
-- **The five behavioural scripts:** all pass (`docs/perf/week6-raw/verification/`). The
-  invariant flags only the one SKU that two of them set up directly with SQL, as in Week 5.
-- **Cross-database invariant:** passes after every load run, with 0 dead-lettered messages.
-- **Failure tests:** `scripts/test-failures.sh`, all PASS, 62 checks
-  (`docs/perf/week6-raw/failure-tests.txt`):
+When I submitted, my explanation was that the broker's CPU use made inventory hold the
+hottest row's lock longer (1.21 → 1.56 ms, ×1.29, predicting 0.77× the throughput against a
+measured 0.79×). To check it, I added timers for each step of a payment and profiled one
+default run.
 
-| Case | What happened |
+> **Where these numbers come from:** the separate local branch `perf-investigation`, **one
+> profiled default run** (639.8 tx/s, 0 errors, invariant PASS, 0 dead letters). It is not
+> part of the graded runs. Its 1-minute load just before the run was 3.36, slightly above the
+> gate I used for the graded runs. The Week 5 side of the comparison comes from the graded
+> Week 5 runs, which had no per-step timers, so the split below compares different runs.
+> Treat it as one measurement, not a settled result.
+
+Time per transaction went from 11.8 ms (Week 5 best default) to 15.6 ms (the profiled Week 6
+run), 3.8 ms more. That extra time splits like this:
+
+| | Extra time per transaction | ms | share |
+|---|---|---|---|
+| 1 | Messages travelling through the broker (checkout → broker → inventory, and back) | +1.5 | about 40 % |
+| 2 | Checkout's own database work during `complete`, outside the stock step | +0.9 | 24 % |
+| 3 | `START` and `SCAN` requests being slower | +0.5 | 13 % |
+| 4 | Waiting for the hottest row's lock in inventory | +0.5 | 13 % |
+| 5 | Holding that lock (the longer critical section) | +0.4 | 11 % |
+
+So, in order:
+1. **The broker round trip is the biggest cost.** It is work that Week 5 didn't do at all:
+   two persistent, confirmed messages per payment, each written to disk by the broker.
+2. **CPU contention comes next** (rows 2 and 3, about 1.4 ms together). Those steps do the
+   same work as in Week 5 but take longer. The machine was 95.6 % busy across all 8 cores
+   on average, and RabbitMQ used about one core (106 % in this run) that Week 5 left to
+   Postgres, checkout and the load client. I read rows 2 and 3 as CPU contention because
+   nothing else changed in those steps. I didn't measure that cause directly.
+3. **The longer lock hold is only a small part:** about 0.4 of the 3.8 ms. My original
+   arithmetic matched the measured drop mostly by coincidence.
+
+Inside one Week 6 payment's stock step (10.35 ms on average in the profiled run), the time
+went like this:
+
+| Step | ms |
 |---|---|
-| A. broker stopped 7.5 s under load | only clean 503s (43, while 9,206 payments succeeded), no other client error; payments resumed; every PENDING sale resolved; all 97,012 accepted scans stored |
-| B. inventory stopped | 503 after 5.2 s, the request waiting in `inventory.stock-commit`; a retry got 409, a scan got 409; completed 0.1 s after inventory started, stock taken once |
-| C. checkout halted after inventory's commit (test hook) | databases disagreed (invariant FAIL, as expected); after restart, recovery replayed the commit and finished the sale; one stock commit |
-| D. analytics stopped under load | checkout served 511.5 tx/s with **0 client errors** (asserted); 289 batches waited in `analytics.scans`; all 81,054 scans stored gapless after restart |
-| E. duplicated messages | a re-published `StockCommitRequested` was replayed (stock unchanged, `stray=1` at checkout); a re-published batch was skipped (`duplicates=1`); a new batch was numbered next |
-| F. publisher confirm timeout (disk alarm) | 503 after 3.3 s, classified *unconfirmed* (not *not delivered*), basket closed; completed 0.7 s after the alarm cleared, stock taken once |
-| G. `/internal/**` | 404 via the gateway and on every service port |
-| H. connections | every service: Postgres and RabbitMQ only |
+| waiting for the hottest row's lock | 6.66 |
+| holding it: the database statements | 1.28 |
+| holding it: the commit, including the disk sync | 0.33 |
+| the reply travelling back through the broker | 1.09 |
+| the request travelling through the broker, including any queueing | 0.60 |
+| claiming the transaction id (the idempotency check) | 0.30 |
+
+The disk sync is not the problem. The lock is held mostly while three short statements go
+back and forth between inventory and Postgres, and on a machine this busy each takes about
+0.5 ms.
+
+**Is RabbitMQ wasting CPU by spinning while it waits?** Probably not much. With no clients it
+uses 0.4 % of a core. Erlang's own accounting puts at most about 0.1 of its ~1.1 cores in
+that spinning; most of its time goes to handling messages and writing them to disk.
+
+**Under stress the waiting moved to a different place.** In Week 5, at 100 stations, every
+payment's HTTP request waited on the row lock: 118 ms of a 119 ms call. In Week 6 only 32
+payments are inside inventory at once (32 consumers, prefetch 1), and the rest wait in the
+`inventory.stock-commit` queue. Lock wait fell to 45–51 ms, but the whole stock step rose to
+147–167 ms.
+
+**My prediction was wrong.** Before building Week 6, I predicted 5–15 % lower throughput,
+counting two persistent, confirmed messages per payment. The measured drop is 19–21 % (best
+runs). I underestimated how much the broker costs on a laptop that is already CPU-bound.
+
+### W6.10 Trade-offs, and what I'd improve next
+
+What I gained:
+- no service needs another to be up at the moment it acts: a request waits in a queue
+  instead of failing;
+- when analytics is down, scans wait in the broker on disk, not in checkout's memory;
+- payments that were waiting for inventory finish by themselves when it comes back;
+- the services know each other only through queue names and message formats.
+
+What I paid:
+- **one more program** to run and keep healthy, and a single broker node with no copy;
+- **about 20–25 % lower throughput** on this laptop (W6.8, W6.9);
+- **"inventory down" is slower for the client:** a 503 after 3–5 s, with the sale
+  completing in the background, instead of Week 5's fast reopen. Once a request is queued,
+  reopening wouldn't be safe.
+
+What I would try next. **None of these is measured**, so I can't say yet whether any of them
+helps:
+- **Batch the stock commits:** let one inventory consumer take several payments and commit
+  them in one transaction, acking all of them after the commit. I built this on
+  `perf-investigation` behind a setting; it passes the golden diff and the behavioural tests,
+  but I haven't measured it. One duplicate-handling path, two copies of a payment in the same
+  batch, isn't tested yet.
+- **Do the stock update in one SQL statement**, so the lock is held for one round trip to
+  Postgres instead of three. This is also built behind a setting and not measured.
+- **Turn off RabbitMQ plugins this project doesn't use** (management UI, MQTT, STOMP, Stream,
+  AMQP 1.0), and try Erlang's busy-wait flags. My profile suggests the busy-wait gain is
+  small.
+- **Try other prefetch values** for inventory (10 and 50 instead of 1).
+- **Test the explanation directly:** run Week 5 with one CPU core kept busy, standing in for
+  RabbitMQ. If Week 5 drops to Week 6's level, CPU contention explains most of the gap; if
+  not, the broker round trip does.
+- **Production:** a three-node RabbitMQ cluster with quorum queues, on machines separate from
+  the services.
+
+I would not try turning off disk syncing, non-persistent messages or RabbitMQ's auto-ack.
+Each would be faster, but each could lose a payment or a scan.
+
+### W6.11 Failure tests A–H
+
+[`scripts/test-failures.sh`](scripts/test-failures.sh) runs eight failure cases against the
+real system. All passed, 62 checks in total; the output is in
+[`docs/perf/week6-raw/failure-tests.txt`](docs/perf/week6-raw/failure-tests.txt).
+
+| Case | What I did | What happened |
+|---|---|---|
+| A | stopped the broker for 7.5 s under load | only clean 503s (43, while 9,206 payments succeeded) and no other client errors; payments resumed by themselves; every PENDING sale was resolved; all 97,012 accepted scans were stored |
+| B | stopped inventory | `complete` got a 503 after 5.2 s, with the request waiting in `inventory.stock-commit`; a retry got 409, and so did a scan; the sale completed 0.1 s after inventory started; stock was taken once |
+| C | halted checkout right after inventory's commit (a test hook) | the two databases disagreed, so the invariant failed, as expected; after a restart, recovery replayed the commit and finished the sale; one stock commit |
+| D | stopped analytics under load | checkout kept serving, 511.5 tx/s with **0 client errors**; 289 batches waited in `analytics.scans`; after a restart, all 81,054 scans were stored with no gaps |
+| E | published duplicate messages | a repeated `StockCommitRequested` was answered from the stored commit (stock unchanged, `stray=1` at checkout); a repeated scan batch was skipped (`duplicates=1`); the next new batch was numbered correctly |
+| F | made publisher confirms time out (a broker disk alarm) | 503 after 3.3 s, classified as *unconfirmed*, not *not delivered*, so the basket stayed closed; the sale completed 0.7 s after the alarm cleared; stock was taken once |
+| G | called `/internal/**` | 404 through the gateway and on every service port |
+| H | listed every service's connections | Postgres and RabbitMQ only |
 
 ---
 
@@ -1854,7 +2003,9 @@ the lock holder, and that cost is paid inside the critical section.
     stress run, cleared only by `db/reset.sh`.
 21. **(Week 5) Scans still in checkout's queue are lost if checkout is killed** (analytics
     resumes from what it stored, so the sequence stays gapless). A durable broker would fix
-    that, and is next week's subject.
+    that, and is next week's subject. *(Week 6: once a batch is published it is safe in a
+    durable queue; scans still waiting in checkout's memory are still lost if checkout is
+    killed.)*
 22. **(Week 5) Group commit and a separate PostgreSQL instance for inventory were explored
     but not measured on an idle machine** (W5.6, "Re-run and explored settings"). Neither is
     part of the submitted version.

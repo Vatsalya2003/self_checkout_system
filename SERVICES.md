@@ -1,9 +1,14 @@
 # Services (Week 4: service-based architecture)
 
-> **Week 4 document.** This describes the Week 4 service-based build, in which the four
-> services shared one database (tag `service-based-v1`). On this branch it is superseded by
-> **[MICROSERVICES.md](MICROSERVICES.md)**: each service now has its own database, payment is a
-> saga across checkout and inventory, and scans are pushed to analytics over HTTP.
+> **History: Week 4 document.** This describes the Week 4 service-based build, in which the
+> four services shared one database (tag `service-based-v1`). It no longer describes this
+> branch:
+> - **Week 5** ([MICROSERVICES.md](MICROSERVICES.md)) gave each service its own database and
+>   made payment a saga across checkout and inventory.
+> - **Week 6** ([EVENTS.md](EVENTS.md), the current build) replaced every call between
+>   services with messages through RabbitMQ.
+>
+> The commands below are for the Week 4 build.
 
 The single application is now **four domain services**. Each is its own Maven module,
 its own Spring Boot jar, its own JVM process and its own port. All four share **one
