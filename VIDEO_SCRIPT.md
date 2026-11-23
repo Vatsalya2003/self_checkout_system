@@ -17,16 +17,11 @@ Two terminals side by side:
 
 **Show:** [docs/diagrams/rate-limiter.png](docs/diagrams/rate-limiter.png)
 
-> This is my rate limiter on the Week 6 event-driven self-checkout system. Clients go through the
-> nginx gateway. The limiter is a servlet filter that runs first in checkout-service, before the
-> request body is even read. It's a token bucket stored in Redis, checked with one atomic Lua
-> script, so every instance of a service shares one limit.
->
-> By default I only limit starting a new transaction, 650 a second with a burst of 50. Scans and
-> payments are never refused, for two reasons: refusing them throws away work the basket already
-> did, and since checkout never expires an open basket and the load client abandons its basket on
-> any error, every refused scan or payment would leak a basket. If Redis goes away, each process
-> falls back to a local bucket, so the system keeps running.
+> This is my rate limiter on the Week 6 event-driven self-checkout. It's a servlet filter that runs
+> first in checkout, before the body is read: a token bucket in Redis, checked by one atomic Lua
+> script, so all instances share one limit. I only limit new transactions, 650 a second, burst 50.
+> Refusing scans or payments would waste work and leak baskets, since open baskets never expire. If
+> Redis dies, each process falls back to a local bucket.
 
 ## 0:30 to 0:45 · Start (run before recording, show the output)
 
@@ -39,18 +34,33 @@ scripts/demo/1-start.sh
 
 Start `scripts/demo/watch.sh` in the right terminal.
 
-## 0:45 to 1:30 · Overload with no limiter
+## 0:45 to 1:00 · Configurable
+
+```bash
+grep -n '^ratelimit\.' checkout-service/src/main/resources/application.properties
+curl -s -X POST 'localhost:8082/internal/ratelimit/enabled?value=false'
+```
+
+> The rules are configuration, not code. Each rule names an endpoint and a method, a key (one global
+> bucket, or one per client IP), a rate and a burst; changing them is a properties edit and a
+> restart. And there's a live on/off switch on each instance, which the demo steps use. It stays off
+> for the next step.
+
+## 1:00 to 1:40 · Overload with no limiter
 
 ```bash
 scripts/demo/2-overload-no-limiter.sh 4000 20
 ```
 
-> First, no limiter. The course load client with 4,000 stations. *(while it runs)* Throughput
-> collapses. *(at the end)* About 47 transactions a second instead of 700; 85% of starts fail,
-> mostly with no answer at all, and nginx says it ran out of worker connections. This is what
-> breaking looks like on this laptop.
+Read the numbers off the screen for this run; don't quote the dry run, because every collapse
+comes out a bit different.
 
-## 1:30 to 2:00 · Being honest about 4,000 stations
+> First, no limiter. The course load client with 4,000 stations. *(while it runs)* Throughput
+> collapses. *(at the end, reading the report)* Only [this many] transactions a second instead of
+> about 700; [this share] of starts fail, mostly with no answer at all, and nginx says it ran out of
+> worker connections. This is what breaking looks like on this laptop.
+
+## 1:40 to 2:10 · Being honest about 4,000 stations
 
 **Show:** [reports/rate-limiter/charts/throughput-and-failures.png](reports/rate-limiter/charts/throughput-and-failures.png)
 
@@ -62,15 +72,20 @@ scripts/demo/2-overload-no-limiter.sh 4000 20
 > runs, with no failed transactions. So a limiter inside the service needs a connection limit at
 > the edge in front of it; that's what I'd add next.
 
-## 2:00 to 2:45 · With the limiter: the retry storm vs a polite client
+## 2:10 to 2:55 · With the limiter: the retry storm vs a polite client
 
 ```bash
 scripts/demo/3-overload-with-limiter.sh 2000 20 course
 ```
 
-> Now 2,000 stations, limiter on, still the course client. *(point at watch.sh)* Exactly 650 admitted
+**Show while it runs:** [reports/rate-limiter/charts/latency-p50.png](reports/rate-limiter/charts/latency-p50.png)
+(the red and blue lines sit on top of each other in the Pay panel).
+
+> Now 2,000 stations, limiter on, still the course client. *(point at watch.sh)* About 650 admitted
 > every second while thousands get a 429. The limit is accurate. But look at the pay time: around
-> 400 ms, no better than without the limiter. The course client retries every 429 instantly, so
+> 400 ms. In my measured runs at 2,000 stations with no limiter, the median pay time was 468 ms,
+> with 181 5xx per run from connection resets at start-up; with the limiter and this client it was
+> 460 ms. So no better than without the limiter. The course client retries every 429 instantly, so
 > refused stations are back in the queue a millisecond later, and admitted customers wait behind
 > them.
 
@@ -79,11 +94,11 @@ scripts/demo/3-overload-with-limiter.sh 2000 20 polite
 ```
 
 > Same limiter, same load, but a client that respects the 429: it waits at least the hint the server
-> gives, and backs off further if it's refused again. Still exactly 650 a second, zero errors, and
+> gives, and backs off further if it's refused again. Still about 650 a second, zero errors, and
 > the median time to pay is now about 10 ms instead of 400. My first version of this client slept
 > exactly the millisecond hint, and all the waiting stations came back together; backoff fixed that.
 
-## 2:45 to 3:10 · What a throttled client sees
+## 2:55 to 3:20 · What a throttled client sees
 
 ```bash
 scripts/demo/4-curl-429.sh
@@ -95,7 +110,7 @@ scripts/demo/4-curl-429.sh
 > just ignore it. Admitted requests get the same rate-limit headers and are otherwise exactly what the
 > API contract says.
 
-## 3:10 to 3:35 · Distributed: two instances, one limit
+## 3:20 to 3:45 · Distributed: two instances, one limit
 
 ```bash
 scripts/demo/5-distributed.sh 15
@@ -106,7 +121,7 @@ Optional: `scripts/demo/watch.sh --catalog` in the right terminal.
 > Two catalog instances behind the gateway, both with a 100 a second rule on the same Redis key. Each
 > instance admits about half, and together they admit 101.5 a second, not 200. The limit is shared.
 
-## 3:35 to 4:20 · Fault tolerance: Redis goes down
+## 3:45 to 4:25 · Fault tolerance: Redis goes down
 
 ```bash
 scripts/demo/6-redis-down.sh
@@ -117,7 +132,7 @@ scripts/demo/6-redis-down.sh
 > and 429s. *(Redis comes back)* About two seconds later the shared limit is back. The invariant check
 > at the end still passes, so nothing was lost or oversold.
 
-## 4:20 to 4:50 · The numbers
+## 4:25 to 4:50 · The numbers
 
 ```bash
 scripts/demo/7-numbers.sh
