@@ -1,0 +1,8 @@
+11:59:25 | rule=new-transactions key=global allowed=963 rejected=0 (no Redis call: 0) fallback=0 redis=UP check p50<=1000us p99<=5000us | last 5s
+11:59:30 | rule=new-transactions key=global allowed=2787 rejected=46470 (no Redis call: 39979) fallback=0 redis=UP check p50<=1us p99<=500us | last 5s
+11:59:32 | redis=DOWN (RedisException: Connection disconnected) -> local fallback, each process allows rate / 1 on its own; retrying Redis every 1000 ms
+11:59:35 | rule=new-transactions key=global allowed=2795 rejected=59432 (no Redis call: 28529) fallback=28035 redis=DOWN check p50<=1us p99<=500us | last 5s
+11:59:40 | rule=new-transactions key=global allowed=2752 rejected=78071 (no Redis call: 0) fallback=80823 redis=DOWN check p50<=1us p99<=1us | last 5s
+11:59:44 | redis=UP again -> shared limit restored
+11:59:45 | rule=new-transactions key=global allowed=2798 rejected=72082 (no Redis call: 2263) fallback=71934 redis=UP check p50<=1us p99<=10us | last 5s
+11:59:50 | rule=new-transactions key=global allowed=2750 rejected=66132 (no Redis call: 57377) fallback=0 redis=UP check p50<=1us p99<=500us | last 5s

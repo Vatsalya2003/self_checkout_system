@@ -1,0 +1,4 @@
+12:00:30 catalog-service | rule=catalog-reads key=global allowed=250 rejected=101272 (no Redis call: 0) fallback=101522 
+12:00:35 catalog-service | redis=UP again -> shared limit restored
+12:00:31 catalog-service-2 | rule=catalog-reads key=global allowed=250 rejected=102457 (no Redis call: 0) fallback=10270
+12:00:35 catalog-service-2 | redis=UP again -> shared limit restored

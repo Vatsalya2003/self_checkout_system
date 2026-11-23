@@ -63,6 +63,11 @@
 			</dependency>
 			<dependency>
 				<groupId>com.selfcheckout</groupId>
+				<artifactId>rate-limit</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.selfcheckout</groupId>
 				<artifactId>shared-web</artifactId>
 				<version>${project.version}</version>
 			</dependency>

@@ -1,0 +1,2 @@
+load 5.84 5.18 3.50 | battery 72% | NOT a measured run (on battery)
+redis stopped 12:00:22, started 12:00:34

@@ -205,6 +205,23 @@ public class RateLimiter {
         }
     }
 
+    /**
+     * Opens the Redis connection and loads the script at start-up, on a key of
+     * its own, so the first real customer does not pay for either. If Redis is
+     * not there, the service still starts; the breaker handles the rest.
+     */
+    public void warmUp() {
+        long start = nanoClock.getAsLong();
+        try {
+            store.tryAcquire("rl:warm-up", 1, 1);
+            log.info("ratelimit | redis=UP at start-up (connection and script ready in {} ms)",
+                    (nanoClock.getAsLong() - start) / 1_000_000);
+        } catch (RuntimeException e) {
+            log.warn("ratelimit | redis not reachable at start-up ({}) -- requests will use the local fallback until it is",
+                    describe(e));
+        }
+    }
+
     public void logRules() {
         if (props.getRules().isEmpty()) {
             log.info("ratelimit | no rules configured: every request passes unchecked");

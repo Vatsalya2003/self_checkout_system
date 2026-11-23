@@ -21,9 +21,12 @@ public class LocalTokenBucket {
     }
 
     public synchronized BucketResult tryAcquire(long nowNanos) {
+        // Two threads can read the clock in one order and get this lock in the
+        // other; the later one then brings an EARLIER time. Never move the
+        // bucket's clock backwards, or that stretch of time would refill twice.
         long elapsed = Math.max(0, nowNanos - lastNanos);
         tokens = Math.min(burst, tokens + elapsed * ratePerSecond / 1_000_000_000.0);
-        lastNanos = nowNanos;
+        lastNanos = Math.max(lastNanos, nowNanos);
 
         boolean allowed = tokens >= 1;
         long nextIn = 0;

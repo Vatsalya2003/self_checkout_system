@@ -67,12 +67,14 @@ public class RateLimitFilter extends OncePerRequestFilter {
         long retryAfter = Math.max(1, ceilSeconds(d.retryAfterMicros()));
         response.setStatus(429);
         response.setHeader(RETRY_AFTER, Long.toString(retryAfter));
+        // Same Content-Type as the API's other errors ("application/json", no charset).
         response.setContentType("application/json");
-        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         String message = "Too many requests for " + rule.getMethod() + " " + rule.getPath() + ": the limit is "
                 + RateLimiter.formatRate(rule.getRatePerSecond()) + " per second (burst " + rule.getBurst()
                 + "). Retry after " + retryAfter + " s.";
-        response.getWriter().write("{\"error\":\"RATE_LIMITED\",\"message\":\"" + message + "\"}");
+        byte[] body = ("{\"error\":\"RATE_LIMITED\",\"message\":\"" + message + "\"}").getBytes(StandardCharsets.UTF_8);
+        response.setContentLength(body.length);
+        response.getOutputStream().write(body);
     }
 
     /** The bucket key for this request: one shared bucket, or one per client address. */

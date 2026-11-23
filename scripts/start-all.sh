@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 # Start the four services and the gateway, each as its own process.
 #
-#   scripts/start-all.sh            # start (build the jars first if any is missing)
-#   scripts/start-all.sh --build    # rebuild all jars, then start
+#   scripts/start-all.sh                 # start (build the jars first if any is missing)
+#   scripts/start-all.sh --build         # rebuild all jars, then start
+#   scripts/start-all.sh --two-catalogs  # also a second catalog-service on :8085
+#                                        # (shows two instances sharing one rate limit)
+#   scripts/start-all.sh --no-limiter    # start with the rate limiter OFF
+#                                        # (it can also be switched live, see RATE_LIMITER.md)
+# Flags can be combined.
 #
 # Reset first if you want a clean run:
 #   scripts/stop-all.sh && db/reset.sh && scripts/start-all.sh
@@ -27,7 +32,21 @@ SERVICES=(
 )
 
 need_build=0
-[ "${1:-}" = "--build" ] && need_build=1
+two_catalogs=0
+EXTRA_ARGS=()     # passed to every service
+CATALOG_ARGS=()   # passed to the catalog instances only
+for arg in "$@"; do
+  case "$arg" in
+    --build)        need_build=1 ;;
+    --two-catalogs) two_catalogs=1 ;;
+    --no-limiter)   EXTRA_ARGS+=("--ratelimit.enabled=false") ;;
+    *) echo "unknown option: $arg" >&2; exit 1 ;;
+  esac
+done
+# With two catalog instances, each one's local fallback (used only while
+# Redis is down) takes half of the catalog limit. Checkout is never doubled,
+# so its fallback keeps the whole rate.
+[ $two_catalogs = 1 ] && CATALOG_ARGS+=("--ratelimit.fallback-instances=2")
 for s in "${SERVICES[@]}"; do
   set -- $s
   [ -f "$1/target/$1-0.0.1-SNAPSHOT.jar" ] || need_build=1
@@ -37,13 +56,19 @@ if [ $need_build = 1 ]; then
   ./mvnw -B -q -DskipTests package
 fi
 
-launch() {   # name port heap
-  if lsof -tiTCP:"$2" -sTCP:LISTEN >/dev/null; then
-    echo "port $2 is already in use -- run scripts/stop-all.sh first" >&2; exit 1
+launch() {   # name port heap  (the jar is the one named after the service)
+  launch_as "$1" "$1" "$2" "$3"
+}
+launch_as() {   # instance-name jar-name port heap  (two instances of one jar need two names)
+  if lsof -tiTCP:"$3" -sTCP:LISTEN >/dev/null; then
+    echo "port $3 is already in use -- run scripts/stop-all.sh first" >&2; exit 1
   fi
-  nohup "$JAVA" -Xmx"$3" -jar "$1/target/$1-0.0.1-SNAPSHOT.jar" > "logs/$1.log" 2>&1 &
+  local args=(${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"})
+  [ "$2" = catalog-service ] && args+=(${CATALOG_ARGS[@]+"${CATALOG_ARGS[@]}"})
+  nohup "$JAVA" -Xmx"$4" -jar "$2/target/$2-0.0.1-SNAPSHOT.jar" --server.port="$3" ${args[@]+"${args[@]}"} \
+    > "logs/$1.log" 2>&1 &
   echo $! > "logs/$1.pid"
-  echo "started $1 (pid $!) on :$2"
+  echo "started $1 (pid $!) on :$3"
 }
 healthy() {  # name port heap path status
   for i in $(seq 120); do
@@ -74,10 +99,23 @@ fi
   || { echo "rabbitmq is not running" >&2; exit 1; }
 echo "rabbitmq running"
 
+# Rate limiter: Redis holds the shared token buckets. If it is not running the
+# services still start and work (the limiter falls back to a per-process
+# bucket), so a failure here is a warning, not a stop.
+if ! redis-cli ping >/dev/null 2>&1; then
+  echo "starting redis..."
+  brew services start redis >/dev/null
+  for i in $(seq 20); do redis-cli ping >/dev/null 2>&1 && break; sleep 0.5; done
+fi
+if redis-cli ping >/dev/null 2>&1; then echo "redis running"; else echo "WARNING: redis is not running -- the rate limiter will use its local fallback" >&2; fi
+
 # Week 5: catalog first. The other three ask it for the catalog at startup
 # (Week 6: CatalogRequested through the broker; they may not read
 # catalog_db), so it should already be listening.
 set -- ${SERVICES[0]}; launch "$@"; healthy "$@"
+if [ $two_catalogs = 1 ]; then
+  launch_as catalog-service-2 catalog-service 8085 512m; healthy catalog-service-2 8085 512m /items 200
+fi
 for s in "${SERVICES[@]:1}"; do set -- $s; launch "$@"; done
 for s in "${SERVICES[@]:1}"; do set -- $s; healthy "$@"; done
 

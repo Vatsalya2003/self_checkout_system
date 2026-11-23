@@ -54,6 +54,15 @@ class LocalTokenBucketTest {
     }
 
     @Test
+    void aLateArrivingEarlierTimestampDoesNotRefillTheSameTimeTwice() {
+        LocalTokenBucket b = new LocalTokenBucket(10, 1, 0);
+        assertThat(b.tryAcquire(0).allowed()).isTrue();
+        assertThat(b.tryAcquire(SECOND / 10).allowed()).isTrue();        // the token for 0..100 ms
+        assertThat(b.tryAcquire(SECOND / 20).allowed()).isFalse();       // a thread that read the clock at 50 ms
+        assertThat(b.tryAcquire(SECOND / 10 + 1).allowed()).isFalse();   // 0..100 ms must not count again
+    }
+
+    @Test
     void overTenSecondsOfConstantDemandItAdmitsRateTimesTimePlusBurst() {
         LocalTokenBucket b = new LocalTokenBucket(50, 10, 0);
         int allowed = 0;

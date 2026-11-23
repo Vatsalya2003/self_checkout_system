@@ -1,0 +1,38 @@
+Self-Checkout Load Client starting...
+  baseUrl=http://localhost:8080 stations=10 duration=30s basket=[1..20]
+Fetching catalog...
+Catalog loaded: 2000 items.
+Starting 10 simulated station(s) for 30s...
+Duration elapsed, waiting for in-flight transactions to finish...
+Fetching low-stock alerts and popular items...
+
+================ LOAD TEST REPORT ================
+Base URL:        http://localhost:8080
+Stations:        10
+Duration:        30.0s (requested 30s)
+Transactions:    16036 (534.4/sec)
+Items scanned:   168041 (5599.9/sec)
+
+Operation                    OK   Errors   Mean(ms)    P50(ms)    P95(ms)    P99(ms)    Max(ms)     Err%
+START_TRANSACTION         16036   351426       0.46       0.38       1.11       2.24      20.57   95.64%
+SCAN_ITEM                168041        0       0.23       0.21       0.31       0.82       6.61    0.00%
+COMPLETE_TRANSACTION      16036        0      10.73       9.67      19.49      37.47     117.49    0.00%
+
+Low-stock alerts (2):
+  SKU-000001   Item 1                         stock=0      threshold=50
+  SKU-000002   Item 2                         stock=0      threshold=50
+
+Most popular items (top 10):
+  #1   SKU-000001   Item 1                         scans=126
+  #2   SKU-000002   Item 2                         scans=62
+  #3   SKU-000003   Item 3                         scans=35
+  #4   SKU-000004   Item 4                         scans=28
+  #5   SKU-000006   Item 6                         scans=18
+  #6   SKU-000007   Item 7                         scans=17
+  #7   SKU-000005   Item 5                         scans=16
+  #8   SKU-000008   Item 8                         scans=15
+  #9   SKU-000015   Item 15                        scans=12
+  #10  SKU-000009   Item 9                         scans=11
+===================================================
+
+JSON report written to: reports/rate-limiter/phase3/redis-down-checkout/report-20261123-115952.json

@@ -1,0 +1,27 @@
+probe: GET /items with 16 threads for 20s
+   t |   200/s   429/s  other/s
+   1 |     119   14456        0
+   2 |     101   24048        0
+   3 |     100   26839        0
+   4 |     101   30822        0
+   5 |     100   33045        0
+   6 |     101   37492        0
+   7 |     101   35066        0
+   8 |     101   35870        0
+   9 |     100   37530        0
+  10 |     101   37510        0
+  11 |     100   32524        0
+  12 |     101   40661        0
+  13 |     100   39221        0
+  14 |     101   39218        0
+  15 |     100   39479        0
+  16 |     100   41367        0
+  17 |     101   37947        0
+  18 |     101   39128        0
+  19 |     100   38875        0
+  20 |     100   40320        0
+
+summary: 2029 x 200 (101.5/s), 701440 x 429, 0 other, over 20 s
+  instance :8081  allowed   1026  rejected  350709   (its own counters)
+  instance :8085  allowed   1003  rejected  350731   (its own counters)
+  all instances together allowed 2029 = 101.5 per second

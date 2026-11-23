@@ -1,0 +1,4 @@
+# summary of the course load client's stderr (the raw file, one line per failed transaction, was 81,882,258 bytes)
+failed transactions: 351426
+by kind and operation:
+  351426 429 rate limited                       start

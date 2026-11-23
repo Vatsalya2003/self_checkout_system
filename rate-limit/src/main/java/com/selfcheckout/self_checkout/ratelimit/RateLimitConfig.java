@@ -2,7 +2,9 @@ package com.selfcheckout.self_checkout.ratelimit;
 
 import io.lettuce.core.ClientOptions;
 import io.lettuce.core.SocketOptions;
+import io.lettuce.core.resource.Delay;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.data.redis.autoconfigure.ClientResourcesBuilderCustomizer;
 import org.springframework.boot.data.redis.autoconfigure.LettuceClientOptionsBuilderCustomizer;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.SmartLifecycle;
@@ -55,7 +57,21 @@ public class RateLimitConfig {
                 .socketOptions(SocketOptions.builder().connectTimeout(Duration.ofMillis(100)).build());
     }
 
-    /** Prints the one-line "ratelimit | ..." summary every log-interval, while there is traffic. */
+    /**
+     * Lettuce reconnects with a growing delay (up to 30 s) by default, so after
+     * an outage the limiter could stay on its fallback long after Redis is back.
+     * A fixed half-second delay brings the shared limit back within about a
+     * second; one connect attempt every 500 ms costs nothing.
+     */
+    @Bean
+    public ClientResourcesBuilderCustomizer rateLimitRedisReconnect() {
+        return builder -> builder.reconnectDelay(Delay.constant(Duration.ofMillis(500)));
+    }
+
+    /**
+     * At start-up: warm the Redis connection up. Then print the one-line
+     * "ratelimit | ..." summary every log-interval, while there is traffic.
+     */
     @Bean
     public SmartLifecycle rateLimitSummaryLogger(RateLimiter limiter, RateLimitProperties props) {
         return new SmartLifecycle() {
@@ -63,6 +79,7 @@ public class RateLimitConfig {
 
             @Override
             public void start() {
+                limiter.warmUp();
                 timer = Executors.newSingleThreadScheduledExecutor(r -> {
                     Thread t = new Thread(r, "ratelimit-log");
                     t.setDaemon(true);
