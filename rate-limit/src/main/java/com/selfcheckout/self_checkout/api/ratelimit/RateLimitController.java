@@ -1,4 +1,6 @@
-package com.selfcheckout.self_checkout.ratelimit;
+package com.selfcheckout.self_checkout.api.ratelimit;
+
+import com.selfcheckout.self_checkout.ratelimit.RateLimiter;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;

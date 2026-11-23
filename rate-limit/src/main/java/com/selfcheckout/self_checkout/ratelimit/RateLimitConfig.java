@@ -6,11 +6,9 @@ import io.lettuce.core.resource.Delay;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.data.redis.autoconfigure.ClientResourcesBuilderCustomizer;
 import org.springframework.boot.data.redis.autoconfigure.LettuceClientOptionsBuilderCustomizer;
-import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.Ordered;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.time.Duration;
@@ -32,18 +30,6 @@ public class RateLimitConfig {
         RateLimiter limiter = new RateLimiter(props, new RedisTokenBucket(redis), System::nanoTime);
         limiter.logRules();
         return limiter;
-    }
-
-    /**
-     * The very first filter, ahead of even Spring Boot's character-encoding
-     * filter, so a refused request does no other work at all. (It never reads
-     * the body, so nothing it skips could matter to it.)
-     */
-    @Bean
-    public FilterRegistrationBean<RateLimitFilter> rateLimitFilter(RateLimiter limiter) {
-        FilterRegistrationBean<RateLimitFilter> reg = new FilterRegistrationBean<>(new RateLimitFilter(limiter));
-        reg.setOrder(Ordered.HIGHEST_PRECEDENCE);
-        return reg;
     }
 
     /**

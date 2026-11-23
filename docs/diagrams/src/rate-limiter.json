@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Rate limiter on the Week 6 self-checkout",
+    "locale": "en",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    { "id": "client", "type": "external", "label": "Load client", "sublabel": "course or polite client", "pos": [40, 60], "size": [180, 64] },
+    { "id": "gateway", "type": "cloud", "label": "nginx gateway", "sublabel": ":8080 · sets X-Real-IP", "pos": [330, 56], "size": [260, 72] },
+    { "id": "checkout", "type": "backend", "label": "checkout-service", "sublabel": ":8082 · rule POST /transactions 650/s", "pos": [330, 290], "size": [260, 84], "tag": "RateLimitFilter runs first" },
+    { "id": "catalog1", "type": "backend", "label": "catalog-service", "sublabel": ":8081 · GET /items 100/s", "pos": [820, 290], "size": [210, 76] },
+    { "id": "catalog2", "type": "backend", "label": "catalog-service-2", "sublabel": ":8085 · same rule", "pos": [1100, 290], "size": [210, 76] },
+    { "id": "redis", "type": "database", "label": "Redis :6379", "sublabel": "one hash per bucket · Lua token bucket", "pos": [820, 540], "size": [290, 76] },
+    { "id": "fallback", "type": "backend", "label": "Local fallback bucket", "sublabel": "in each process · rate / instances", "pos": [40, 540], "size": [230, 76] },
+    { "id": "rest", "type": "external", "label": "Week 6 system", "sublabel": "Postgres · RabbitMQ saga · inventory · analytics", "pos": [330, 740], "size": [300, 72] }
+  ],
+  "connections": [
+    { "id": "client-gateway", "from": "client", "to": "gateway", "label": "HTTP", "fromSide": "right", "toSide": "left" },
+    { "id": "gateway-checkout", "from": "gateway", "to": "checkout", "label": "POST /transactions", "variant": "emphasis", "fromSide": "bottom", "toSide": "top", "labelDy": 24 },
+    { "id": "gateway-catalog1", "from": "gateway", "to": "catalog1", "label": "GET /items", "fromSide": "right", "toSide": "top" },
+    { "id": "gateway-catalog2", "from": "gateway", "to": "catalog2", "label": "GET /items", "fromSide": "right", "toSide": "top" },
+    { "id": "checkout-redis", "from": "checkout", "to": "redis", "label": "EVALSHA · 20 ms timeout", "variant": "emphasis", "fromSide": "right", "toSide": "left" },
+    { "id": "catalog1-redis", "from": "catalog1", "to": "redis", "label": "shared key", "fromSide": "bottom", "toSide": "top" },
+    { "id": "catalog2-redis", "from": "catalog2", "to": "redis", "label": "shared key", "fromSide": "bottom", "toSide": "right" },
+    { "id": "checkout-fallback", "from": "checkout", "to": "fallback", "label": "Redis down: breaker open", "variant": "dashed", "fromSide": "left", "toSide": "top" },
+    { "id": "checkout-rest", "from": "checkout", "to": "rest", "label": "admitted requests only", "fromSide": "bottom", "toSide": "top" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Check order", "items": ["Deny cache: bucket known empty, answer 429 locally", "Redis: one atomic Lua call shared by every instance", "Local fallback when Redis fails or the breaker is open"] },
+    { "dot": "rose", "title": "Throttled answer", "items": ["429 with JSON body, before any business code", "Retry-After in whole seconds (standard)", "X-RateLimit-Retry-After-Ms (non-standard, a lower bound)"] },
+    { "dot": "emerald", "title": "Never a 5xx", "items": ["Any limiter error lets the request through", "Breaker: 5 failures open it for 1 s", "Reconnect every 500 ms, shared limit back in ~1 s"] }
+  ]
+}

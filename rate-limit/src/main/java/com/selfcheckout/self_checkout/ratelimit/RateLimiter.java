@@ -280,7 +280,7 @@ public class RateLimiter {
         return root.getClass().getSimpleName() + msg;
     }
 
-    static String formatRate(double rate) {
+    public static String formatRate(double rate) {
         return rate == Math.rint(rate) ? Long.toString((long) rate) : Double.toString(rate);
     }
 

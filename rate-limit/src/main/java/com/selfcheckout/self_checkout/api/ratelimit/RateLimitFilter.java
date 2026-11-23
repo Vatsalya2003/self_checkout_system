@@ -1,4 +1,8 @@
-package com.selfcheckout.self_checkout.ratelimit;
+package com.selfcheckout.self_checkout.api.ratelimit;
+
+import com.selfcheckout.self_checkout.ratelimit.Decision;
+import com.selfcheckout.self_checkout.ratelimit.RateLimitProperties;
+import com.selfcheckout.self_checkout.ratelimit.RateLimiter;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -19,7 +23,7 @@ import java.nio.charset.StandardCharsets;
 // status and body are exactly what the API contract says); if refused it gets
 // a 429 written right here, so no controller, database or broker work is done.
 //
-// It runs FIRST in the filter chain (RateLimitConfig) and never reads the
+// It runs FIRST in the filter chain (RateLimitWebConfig) and never reads the
 // request body, so a refused request costs Tomcat's header parsing and this
 // check, nothing more.
 //

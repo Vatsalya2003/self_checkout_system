@@ -28,6 +28,23 @@ is loading the catalog at startup. No arrow goes from one service to another.
 > - **The broker, the events and the saga over events:** [EVENTS.md](EVENTS.md)
 > - Every raw run, check output and failure test is in [`docs/perf/week6-raw/`](docs/perf/week6-raw/).
 
+> ## Rate limiter (branch `rate-limiter`, built on Week 6)
+>
+> A server-side token-bucket limiter shared through **Redis**, with a local fallback so the
+> system keeps working when Redis is down. By default it limits only new transactions
+> (`POST /transactions`, 650/s, burst 50); scans and payments are never refused. A refusal is a
+> `429` with `Retry-After` (and a non-standard `X-RateLimit-Retry-After-Ms`) before any business code runs.
+>
+> - **Write-up, design and results:** [RATE_LIMITER.md](RATE_LIMITER.md)
+> - **Diagram:** [`docs/diagrams/rate-limiter.svg`](docs/diagrams/rate-limiter.svg) ([PNG](docs/diagrams/rate-limiter.png))
+> - **Measured runs and charts:** [`reports/rate-limiter/`](reports/rate-limiter/)
+> - **Demo, step by step:** [`scripts/demo/`](scripts/demo/) (`1-start.sh` to `7-numbers.sh`, and `watch.sh`)
+> - In short: the admitted rate holds at 650/s under every load and while Redis is down; two service
+>   instances share one limit; admitted customers pay in 4 to 7 ms (p50) when clients back off, but
+>   not during the course client's instant-retry storm; at 4,000 stations the machine runs out of
+>   connections before the limiter is reached, which needs an edge connection limit
+>   ([details](RATE_LIMITER.md#results)).
+
 ---
 
 ## Architecture
@@ -366,7 +383,8 @@ problem, and `GET /internal/scans/max-seq` disappears.
 - JDK 21 (a full JDK; the load client needs `javac`);
 - PostgreSQL 16 (Homebrew);
 - RabbitMQ (Homebrew: `brew install rabbitmq`);
-- nginx (Homebrew: `brew install nginx`).
+- nginx (Homebrew: `brew install nginx`);
+- Redis, for the rate limiter (Homebrew: `brew install redis`; `start-all.sh` starts it if it is down).
 
 Maven comes with `./mvnw`. The Homebrew default PostgreSQL user may create databases and roles.
 
@@ -394,6 +412,12 @@ scripts/check-invariant-micro.sh    # stock, checkout vs inventory, gapless scan
 scripts/check-connections.sh        # each service talks only to its database and the broker
 ```
 
+Rate limiter options for `start-all.sh`: `--no-limiter` (start with it off), `--checkout-rate=N`
+(change checkout's limit), `--two-catalogs` (a second catalog-service on :8085 behind the gateway).
+The limiter can also be switched live: `curl -X POST 'localhost:8082/internal/ratelimit/enabled?value=false'`.
+The demo is `scripts/demo/1-start.sh` to `7-numbers.sh` (run `scripts/demo/watch.sh` in a second
+terminal), and the measured runs are made with `scripts/ratelimit-bench/run-set.sh`.
+
 Reset and restart before every load run:
 `scripts/stop-all.sh && db/reset.sh && scripts/start-all.sh`.
 
@@ -402,7 +426,7 @@ The harness used for every run is in
 [`docs/perf/week6-raw/harness/`](docs/perf/week6-raw/harness/).
 
 Other checks:
-- `./mvnw test`: unit and ArchUnit tests (52).
+- `./mvnw test`: unit and ArchUnit tests (88, of which 36 are the rate limiter's).
 - `scripts/test-*.py`: the five behavioural scripts.
 - `scripts/test-failures.sh`: the failure tests (A–H).
 - `scripts/test-service-restart.sh`: stops and restarts each service.
@@ -422,12 +446,14 @@ Other checks:
 | 3 | Pipelined analytics, then checkout performance work | [`pipeline-v1`](https://github.com/Vatsalya2003/self_checkout_system/tree/pipeline-v1) / [`pipeline-v2`](https://github.com/Vatsalya2003/self_checkout_system/tree/pipeline-v2) |
 | 4 | Service-based, one shared database | [`service-based-v1`](https://github.com/Vatsalya2003/self_checkout_system/tree/service-based-v1) |
 | 5 | Microservices, a database each, payment saga | [`microservices-v1`](https://github.com/Vatsalya2003/self_checkout_system/tree/microservices-v1) |
-| 6 | Event-based: all cross-service communication through RabbitMQ (this branch) | [`event-driven-v1`](https://github.com/Vatsalya2003/self_checkout_system/tree/event-driven-v1) (submitted), `event-driven-v2` (same code and reports, rewritten docs and the main diagram) |
+| 6 | Event-based: all cross-service communication through RabbitMQ | [`event-driven-v1`](https://github.com/Vatsalya2003/self_checkout_system/tree/event-driven-v1) (submitted), `event-driven-v2` (same code and reports, rewritten docs and the main diagram) |
+| 6 + | Rate limiter on the Week 6 system: Redis token bucket, local fallback (this branch) | `rate-limiter-v1` |
 
 ---
 
 ## More detail
 
+- [RATE_LIMITER.md](RATE_LIMITER.md): the rate limiter: what it limits and why, the token bucket in Redis, fault tolerance, and every measurement.
 - [EVENTS.md](EVENTS.md): the broker, every event, the saga over events, delivery guarantees, failure handling.
 - [ARCHITECTURE.md](ARCHITECTURE.md): trade-offs and measured results, week by week; Week 6 is [§ Week 6](ARCHITECTURE.md#week-6-event-based-architecture).
 - [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md): a code walkthrough, starting with a payment and a scan crossing the broker.

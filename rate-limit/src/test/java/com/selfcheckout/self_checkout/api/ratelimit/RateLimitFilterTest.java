@@ -1,4 +1,9 @@
-package com.selfcheckout.self_checkout.ratelimit;
+package com.selfcheckout.self_checkout.api.ratelimit;
+
+import com.selfcheckout.self_checkout.ratelimit.Decision;
+import com.selfcheckout.self_checkout.ratelimit.LocalTokenBucket;
+import com.selfcheckout.self_checkout.ratelimit.RateLimitProperties;
+import com.selfcheckout.self_checkout.ratelimit.RateLimiter;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockFilterChain;
