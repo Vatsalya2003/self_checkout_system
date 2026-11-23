@@ -61,6 +61,7 @@ class RateLimitFilterTest {
         assertThat(res.getHeader(RateLimitFilter.REMAINING)).isEqualTo("1");
         assertThat(res.getHeader(RateLimitFilter.RESET)).isEqualTo("1");
         assertThat(res.getHeader(RateLimitFilter.RETRY_AFTER)).isNull();
+        assertThat(res.getHeader(RateLimitFilter.RETRY_AFTER_MS)).isNull();
     }
 
     @Test
@@ -74,6 +75,7 @@ class RateLimitFilterTest {
         assertThat(chain.getRequest()).isNull();   // no controller, no database, no broker
         assertThat(res.getStatus()).isEqualTo(429);
         assertThat(res.getHeader(RateLimitFilter.RETRY_AFTER)).isEqualTo("1");
+        assertThat(res.getHeader(RateLimitFilter.RETRY_AFTER_MS)).isEqualTo("500");   // 2 per second: next token in 500 ms
         assertThat(res.getHeader(RateLimitFilter.REMAINING)).isEqualTo("0");
         assertThat(res.getContentType()).startsWith("application/json");
         assertThat(res.getContentAsString())

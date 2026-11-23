@@ -34,11 +34,15 @@ public class RateLimitConfig {
         return limiter;
     }
 
-    /** First in the chain, so a refused request does no other work at all. */
+    /**
+     * The very first filter, ahead of even Spring Boot's character-encoding
+     * filter, so a refused request does no other work at all. (It never reads
+     * the body, so nothing it skips could matter to it.)
+     */
     @Bean
     public FilterRegistrationBean<RateLimitFilter> rateLimitFilter(RateLimiter limiter) {
         FilterRegistrationBean<RateLimitFilter> reg = new FilterRegistrationBean<>(new RateLimitFilter(limiter));
-        reg.setOrder(Ordered.HIGHEST_PRECEDENCE + 10);
+        reg.setOrder(Ordered.HIGHEST_PRECEDENCE);
         return reg;
     }
 

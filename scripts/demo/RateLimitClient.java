@@ -24,11 +24,14 @@ import java.util.regex.Pattern;
  *   java scripts/demo/RateLimitClient.java --mode=probe  --path=/items --concurrency=16 --duration=20 --instances=8081,8085
  *
  * polite: checkout stations like the course load client, with one difference:
- *         a station that gets a 429 WAITS for Retry-After (plus a little random
- *         jitter so they don't all come back at once) before trying again. The
- *         course client retries immediately, which turns every 429 into another
- *         request. This client also times the 429 answers, which the course
- *         client does not record.
+ *         a station that gets a 429 WAITS before trying again, for as long as
+ *         the server says (plus a little random jitter so they don't all come
+ *         back at once). The course client retries immediately, which turns
+ *         every 429 into another request. This client also times the 429
+ *         answers, which the course client does not record.
+ *         --wait=ms (default) uses X-RateLimit-Retry-After-Ms, the exact wait;
+ *         --wait=seconds uses only the standard Retry-After (whole seconds).
+ *         --report=file.json writes the summary as JSON.
  * probe:  sends GET requests to one path as fast as `concurrency` threads can,
  *         counts 200s and 429s per second, and at the end reads each service
  *         instance's own counters (/internal/ratelimit/stats on its port), so
@@ -58,6 +61,7 @@ public class RateLimitClient {
     final ConcurrentLinkedQueue<Long> admittedNanos = new ConcurrentLinkedQueue<>();
     final ConcurrentLinkedQueue<Long> throttledNanos = new ConcurrentLinkedQueue<>();
     final ConcurrentLinkedQueue<Long> completeNanos = new ConcurrentLinkedQueue<>();
+    final ConcurrentLinkedQueue<Long> scanNanos = new ConcurrentLinkedQueue<>();
 
     RateLimitClient(Map<String, String> opt) {
         this.opt = opt;
@@ -85,13 +89,14 @@ public class RateLimitClient {
         int stations = Integer.parseInt(opt.getOrDefault("stations", "100"));
         int duration = Integer.parseInt(opt.getOrDefault("duration", "60"));
         List<String> skus = fetchSkus();
-        System.out.printf("polite client: %d stations for %ds against %s (a 429 means: wait Retry-After, then retry)%n",
-                stations, duration, base);
+        boolean exactWait = !"seconds".equals(opt.getOrDefault("wait", "ms"));
+        System.out.printf("polite client: %d stations for %ds against %s (a 429 means: wait %s, then retry)%n",
+                stations, duration, base, exactWait ? "X-RateLimit-Retry-After-Ms" : "Retry-After (whole seconds)");
         System.out.println("   t | admitted/s throttled/s waiting | completed/s scans/s errors | 201 p50  429 p50");
         try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
             for (int i = 1; i <= stations; i++) {
                 String id = String.format("polite-%03d", i);
-                pool.submit(() -> station(id, skus));
+                pool.submit(() -> station(id, skus, exactWait));
             }
             ticker(duration, true);
             stop.set(true);
@@ -99,18 +104,38 @@ public class RateLimitClient {
         long[] a = sorted(admittedNanos);
         long[] t = sorted(throttledNanos);
         long[] c = sorted(completeNanos);
+        long[] sc = sorted(scanNanos);
         System.out.println();
         System.out.printf("summary: %d s, %d stations%n", duration, stations);
-        System.out.printf("  POST /transactions admitted  %8d  (%.1f/s)   latency p50 %s  p99 %s%n",
-                started.sum(), started.sum() / (double) duration, ms(pct(a, .50)), ms(pct(a, .99)));
-        System.out.printf("  POST /transactions throttled %8d  (%.1f/s)   latency p50 %s  p99 %s  <- the 429s%n",
-                throttled.sum(), throttled.sum() / (double) duration, ms(pct(t, .50)), ms(pct(t, .99)));
-        System.out.printf("  completed transactions       %8d  (%.1f/s)   complete p50 %s  p99 %s%n",
-                completed.sum(), completed.sum() / (double) duration, ms(pct(c, .50)), ms(pct(c, .99)));
+        System.out.printf("  POST /transactions admitted  %8d  (%.1f/s)   latency p50 %s  p95 %s  p99 %s%n",
+                started.sum(), started.sum() / (double) duration, ms(pct(a, .50)), ms(pct(a, .95)), ms(pct(a, .99)));
+        System.out.printf("  POST /transactions throttled %8d  (%.1f/s)   latency p50 %s  p95 %s  p99 %s  <- the 429s%n",
+                throttled.sum(), throttled.sum() / (double) duration, ms(pct(t, .50)), ms(pct(t, .95)), ms(pct(t, .99)));
+        System.out.printf("  scans                        %8d  (%.1f/s)   latency p50 %s  p95 %s  p99 %s%n",
+                scans.sum(), scans.sum() / (double) duration, ms(pct(sc, .50)), ms(pct(sc, .95)), ms(pct(sc, .99)));
+        System.out.printf("  completed transactions       %8d  (%.1f/s)   complete p50 %s  p95 %s  p99 %s%n",
+                completed.sum(), completed.sum() / (double) duration, ms(pct(c, .50)), ms(pct(c, .95)), ms(pct(c, .99)));
         System.out.printf("  errors (anything but 201/200/429, or no answer): %d%n", errors.sum());
+        if (opt.containsKey("report")) {
+            String json = String.format(java.util.Locale.ROOT, """
+                    {"client":"polite","wait":"%s","stations":%d,"durationSeconds":%d,
+                     "admitted":%d,"throttled":%d,"completed":%d,"scans":%d,"errors":%d,
+                     "transactionsPerSecond":%.1f,
+                     "startAdmittedMs":{"p50":%.3f,"p95":%.3f,"p99":%.3f},
+                     "start429Ms":{"p50":%.3f,"p95":%.3f,"p99":%.3f},
+                     "scanMs":{"p50":%.3f,"p95":%.3f,"p99":%.3f},
+                     "completeMs":{"p50":%.3f,"p95":%.3f,"p99":%.3f}}
+                    """,
+                    exactWait ? "ms" : "seconds", stations, duration, started.sum(), throttled.sum(), completed.sum(),
+                    scans.sum(), errors.sum(), completed.sum() / (double) duration,
+                    msd(pct(a, .5)), msd(pct(a, .95)), msd(pct(a, .99)), msd(pct(t, .5)), msd(pct(t, .95)), msd(pct(t, .99)),
+                    msd(pct(sc, .5)), msd(pct(sc, .95)), msd(pct(sc, .99)), msd(pct(c, .5)), msd(pct(c, .95)), msd(pct(c, .99)));
+            java.nio.file.Files.writeString(java.nio.file.Path.of(opt.get("report")), json);
+            System.out.println("  report: " + opt.get("report"));
+        }
     }
 
-    void station(String id, List<String> skus) {
+    void station(String id, List<String> skus, boolean exactWait) {
         ThreadLocalRandom rnd = ThreadLocalRandom.current();
         while (!stop.get()) {
             try {
@@ -120,8 +145,14 @@ public class RateLimitClient {
                 if (r.statusCode() == 429) {
                     throttled.increment();
                     throttledNanos.add(took);
-                    long waitMs = 1000L * Long.parseLong(r.headers().firstValue("Retry-After").orElse("1"))
-                            + rnd.nextLong(250);
+                    // exact wait from the non-standard header, else whole seconds from
+                    // Retry-After; plus up to the same again at random (or 250 ms), so
+                    // the waiting stations don't all come back in the same instant
+                    String exact = r.headers().firstValue("X-RateLimit-Retry-After-Ms").orElse(null);
+                    long waitMs = exactWait && exact != null
+                            ? Long.parseLong(exact)
+                            : 1000L * Long.parseLong(r.headers().firstValue("Retry-After").orElse("1"));
+                    waitMs += rnd.nextLong(Math.max(1, Math.min(waitMs, 250)));
                     waiting.increment();
                     try {
                         Thread.sleep(waitMs);
@@ -146,9 +177,11 @@ public class RateLimitClient {
                 boolean okSoFar = true;
                 for (int i = 0; i < n && okSoFar; i++) {
                     String sku = skus.get(rnd.nextInt(skus.size()));
+                    long ts = System.nanoTime();
                     HttpResponse<String> s = send("POST", "/transactions/" + tx + "/items", "{\"sku\":\"" + sku + "\"}");
                     if (s.statusCode() == 200) {
                         scans.increment();
+                        scanNanos.add(System.nanoTime() - ts);
                     } else {
                         errors.increment();
                         okSoFar = false;
@@ -303,6 +336,10 @@ public class RateLimitClient {
         }
         int i = (int) Math.ceil(p * sortedNanos.length) - 1;
         return sortedNanos[Math.max(0, Math.min(sortedNanos.length - 1, i))];
+    }
+
+    static double msd(long nanos) {
+        return nanos < 0 ? -1 : nanos / 1_000_000.0;
     }
 
     static String ms(long nanos) {

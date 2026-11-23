@@ -19,6 +19,10 @@ import java.nio.charset.StandardCharsets;
 // status and body are exactly what the API contract says); if refused it gets
 // a 429 written right here, so no controller, database or broker work is done.
 //
+// It runs FIRST in the filter chain (RateLimitConfig) and never reads the
+// request body, so a refused request costs Tomcat's header parsing and this
+// check, nothing more.
+//
 // The limiter must never break a request by itself: if the check throws for
 // any reason, the request is let through and the error is logged.
 public class RateLimitFilter extends OncePerRequestFilter {
@@ -29,6 +33,14 @@ public class RateLimitFilter extends OncePerRequestFilter {
     public static final String REMAINING = "X-RateLimit-Remaining";
     public static final String RESET = "X-RateLimit-Reset";
     public static final String RETRY_AFTER = "Retry-After";
+    /**
+     * NOT a standard header: the wait in milliseconds. Retry-After must be whole
+     * seconds, so it says "1" even when the next token is 2 ms away, and a client
+     * that obeys it waits far too long (with a 550/s limit, a well-behaved client
+     * left ~12 % of the allowed rate unused). Clients that know this header can
+     * wait exactly as long as needed; everyone else just ignores it.
+     */
+    public static final String RETRY_AFTER_MS = "X-RateLimit-Retry-After-Ms";
 
     private final RateLimiter limiter;
 
@@ -67,6 +79,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
         long retryAfter = Math.max(1, ceilSeconds(d.retryAfterMicros()));
         response.setStatus(429);
         response.setHeader(RETRY_AFTER, Long.toString(retryAfter));
+        response.setHeader(RETRY_AFTER_MS, Long.toString(Math.max(1, (d.retryAfterMicros() + 999) / 1_000)));
         // Same Content-Type as the API's other errors ("application/json", no charset).
         response.setContentType("application/json");
         String message = "Too many requests for " + rule.getMethod() + " " + rule.getPath() + ": the limit is "
