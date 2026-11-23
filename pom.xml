@@ -35,6 +35,7 @@
 		<module>messaging</module>
 		<module>catalog-client</module>
 		<module>shared-web</module>
+		<module>rate-limit</module>
 		<module>catalog-service</module>
 		<module>checkout-service</module>
 		<module>inventory-service</module>
