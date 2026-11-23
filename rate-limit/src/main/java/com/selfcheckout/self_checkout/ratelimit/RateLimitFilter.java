@@ -51,14 +51,14 @@ public class RateLimitFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-        RateLimitProperties.Rule rule = limiter.isEnabled() ? limiter.match(request.getMethod(), request.getRequestURI()) : null;
-        if (rule == null) {
-            chain.doFilter(request, response);
-            return;
-        }
-
+        RateLimitProperties.Rule rule;
         Decision d;
         try {
+            rule = limiter.isEnabled() ? limiter.match(request.getMethod(), request.getRequestURI()) : null;
+            if (rule == null) {
+                chain.doFilter(request, response);
+                return;
+            }
             d = limiter.check(rule, keyFor(rule, request));
         } catch (RuntimeException e) {
             log.error("ratelimit | check failed, letting the request through: {}", e.toString());

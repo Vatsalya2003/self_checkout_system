@@ -40,6 +40,8 @@ public class RateLimiter {
     private final LongSupplier nanoClock;
     private final CircuitBreaker breaker;
     private final AtomicBoolean enabled;
+    /** The configured rules that are complete; an incomplete one is skipped with an ERROR at start-up. */
+    private final List<RateLimitProperties.Rule> rules = new ArrayList<>();
 
     private final Map<String, RuleStats> stats = new LinkedHashMap<>();
     private final ConcurrentHashMap<String, Long> deniedUntilNanos = new ConcurrentHashMap<>();
@@ -60,13 +62,36 @@ public class RateLimiter {
         this.breaker = new CircuitBreaker(props.getBreakerFailureThreshold(), props.getBreakerOpenFor().toNanos(),
                 nanoClock, this::onBreakerChange);
         for (RateLimitProperties.Rule rule : props.getRules()) {
+            String problem = problemWith(rule);
+            if (problem != null) {
+                log.error("ratelimit | rule ignored, {}: name={} method={} path={} rate={} burst={}", problem,
+                        rule.getName(), rule.getMethod(), rule.getPath(), rule.getRatePerSecond(), rule.getBurst());
+                continue;
+            }
+            rules.add(rule);
             stats.put(rule.getName(), new RuleStats());
         }
     }
 
+    /**
+     * Why a rule cannot be used, or null if it is fine. (One way to end up here:
+     * overriding ONE field of a list entry from the command line, e.g.
+     * --ratelimit.rules[0].burst=10, replaces the whole list in Spring Boot, so
+     * the entry has no name, method or path.)
+     */
+    static String problemWith(RateLimitProperties.Rule rule) {
+        if (rule.getName() == null || rule.getMethod() == null || rule.getPath() == null) {
+            return "name, method and path are all required";
+        }
+        if (!(rule.getRatePerSecond() > 0) || rule.getBurst() < 1) {
+            return "rate-per-second must be > 0 and burst >= 1";
+        }
+        return null;
+    }
+
     /** The rule for this request, or null if no rule applies (then the request is never checked). */
     public RateLimitProperties.Rule match(String method, String path) {
-        for (RateLimitProperties.Rule rule : props.getRules()) {
+        for (RateLimitProperties.Rule rule : rules) {
             if (rule.matches(method, path)) {
                 return rule;
             }
@@ -162,8 +187,8 @@ public class RateLimiter {
         out.put("checkMeanMicros", Math.round(t.meanMicros() * 10) / 10.0);
         out.put("checkP50MicrosAtMost", t.percentileMicros(0.50));
         out.put("checkP99MicrosAtMost", t.percentileMicros(0.99));
-        List<Map<String, Object>> rules = new ArrayList<>();
-        for (RateLimitProperties.Rule rule : props.getRules()) {
+        List<Map<String, Object>> ruleList = new ArrayList<>();
+        for (RateLimitProperties.Rule rule : rules) {
             RuleStats s = stats.get(rule.getName());
             Map<String, Object> r = new LinkedHashMap<>();
             r.put("name", rule.getName());
@@ -176,9 +201,9 @@ public class RateLimiter {
             r.put("rejected", s.rejected.sum());
             r.put("rejectedWithoutRedisCall", s.rejectedFromCache.sum());
             r.put("decidedByLocalFallback", s.fallback.sum());
-            rules.add(r);
+            ruleList.add(r);
         }
-        out.put("rules", rules);
+        out.put("rules", ruleList);
         return out;
     }
 
@@ -187,7 +212,7 @@ public class RateLimiter {
         LatencyHistogram.Snapshot now = checkTime.snapshot();
         LatencyHistogram.Snapshot interval = now.minus(lastLoggedTime);
         lastLoggedTime = now;
-        for (RateLimitProperties.Rule rule : props.getRules()) {
+        for (RateLimitProperties.Rule rule : rules) {
             RuleStats s = stats.get(rule.getName());
             long[] cur = {s.allowed.sum(), s.rejected.sum(), s.rejectedFromCache.sum(), s.fallback.sum()};
             long[] prev = lastLogged.getOrDefault(rule.getName(), new long[4]);
@@ -223,11 +248,11 @@ public class RateLimiter {
     }
 
     public void logRules() {
-        if (props.getRules().isEmpty()) {
-            log.info("ratelimit | no rules configured: every request passes unchecked");
+        if (rules.isEmpty()) {
+            log.info("ratelimit | no usable rules: every request passes unchecked");
             return;
         }
-        for (RateLimitProperties.Rule rule : props.getRules()) {
+        for (RateLimitProperties.Rule rule : rules) {
             log.info("ratelimit | rule {} | enabled={} | fallback when Redis is down: rate / {} per process",
                     rule, isEnabled(), Math.max(1, props.getFallbackInstances()));
         }

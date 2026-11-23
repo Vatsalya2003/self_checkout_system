@@ -7,6 +7,8 @@
 #                                        # (shows two instances sharing one rate limit)
 #   scripts/start-all.sh --no-limiter    # start with the rate limiter OFF
 #                                        # (it can also be switched live, see RATE_LIMITER.md)
+#   scripts/start-all.sh --checkout-rate=N  # new-transactions limit of N per second
+#                                        # instead of the one in checkout's properties
 # Flags can be combined.
 #
 # Reset first if you want a clean run:
@@ -35,11 +37,13 @@ need_build=0
 two_catalogs=0
 EXTRA_ARGS=()     # passed to every service
 CATALOG_ARGS=()   # passed to the catalog instances only
+CHECKOUT_ARGS=()  # passed to checkout-service only
 for arg in "$@"; do
   case "$arg" in
     --build)        need_build=1 ;;
     --two-catalogs) two_catalogs=1 ;;
     --no-limiter)   EXTRA_ARGS+=("--ratelimit.enabled=false") ;;
+    --checkout-rate=*) CHECKOUT_ARGS+=("--checkout.new-transactions-rate=${arg#*=}") ;;
     *) echo "unknown option: $arg" >&2; exit 1 ;;
   esac
 done
@@ -65,6 +69,7 @@ launch_as() {   # instance-name jar-name port heap  (two instances of one jar ne
   fi
   local args=(${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"})
   [ "$2" = catalog-service ] && args+=(${CATALOG_ARGS[@]+"${CATALOG_ARGS[@]}"})
+  [ "$2" = checkout-service ] && args+=(${CHECKOUT_ARGS[@]+"${CHECKOUT_ARGS[@]}"})
   nohup "$JAVA" -Xmx"$4" -jar "$2/target/$2-0.0.1-SNAPSHOT.jar" --server.port="$3" ${args[@]+"${args[@]}"} \
     > "logs/$1.log" 2>&1 &
   echo $! > "logs/$1.pid"

@@ -93,6 +93,20 @@ class RateLimitFilterTest {
     }
 
     @Test
+    void ifMatchingTheRulesBreaksTheRequestStillGoesThrough() throws Exception {
+        RateLimiter broken = new RateLimiter(new RateLimitProperties(), null, now::get) {
+            @Override
+            public RateLimitProperties.Rule match(String method, String path) {
+                throw new NullPointerException("a rule with no method");
+            }
+        };
+        MockFilterChain chain = new MockFilterChain();
+        MockHttpServletResponse res = send(new RateLimitFilter(broken), "POST", "/transactions", null, chain);
+        assertThat(chain.getRequest()).isNotNull();
+        assertThat(res.getStatus()).isEqualTo(200);
+    }
+
+    @Test
     void ifTheCheckItselfBreaksTheRequestStillGoesThrough() throws Exception {
         RateLimiter broken = new RateLimiter(new RateLimitProperties(), null, now::get) {
             @Override

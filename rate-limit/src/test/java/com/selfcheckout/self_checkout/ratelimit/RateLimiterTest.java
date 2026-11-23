@@ -139,6 +139,18 @@ class RateLimiterTest {
     }
 
     @Test
+    void anIncompleteRuleIsIgnoredInsteadOfBreakingRequests() {
+        // what Spring Boot leaves behind after --ratelimit.rules[0].rate-per-second=650 on the command line
+        RateLimitProperties.Rule half = new RateLimitProperties.Rule();
+        half.setRatePerSecond(650);
+        RateLimitProperties props = new RateLimitProperties();
+        props.setRules(List.of(half));
+        RateLimiter l = new RateLimiter(props, store, now::get);
+        assertThat(l.match("POST", "/transactions")).isNull();
+        assertThat(l.stats().get("rules")).asList().isEmpty();
+    }
+
+    @Test
     void turnedOffNothingIsChecked() {
         RateLimiter l = limiter(1);
         l.setEnabled(false);
