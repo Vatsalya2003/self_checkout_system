@@ -1,0 +1,6 @@
+# step 1: find the breaking point WITHOUT the limiter (course load client)
+off-100   course 100  60 off
+off-500   course 500  60 off
+off-1000  course 1000 60 off
+off-2000  course 2000 60 off
+off-4000  course 4000 60 off

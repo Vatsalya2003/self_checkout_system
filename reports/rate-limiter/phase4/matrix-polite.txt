@@ -1,0 +1,8 @@
+polite-100-r1  polite 100  60 on
+polite-500-r1  polite 500  60 on
+polite-1000-r1 polite 1000 60 on
+polite-2000-r1 polite 2000 60 on
+polite-100-r2  polite 100  60 on
+polite-500-r2  polite 500  60 on
+polite-1000-r2 polite 1000 60 on
+polite-2000-r2 polite 2000 60 on

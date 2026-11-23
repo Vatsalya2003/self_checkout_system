@@ -1,0 +1,19 @@
+re-checked about 20 minutes later on the same data, nothing running: the first check (invariant-at-run-end.txt) raced
+with complete calls still in flight inside checkout when the client exited (see scripts/ratelimit-bench/run.sh)
+== stock (inventory_db)
+  ok    SKUs with negative stock                                       0
+  ok    SKUs where 10000 - stock <> SUM(applied)                       0
+== sales (checkout_db)
+  ok    payments still PENDING                                         0
+== checkout_db vs inventory_db
+  ok    completed sales (checkout) = stock commits (inventory)         10348
+  ok    sale lines with no matching stock-commit line                  0
+  ok    stock-commit lines with no matching sale line                  0
+     (lines compared: 101574 in checkout, 101574 in inventory)
+== popularity windows (analytics_db)
+  ok    scan_log gaps (max(seq) - count)                               0
+  ok    scan_log starts at seq 1 (or is empty)                         1
+  ok    windows not equal to a brute-force recount                     0
+== totals
+     sales 10348, units taken 101898, units short (sold out) 0, low-stock alerts 0, scans 120540, windows 241
+PASS

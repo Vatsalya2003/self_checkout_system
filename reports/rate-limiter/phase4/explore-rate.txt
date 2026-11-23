@@ -1,0 +1,3 @@
+# exploratory: which limit keeps admitted customers fast at 2,000 stations?
+explore-on-2000-r550  course 2000 60 on --checkout-rate=550
+explore-on-2000-r650  course 2000 60 on --checkout-rate=650

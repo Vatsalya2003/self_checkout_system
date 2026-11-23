@@ -1,0 +1,8 @@
+load before: { 3.24 5.27 6.14 }
+load after:  { 10.33 6.82 6.65 }
+client stderr was 76316250 bytes
+failed transactions: 327536
+by kind and operation:
+    327536 429 rate limited                     start
+nginx errors: 0 lines
+invariant: PASS dead letters 0

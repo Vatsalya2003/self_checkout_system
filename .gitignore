@@ -34,3 +34,6 @@ reports/*
 !reports/report-stress-100stations-120s.json
 # Rate limiter: its runs, charts and summaries are kept on purpose.
 !reports/rate-limiter/
+# ...except the load client's raw stderr (one line per failed request; summarised in client-errors.txt)
+reports/rate-limiter/**/client-stderr.txt.gz
+reports/rate-limiter/demo/

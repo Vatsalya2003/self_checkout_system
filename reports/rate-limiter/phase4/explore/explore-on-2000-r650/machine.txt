@@ -1,0 +1,4 @@
+label=explore-on-2000-r650 client=course stations=2000 duration=60s limiter=on start-all flags: --checkout-rate=650
+power: AC Power | free disk: 728 GB | 1-min load before: 2.90
+date: 2026-11-23 12:28:38
+checkout ratelimit | rule new-transactions (POST /transactions, key=global, 650/s, burst 50) | enabled=true | fallback when Redis is down: rate / 1 per process

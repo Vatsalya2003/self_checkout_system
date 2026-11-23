@@ -1,0 +1,17 @@
+14:27:09 | rule new-transactions (POST /transactions, key=global, 650/s, burst 50) | enabled=true | fallback when Redis is down: rate / 1 per process
+14:27:10 | redis=UP at start-up (connection and script ready in 192 ms)
+14:27:14 | redis=DOWN (RedisCommandTimeoutException: Command timed out after 20 millisecond(s)) -> local fallback, each process allows rate / 1 on its own; retrying Redis every 1000 ms
+14:27:15 | redis=UP again -> shared limit restored
+14:27:15 | rule=new-transactions key=global allowed=655 rejected=1326 (no Redis call: 0) fallback=1894 redis=UP check p50<=10us p99<=50000us | last 5s
+14:27:20 | rule=new-transactions key=global allowed=3102 rejected=3793 (no Redis call: 2446) fallback=0 redis=UP check p50<=500us p99<=1000us | last 5s
+14:27:25 | rule=new-transactions key=global allowed=3247 rejected=9249 (no Redis call: 3387) fallback=0 redis=UP check p50<=500us p99<=1000us | last 5s
+14:27:30 | rule=new-transactions key=global allowed=3252 rejected=8137 (no Redis call: 3371) fallback=0 redis=UP check p50<=200us p99<=500us | last 5s
+14:27:35 | rule=new-transactions key=global allowed=3252 rejected=8159 (no Redis call: 3507) fallback=0 redis=UP check p50<=200us p99<=500us | last 5s
+14:27:40 | rule=new-transactions key=global allowed=3244 rejected=8120 (no Redis call: 3445) fallback=0 redis=UP check p50<=200us p99<=500us | last 5s
+14:27:45 | rule=new-transactions key=global allowed=3251 rejected=8049 (no Redis call: 3295) fallback=0 redis=UP check p50<=200us p99<=500us | last 5s
+14:27:50 | rule=new-transactions key=global allowed=3254 rejected=8208 (no Redis call: 3569) fallback=0 redis=UP check p50<=200us p99<=500us | last 5s
+14:27:55 | rule=new-transactions key=global allowed=3249 rejected=8305 (no Redis call: 3625) fallback=0 redis=UP check p50<=200us p99<=500us | last 5s
+14:28:00 | rule=new-transactions key=global allowed=3249 rejected=8190 (no Redis call: 3475) fallback=0 redis=UP check p50<=200us p99<=500us | last 5s
+14:28:05 | rule=new-transactions key=global allowed=3247 rejected=8215 (no Redis call: 3436) fallback=0 redis=UP check p50<=200us p99<=500us | last 5s
+14:28:10 | rule=new-transactions key=global allowed=3252 rejected=8217 (no Redis call: 3543) fallback=0 redis=UP check p50<=200us p99<=500us | last 5s
+14:28:15 | rule=new-transactions key=global allowed=2603 rejected=6425 (no Redis call: 2703) fallback=0 redis=UP check p50<=200us p99<=500us | last 5s

@@ -1,0 +1,14 @@
+load before: { 4.07 5.17 5.83 }
+load after:  { 5.25 5.34 5.84 }
+client stderr was 27021113 bytes
+failed transactions: 188820
+by kind and operation:
+       179 502 server error                     complete
+      4159 502 server error                     scan
+      8728 502 server error                     start
+       423 503 server error                     complete
+      1215 no answer (timeout / connection)     complete
+     20986 no answer (timeout / connection)     scan
+    153130 no answer (timeout / connection)     start
+nginx errors: 13464 lines (worker_connections are not enough)
+invariant: PASS dead letters 0

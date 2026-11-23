@@ -1,0 +1,11 @@
+# Phase 5: what does the limiter cost when it is NOT throttling?
+# "high" = limiter on with a limit no run can reach (100000/s), so every request
+# pays for the Redis check and none is refused. Compared with the limiter off.
+off-100-r1     course 100 60 off
+high-100-r1    course 100 60 on  --checkout-rate=100000
+off-500-r1     course 500 60 off
+high-500-r1    course 500 60 on  --checkout-rate=100000
+off-100-r2     course 100 60 off
+high-100-r2    course 100 60 on  --checkout-rate=100000
+off-500-r2     course 500 60 off
+high-500-r2    course 500 60 on  --checkout-rate=100000

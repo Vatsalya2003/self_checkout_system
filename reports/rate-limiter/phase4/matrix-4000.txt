@@ -1,0 +1,6 @@
+off-4000-r1    course 4000 60 off
+on-4000-r1     course 4000 60 on
+polite-4000-r1 polite 4000 60 on
+off-4000-r2    course 4000 60 off
+on-4000-r2     course 4000 60 on
+polite-4000-r2 polite 4000 60 on

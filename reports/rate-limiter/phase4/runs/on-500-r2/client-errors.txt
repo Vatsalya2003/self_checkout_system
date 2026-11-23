@@ -1,0 +1,3 @@
+failed transactions: 250876
+by kind and operation:
+    250876 429 rate limited                     start

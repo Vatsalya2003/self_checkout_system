@@ -1,0 +1,4 @@
+label=high-100-r1 client=course stations=100 duration=60s limiter=on start-all flags: --checkout-rate=100000
+power: AC Power | free disk: 728 GB | 1-min load before: 2.99
+date: 2026-11-23 14:50:17
+checkout ratelimit | rule new-transactions (POST /transactions, key=global, 100000/s, burst 50) | enabled=true | fallback when Redis is down: rate / 1 per process

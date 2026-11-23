@@ -1,0 +1,3 @@
+[station-221] transaction failed: Unexpected status 429 from http://localhost:8080/transactions: {"error":"RATE_LIMITED","message":"Too many requests for POST /transactions: the limit is 650 per second (burst 50). Retry after 1 s."}
+[station-149] transaction failed: Unexpected status 429 from http://localhost:8080/transactions: {"error":"RATE_LIMITED","message":"Too many requests for POST /transactions: the limit is 650 per second (burst 50). Retry after 1 s."}
+[station-127] transaction failed: Unexpected status 429 from http://localhost:8080/transactions: {"error":"RATE_LIMITED","message":"Too many requests for POST /transactions: the limit is 650 per second (burst 50). Retry after 1 s."}

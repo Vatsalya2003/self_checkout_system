@@ -1,0 +1,28 @@
+== stock (inventory_db)
+  ok    SKUs with negative stock                                       0
+  ok    SKUs where 10000 - stock <> SUM(applied)                       0
+== sales (checkout_db)
+  FAIL  payments still PENDING                                         3 (expected 0)
+== checkout_db vs inventory_db
+  FAIL  completed sales (checkout) = stock commits (inventory)         1324 (expected 1327)
+  ok    sale lines with no matching stock-commit line                  0
+  FAIL  stock-commit lines with no matching sale line                  9 (expected 0)
+  first differences (< checkout only, > inventory only):
+    > 905ff7ba-062b-481e-9067-fe97e90aed51|SKU-001587|1|1
+    > 905ff7ba-062b-481e-9067-fe97e90aed51|SKU-001740|1|1
+    > 94a61396-2d33-4581-b643-3357738fce09|SKU-001351|1|1
+    > 94a61396-2d33-4581-b643-3357738fce09|SKU-001504|1|1
+    > 94a61396-2d33-4581-b643-3357738fce09|SKU-001774|1|1
+    > fda79899-2ce1-47e2-b79e-5392fac49581|SKU-000002|1|1
+    > fda79899-2ce1-47e2-b79e-5392fac49581|SKU-000745|1|1
+    > fda79899-2ce1-47e2-b79e-5392fac49581|SKU-001128|1|1
+    > fda79899-2ce1-47e2-b79e-5392fac49581|SKU-001749|1|1
+     (lines compared: 7444 in checkout, 7453 in inventory)
+== popularity windows (analytics_db)
+  ok    scan_log gaps (max(seq) - count)                               0
+  ok    scan_log starts at seq 1 (or is empty)                         1
+  ok    windows not equal to a brute-force recount                     0
+== totals
+     sales 1324, units taken 7465, units short (sold out) 0, low-stock alerts 0, scans 24425, windows 48
+FAIL
+dead-lettered messages across all DLQs: 0

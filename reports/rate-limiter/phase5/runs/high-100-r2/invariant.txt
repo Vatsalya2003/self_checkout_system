@@ -1,0 +1,19 @@
+saga drain before the check: 5 s (queued 0, pending 0 at the end)
+== stock (inventory_db)
+  ok    SKUs with negative stock                                       0
+  ok    SKUs where 10000 - stock <> SUM(applied)                       0
+== sales (checkout_db)
+  ok    payments still PENDING                                         0
+== checkout_db vs inventory_db
+  ok    completed sales (checkout) = stock commits (inventory)         42281
+  ok    sale lines with no matching stock-commit line                  0
+  ok    stock-commit lines with no matching sale line                  0
+     (lines compared: 395046 in checkout, 395046 in inventory)
+== popularity windows (analytics_db)
+  ok    scan_log gaps (max(seq) - count)                               0
+  ok    scan_log starts at seq 1 (or is empty)                         1
+  ok    windows not equal to a brute-force recount                     0
+== totals
+     sales 42281, units taken 369975, units short (sold out) 74197, low-stock alerts 5, scans 444172, windows 888
+PASS
+dead-lettered messages across all DLQs: 0

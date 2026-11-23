@@ -1,0 +1,6 @@
+load before: { 3.04 5.28 6.19 }
+load after:  { 6.64 6.39 6.57 }
+client stderr was 0 bytes
+failed transactions: 0
+nginx errors: 9275 lines (worker_connections are not enough)
+invariant: FAIL dead letters 0

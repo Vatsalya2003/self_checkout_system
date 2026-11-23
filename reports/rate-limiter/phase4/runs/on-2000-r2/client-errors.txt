@@ -1,0 +1,5 @@
+failed transactions: 153404
+by kind and operation:
+    153379 429 rate limited                     start
+         3 502 server error                     scan
+        22 502 server error                     start

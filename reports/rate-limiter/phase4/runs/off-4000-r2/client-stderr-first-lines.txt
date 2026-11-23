@@ -1,0 +1,3 @@
+[station-905] transaction failed: Unexpected status 502 from http://localhost:8080/transactions/9c875377-3f50-4979-98fa-26df5e60f2b3/items: <html>
+<head><title>502 Bad Gateway</title></head>
+<body>

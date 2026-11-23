@@ -1,0 +1,3 @@
+[station-418] transaction failed: Unexpected status 502 from http://localhost:8080/transactions/2dcb457e-25ca-44b0-98a6-af5524ca74dd/items: <html>
+<head><title>502 Bad Gateway</title></head>
+<body>

@@ -1,0 +1,9 @@
+failed transactions: 200702
+by kind and operation:
+       394 502 server error                     complete
+     10676 502 server error                     scan
+     20693 502 server error                     start
+       431 503 server error                     complete
+       765 no answer (timeout / connection)     complete
+     11812 no answer (timeout / connection)     scan
+    155931 no answer (timeout / connection)     start

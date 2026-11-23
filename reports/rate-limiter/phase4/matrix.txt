@@ -1,0 +1,36 @@
+# Phase 4 matrix. Limit 650/s (checkout's configured rule). Every run 60 s,
+# reset + restart before it, invariant after it. Two passes, interleaved so
+# drift in the machine's state hits every mode equally.
+#   off     course load client, limiter off
+#   on      course load client, limiter on (retries every 429 at once)
+#   polite  polite client, limiter on (waits X-RateLimit-Retry-After-Ms)
+off-100-r1     course 100  60 off
+on-100-r1      course 100  60 on
+polite-100-r1  polite 100  60 on
+off-500-r1     course 500  60 off
+on-500-r1      course 500  60 on
+polite-500-r1  polite 500  60 on
+off-1000-r1    course 1000 60 off
+on-1000-r1     course 1000 60 on
+polite-1000-r1 polite 1000 60 on
+off-2000-r1    course 2000 60 off
+on-2000-r1     course 2000 60 on
+polite-2000-r1 polite 2000 60 on
+off-4000-r1    course 4000 60 off
+on-4000-r1     course 4000 60 on
+polite-4000-r1 polite 4000 60 on
+off-100-r2     course 100  60 off
+on-100-r2      course 100  60 on
+polite-100-r2  polite 100  60 on
+off-500-r2     course 500  60 off
+on-500-r2      course 500  60 on
+polite-500-r2  polite 500  60 on
+off-1000-r2    course 1000 60 off
+on-1000-r2     course 1000 60 on
+polite-1000-r2 polite 1000 60 on
+off-2000-r2    course 2000 60 off
+on-2000-r2     course 2000 60 on
+polite-2000-r2 polite 2000 60 on
+off-4000-r2    course 4000 60 off
+on-4000-r2     course 4000 60 on
+polite-4000-r2 polite 4000 60 on

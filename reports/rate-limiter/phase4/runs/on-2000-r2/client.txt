@@ -1,0 +1,40 @@
+Self-Checkout Load Client starting...
+  baseUrl=http://localhost:8080 stations=2000 duration=60s basket=[1..20]
+Fetching catalog...
+Catalog loaded: 2000 items.
+Starting 2000 simulated station(s) for 60s...
+Duration elapsed, waiting for in-flight transactions to finish...
+Fetching low-stock alerts and popular items...
+
+================ LOAD TEST REPORT ================
+Base URL:        http://localhost:8080
+Stations:        2000
+Duration:        61.9s (requested 60s)
+Transactions:    38632 (624.0/sec)
+Items scanned:   407952 (6589.4/sec)
+
+Operation                    OK   Errors   Mean(ms)    P50(ms)    P95(ms)    P99(ms)    Max(ms)     Err%
+START_TRANSACTION         38635   153401     181.88     167.07     274.18     354.95    1024.27   79.88%
+SCAN_ITEM                407952        3     174.20     162.39     265.06     317.28     682.81    0.00%
+COMPLETE_TRANSACTION      38632        0     485.07     464.21     701.76     912.66    1757.13    0.00%
+
+Low-stock alerts (4):
+  SKU-000001   Item 1                         stock=0      threshold=50
+  SKU-000002   Item 2                         stock=0      threshold=50
+  SKU-000003   Item 3                         stock=0      threshold=50
+  SKU-000004   Item 4                         stock=0      threshold=50
+
+Most popular items (top 10):
+  #1   SKU-000001   Item 1                         scans=118
+  #2   SKU-000002   Item 2                         scans=65
+  #3   SKU-000003   Item 3                         scans=44
+  #4   SKU-000004   Item 4                         scans=27
+  #5   SKU-000005   Item 5                         scans=27
+  #6   SKU-000006   Item 6                         scans=25
+  #7   SKU-000007   Item 7                         scans=20
+  #8   SKU-000009   Item 9                         scans=17
+  #9   SKU-000010   Item 10                        scans=13
+  #10  SKU-000013   Item 13                        scans=12
+===================================================
+
+JSON report written to: reports/rate-limiter/phase4/runs/on-2000-r2/report-20261123-135322.json

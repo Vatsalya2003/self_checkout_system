@@ -1,0 +1,72 @@
+{
+  "generatedAt": "2026-11-23T22:54:08.744387Z",
+  "config": {
+    "baseUrl": "http://localhost:8080",
+    "stations": 500,
+    "durationSecondsRequested": 60,
+    "minItems": 1,
+    "maxItems": 20
+  },
+  "wallClockSeconds": 60.532346458,
+  "totalTransactions": 42174,
+  "totalItemsScanned": 443420,
+  "transactionsPerSecond": 696.718407062944,
+  "itemsPerSecond": 7325.339689378542,
+  "operations": [
+    {
+      "operation": "START_TRANSACTION",
+      "successCount": 42174,
+      "errorCount": 0,
+      "errorRate": 0.0,
+      "meanMs": 35.43397632309006,
+      "p50Ms": 32.549125,
+      "p95Ms": 55.339917,
+      "p99Ms": 114.100417,
+      "minMs": 0.208542,
+      "maxMs": 249.499625
+    },
+    {
+      "operation": "SCAN_ITEM",
+      "successCount": 443420,
+      "errorCount": 0,
+      "errorRate": 0.0,
+      "meanMs": 34.29659454927383,
+      "p50Ms": 32.465209,
+      "p95Ms": 53.172083,
+      "p99Ms": 68.371042,
+      "minMs": 0.187292,
+      "maxMs": 164.117709
+    },
+    {
+      "operation": "COMPLETE_TRANSACTION",
+      "successCount": 42174,
+      "errorCount": 0,
+      "errorRate": 0.0,
+      "meanMs": 318.26551543946505,
+      "p50Ms": 301.98425,
+      "p95Ms": 488.669292,
+      "p99Ms": 621.916542,
+      "minMs": 171.195208,
+      "maxMs": 1360.688375
+    }
+  ],
+  "lowStockAlerts": [
+    {"sku": "SKU-000001", "name": "Item 1", "currentStock": 0, "threshold": 50},
+    {"sku": "SKU-000002", "name": "Item 2", "currentStock": 0, "threshold": 50},
+    {"sku": "SKU-000003", "name": "Item 3", "currentStock": 0, "threshold": 50},
+    {"sku": "SKU-000004", "name": "Item 4", "currentStock": 0, "threshold": 50},
+    {"sku": "SKU-000005", "name": "Item 5", "currentStock": 0, "threshold": 50}
+  ],
+  "popularItems": [
+    {"rank": 1, "sku": "SKU-000001", "name": "Item 1", "scanCount": 109},
+    {"rank": 2, "sku": "SKU-000002", "name": "Item 2", "scanCount": 63},
+    {"rank": 3, "sku": "SKU-000003", "name": "Item 3", "scanCount": 46},
+    {"rank": 4, "sku": "SKU-000005", "name": "Item 5", "scanCount": 29},
+    {"rank": 5, "sku": "SKU-000004", "name": "Item 4", "scanCount": 26},
+    {"rank": 6, "sku": "SKU-000007", "name": "Item 7", "scanCount": 22},
+    {"rank": 7, "sku": "SKU-000006", "name": "Item 6", "scanCount": 21},
+    {"rank": 8, "sku": "SKU-000013", "name": "Item 13", "scanCount": 11},
+    {"rank": 9, "sku": "SKU-000021", "name": "Item 21", "scanCount": 11},
+    {"rank": 10, "sku": "SKU-000022", "name": "Item 22", "scanCount": 11}
+  ]
+}

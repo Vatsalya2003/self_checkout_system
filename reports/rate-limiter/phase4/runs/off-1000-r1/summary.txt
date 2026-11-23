@@ -1,0 +1,8 @@
+load before: { 2.89 6.10 6.38 }
+load after:  { 7.95 7.11 6.74 }
+client stderr was 1788 bytes
+failed transactions: 6
+by kind and operation:
+         6 502 server error                     scan
+nginx errors: 8 lines
+invariant: PASS dead letters 0

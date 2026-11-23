@@ -1,0 +1,5 @@
+failed transactions: 571
+by kind and operation:
+        10 502 server error                     complete
+       171 502 server error                     scan
+       390 502 server error                     start

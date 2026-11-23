@@ -24,13 +24,18 @@ import java.util.regex.Pattern;
  *   java scripts/demo/RateLimitClient.java --mode=probe  --path=/items --concurrency=16 --duration=20 --instances=8081,8085
  *
  * polite: checkout stations like the course load client, with one difference:
- *         a station that gets a 429 WAITS before trying again, for as long as
- *         the server says (plus a little random jitter so they don't all come
- *         back at once). The course client retries immediately, which turns
+ *         a station that gets a 429 WAITS before trying again: at least as
+ *         long as the server says, and longer each time it is refused again in
+ *         a row (exponential backoff with random jitter, capped at 2 s, reset
+ *         after an admitted request). The backoff matters: with one global
+ *         bucket the server's hint is "the next token exists in ~2 ms", which
+ *         is true but is only enough for ONE of the waiting stations. Sleeping
+ *         exactly that long makes every station come back together. The course client retries immediately, which turns
  *         every 429 into another request. This client also times the 429
  *         answers, which the course client does not record.
- *         --wait=ms (default) uses X-RateLimit-Retry-After-Ms, the exact wait;
- *         --wait=seconds uses only the standard Retry-After (whole seconds).
+ *         --wait=ms (default) takes the hint from X-RateLimit-Retry-After-Ms;
+ *         --wait=seconds uses only the standard Retry-After (whole seconds);
+ *         --wait=exact sleeps exactly the ms hint, no backoff (shows the herd).
  *         --report=file.json writes the summary as JSON.
  * probe:  sends GET requests to one path as fast as `concurrency` threads can,
  *         counts 200s and 429s per second, and at the end reads each service
@@ -56,6 +61,7 @@ public class RateLimitClient {
     final LongAdder scans = new LongAdder();
     final LongAdder errors = new LongAdder();
     final LongAdder waiting = new LongAdder();
+    volatile boolean exactOnly;
     final LongAdder ok = new LongAdder();
     final LongAdder other = new LongAdder();
     final ConcurrentLinkedQueue<Long> admittedNanos = new ConcurrentLinkedQueue<>();
@@ -89,9 +95,11 @@ public class RateLimitClient {
         int stations = Integer.parseInt(opt.getOrDefault("stations", "100"));
         int duration = Integer.parseInt(opt.getOrDefault("duration", "60"));
         List<String> skus = fetchSkus();
-        boolean exactWait = !"seconds".equals(opt.getOrDefault("wait", "ms"));
+        String waitOpt = opt.getOrDefault("wait", "ms");
+        boolean exactWait = !"seconds".equals(waitOpt);
+        exactOnly = "exact".equals(waitOpt);
         System.out.printf("polite client: %d stations for %ds against %s (a 429 means: wait %s, then retry)%n",
-                stations, duration, base, exactWait ? "X-RateLimit-Retry-After-Ms" : "Retry-After (whole seconds)");
+                stations, duration, base, exactOnly ? "exactly X-RateLimit-Retry-After-Ms" : exactWait ? "X-RateLimit-Retry-After-Ms + backoff" : "Retry-After (whole seconds)");
         System.out.println("   t | admitted/s throttled/s waiting | completed/s scans/s errors | 201 p50  429 p50");
         try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
             for (int i = 1; i <= stations; i++) {
@@ -126,7 +134,7 @@ public class RateLimitClient {
                      "scanMs":{"p50":%.3f,"p95":%.3f,"p99":%.3f},
                      "completeMs":{"p50":%.3f,"p95":%.3f,"p99":%.3f}}
                     """,
-                    exactWait ? "ms" : "seconds", stations, duration, started.sum(), throttled.sum(), completed.sum(),
+                    waitOpt, stations, duration, started.sum(), throttled.sum(), completed.sum(),
                     scans.sum(), errors.sum(), completed.sum() / (double) duration,
                     msd(pct(a, .5)), msd(pct(a, .95)), msd(pct(a, .99)), msd(pct(t, .5)), msd(pct(t, .95)), msd(pct(t, .99)),
                     msd(pct(sc, .5)), msd(pct(sc, .95)), msd(pct(sc, .99)), msd(pct(c, .5)), msd(pct(c, .95)), msd(pct(c, .99)));
@@ -135,8 +143,11 @@ public class RateLimitClient {
         }
     }
 
+    static final long BACKOFF_BASE_MS = 50, BACKOFF_CAP_MS = 2000;
+
     void station(String id, List<String> skus, boolean exactWait) {
         ThreadLocalRandom rnd = ThreadLocalRandom.current();
+        int refusedInARow = 0;
         while (!stop.get()) {
             try {
                 long t0 = System.nanoTime();
@@ -145,14 +156,24 @@ public class RateLimitClient {
                 if (r.statusCode() == 429) {
                     throttled.increment();
                     throttledNanos.add(took);
-                    // exact wait from the non-standard header, else whole seconds from
-                    // Retry-After; plus up to the same again at random (or 250 ms), so
-                    // the waiting stations don't all come back in the same instant
+                    // the server's hint is the earliest moment trying again can work:
+                    // ms from the non-standard header, else whole seconds from Retry-After
                     String exact = r.headers().firstValue("X-RateLimit-Retry-After-Ms").orElse(null);
-                    long waitMs = exactWait && exact != null
+                    long hintMs = exactWait && exact != null
                             ? Long.parseLong(exact)
                             : 1000L * Long.parseLong(r.headers().firstValue("Retry-After").orElse("1"));
-                    waitMs += rnd.nextLong(Math.max(1, Math.min(waitMs, 250)));
+                    long waitMs;
+                    if (exactOnly) {
+                        waitMs = hintMs;                       // --wait=exact: no backoff
+                    } else if (exactWait) {
+                        // never sooner than the hint; on top of it a random share of a
+                        // window that doubles with every 429 in a row (full jitter)
+                        long window = Math.min(BACKOFF_CAP_MS, BACKOFF_BASE_MS << Math.min(refusedInARow, 6));
+                        waitMs = hintMs + rnd.nextLong(window + 1);
+                    } else {
+                        waitMs = hintMs + rnd.nextLong(Math.min(hintMs, 250) + 1);
+                    }
+                    refusedInARow++;
                     waiting.increment();
                     try {
                         Thread.sleep(waitMs);
@@ -165,6 +186,7 @@ public class RateLimitClient {
                     errors.increment();
                     continue;
                 }
+                refusedInARow = 0;
                 started.increment();
                 admittedNanos.add(took);
                 Matcher m = TX_ID.matcher(r.body());

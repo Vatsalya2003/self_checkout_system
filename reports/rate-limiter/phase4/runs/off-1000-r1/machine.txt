@@ -1,0 +1,4 @@
+label=off-1000-r1 client=course stations=1000 duration=60s limiter=off start-all flags: --no-limiter
+power: AC Power | free disk: 728 GB | 1-min load before: 2.88
+date: 2026-11-23 12:50:38
+checkout ratelimit | rule new-transactions (POST /transactions, key=global, 650/s, burst 50) | enabled=false | fallback when Redis is down: rate / 1 per process

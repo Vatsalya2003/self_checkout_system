@@ -1,0 +1,37 @@
+Self-Checkout Load Client starting...
+  baseUrl=http://localhost:8080 stations=4000 duration=60s basket=[1..20]
+Fetching catalog...
+Catalog loaded: 2000 items.
+Starting 4000 simulated station(s) for 60s...
+Duration elapsed, waiting for in-flight transactions to finish...
+Fetching low-stock alerts and popular items...
+
+================ LOAD TEST REPORT ================
+Base URL:        http://localhost:8080
+Stations:        4000
+Duration:        72.5s (requested 60s)
+Transactions:    2342 (32.3/sec)
+Items scanned:   64889 (894.7/sec)
+
+Operation                    OK   Errors   Mean(ms)    P50(ms)    P95(ms)    P99(ms)    Max(ms)     Err%
+START_TRANSACTION         25796   197394    1606.53     776.74    6466.69    7405.52   15672.27   88.44%
+SCAN_ITEM                 64889    21769     582.83     267.76    2188.14    4928.20   15391.97   25.12%
+COMPLETE_TRANSACTION       2342     1685    1434.32    1233.60    3328.71    6093.90    9762.24   41.84%
+
+Low-stock alerts (0):
+  (none)
+
+Most popular items (top 10):
+  #1   SKU-000001   Item 1                         scans=114
+  #2   SKU-000002   Item 2                         scans=49
+  #3   SKU-000003   Item 3                         scans=43
+  #4   SKU-000005   Item 5                         scans=28
+  #5   SKU-000004   Item 4                         scans=27
+  #6   SKU-000006   Item 6                         scans=19
+  #7   SKU-000009   Item 9                         scans=19
+  #8   SKU-000007   Item 7                         scans=17
+  #9   SKU-000008   Item 8                         scans=15
+  #10  SKU-000022   Item 22                        scans=13
+===================================================
+
+JSON report written to: reports/rate-limiter/phase4/runs/off-4000-r1/report-20261123-131146.json

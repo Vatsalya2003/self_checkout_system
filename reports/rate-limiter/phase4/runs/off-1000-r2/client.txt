@@ -1,0 +1,41 @@
+Self-Checkout Load Client starting...
+  baseUrl=http://localhost:8080 stations=1000 duration=60s basket=[1..20]
+Fetching catalog...
+Catalog loaded: 2000 items.
+Starting 1000 simulated station(s) for 60s...
+Duration elapsed, waiting for in-flight transactions to finish...
+Fetching low-stock alerts and popular items...
+
+================ LOAD TEST REPORT ================
+Base URL:        http://localhost:8080
+Stations:        1000
+Duration:        61.4s (requested 60s)
+Transactions:    44075 (718.1/sec)
+Items scanned:   464214 (7563.0/sec)
+
+Operation                    OK   Errors   Mean(ms)    P50(ms)    P95(ms)    P99(ms)    Max(ms)     Err%
+START_TRANSACTION         44197        0      90.80      84.90     134.00     186.61     452.72    0.00%
+SCAN_ITEM                464214      114      87.70      84.15     127.26     152.17     279.95    0.02%
+COMPLETE_TRANSACTION      44075        8     362.35     348.21     535.57     658.81    1216.78    0.02%
+
+Low-stock alerts (5):
+  SKU-000001   Item 1                         stock=0      threshold=50
+  SKU-000002   Item 2                         stock=0      threshold=50
+  SKU-000003   Item 3                         stock=0      threshold=50
+  SKU-000004   Item 4                         stock=0      threshold=50
+  SKU-000005   Item 5                         stock=0      threshold=50
+
+Most popular items (top 10):
+  #1   SKU-000001   Item 1                         scans=134
+  #2   SKU-000002   Item 2                         scans=61
+  #3   SKU-000003   Item 3                         scans=35
+  #4   SKU-000004   Item 4                         scans=28
+  #5   SKU-000007   Item 7                         scans=22
+  #6   SKU-000005   Item 5                         scans=21
+  #7   SKU-000006   Item 6                         scans=16
+  #8   SKU-000008   Item 8                         scans=14
+  #9   SKU-000009   Item 9                         scans=14
+  #10  SKU-000018   Item 18                        scans=11
+===================================================
+
+JSON report written to: reports/rate-limiter/phase4/runs/off-1000-r2/report-20261123-134017.json

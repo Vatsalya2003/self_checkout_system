@@ -1,0 +1,6 @@
+load before: { 2.86 4.31 5.30 }
+load after:  { 14.01 8.73 6.98 }
+client stderr was 0 bytes
+failed transactions: 0
+nginx errors: 41031 lines (worker_connections are not enough)
+invariant: PASS dead letters 0

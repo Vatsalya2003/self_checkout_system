@@ -1,0 +1,2 @@
+12:50:34 | rule new-transactions (POST /transactions, key=global, 650/s, burst 50) | enabled=false | fallback when Redis is down: rate / 1 per process
+12:50:35 | redis=UP at start-up (connection and script ready in 164 ms)

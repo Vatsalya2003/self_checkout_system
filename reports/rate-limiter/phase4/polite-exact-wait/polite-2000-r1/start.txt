@@ -1,0 +1,11 @@
+rabbitmq running
+redis running
+started catalog-service (pid 73054) on :8081
+  catalog-service healthy
+started checkout-service (pid 73076) on :8082
+started inventory-service (pid 73081) on :8083
+started analytics-service (pid 73084) on :8084
+  checkout-service healthy
+  inventory-service healthy
+  analytics-service healthy
+gateway up on :8080 -> all services reachable through one base URL

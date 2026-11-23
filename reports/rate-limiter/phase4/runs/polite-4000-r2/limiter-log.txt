@@ -1,0 +1,45 @@
+14:20:24 | rule new-transactions (POST /transactions, key=global, 650/s, burst 50) | enabled=true | fallback when Redis is down: rate / 1 per process
+14:20:25 | redis=UP at start-up (connection and script ready in 172 ms)
+14:20:29 | redis=DOWN (RedisCommandTimeoutException: Command timed out after 20 millisecond(s)) -> local fallback, each process allows rate / 1 on its own; retrying Redis every 1000 ms
+14:20:29 | redis=UP again -> shared limit restored
+14:20:29 | redis=DOWN (RedisCommandTimeoutException: Command timed out after 20 millisecond(s)) -> local fallback, each process allows rate / 1 on its own; retrying Redis every 1000 ms
+14:20:29 | redis=UP again -> shared limit restored
+14:20:29 | redis=DOWN (RedisCommandTimeoutException: Command timed out after 20 millisecond(s)) -> local fallback, each process allows rate / 1 on its own; retrying Redis every 1000 ms
+14:20:29 | redis=UP again -> shared limit restored
+14:20:29 | redis=DOWN (RedisCommandTimeoutException: Command timed out after 20 millisecond(s)) -> local fallback, each process allows rate / 1 on its own; retrying Redis every 1000 ms
+14:20:29 | redis=UP again -> shared limit restored
+14:20:29 | redis=DOWN (RedisCommandTimeoutException: Command timed out after 20 millisecond(s)) -> local fallback, each process allows rate / 1 on its own; retrying Redis every 1000 ms
+14:20:29 | redis=UP again -> shared limit restored
+14:20:29 | redis=DOWN (RedisCommandTimeoutException: Command timed out after 20 millisecond(s)) -> local fallback, each process allows rate / 1 on its own; retrying Redis every 1000 ms
+14:20:29 | redis=UP again -> shared limit restored
+14:20:29 | redis=DOWN (RedisCommandTimeoutException: Command timed out after 20 millisecond(s)) -> local fallback, each process allows rate / 1 on its own; retrying Redis every 1000 ms
+14:20:29 | redis=UP again -> shared limit restored
+14:20:29 | redis=DOWN (RedisCommandTimeoutException: Command timed out after 20 millisecond(s)) -> local fallback, each process allows rate / 1 on its own; retrying Redis every 1000 ms
+14:20:29 | redis=UP again -> shared limit restored
+14:20:29 | redis=DOWN (RedisCommandTimeoutException: Command timed out after 20 millisecond(s)) -> local fallback, each process allows rate / 1 on its own; retrying Redis every 1000 ms
+14:20:29 | redis=UP again -> shared limit restored
+14:20:30 | rule=new-transactions key=global allowed=1194 rejected=5049 (no Redis call: 317) fallback=1183 redis=UP check p50<=5000us p99<=50000us | last 5s
+14:20:35 | rule=new-transactions key=global allowed=2992 rejected=15878 (no Redis call: 11874) fallback=0 redis=UP check p50<=1us p99<=5000us | last 5s
+14:20:40 | rule=new-transactions key=global allowed=3252 rejected=13005 (no Redis call: 10261) fallback=0 redis=UP check p50<=1us p99<=1000us | last 5s
+14:20:45 | rule=new-transactions key=global allowed=3251 rejected=19557 (no Redis call: 16322) fallback=0 redis=UP check p50<=1us p99<=1000us | last 5s
+14:20:46 | redis=DOWN (RedisCommandTimeoutException: Command timed out after 20 millisecond(s)) -> local fallback, each process allows rate / 1 on its own; retrying Redis every 1000 ms
+14:20:50 | rule=new-transactions key=global allowed=748 rejected=2505 (no Redis call: 1994) fallback=389 redis=DOWN check p50<=1us p99<=10000us | last 5s
+14:20:55 | rule=new-transactions key=global allowed=80 rejected=0 (no Redis call: 0) fallback=80 redis=DOWN check p50<=1us p99<=50000us | last 5s
+14:21:04 | redis=UP again -> shared limit restored
+14:21:05 | rule=new-transactions key=global allowed=427 rejected=7289 (no Redis call: 0) fallback=7689 redis=UP check p50<=1us p99<=10us | last 5s
+14:21:08 | redis=DOWN (RedisCommandTimeoutException: Command timed out after 20 millisecond(s)) -> local fallback, each process allows rate / 1 on its own; retrying Redis every 1000 ms
+14:21:08 | redis=UP again -> shared limit restored
+14:21:08 | redis=DOWN (RedisCommandTimeoutException: Command timed out after 20 millisecond(s)) -> local fallback, each process allows rate / 1 on its own; retrying Redis every 1000 ms
+14:21:08 | redis=UP again -> shared limit restored
+14:21:08 | redis=DOWN (RedisCommandTimeoutException: Command timed out after 20 millisecond(s)) -> local fallback, each process allows rate / 1 on its own; retrying Redis every 1000 ms
+14:21:08 | redis=UP again -> shared limit restored
+14:21:10 | redis=DOWN (RedisCommandTimeoutException: Command timed out after 20 millisecond(s)) -> local fallback, each process allows rate / 1 on its own; retrying Redis every 1000 ms
+14:21:10 | rule=new-transactions key=global allowed=630 rejected=6005 (no Redis call: 4055) fallback=414 redis=DOWN check p50<=1us p99<=50000us | last 5s
+14:21:12 | redis=UP again -> shared limit restored
+14:21:14 | redis=DOWN (RedisCommandTimeoutException: Command timed out after 20 millisecond(s)) -> local fallback, each process allows rate / 1 on its own; retrying Redis every 1000 ms
+14:21:15 | rule=new-transactions key=global allowed=879 rejected=4065 (no Redis call: 111) fallback=4592 redis=DOWN check p50<=1us p99<=2000us | last 5s
+14:21:20 | rule=new-transactions key=global allowed=833 rejected=5173 (no Redis call: 0) fallback=6006 redis=DOWN check p50<=1us p99<=1us | last 5s
+14:21:29 | redis=UP again -> shared limit restored
+14:21:30 | rule=new-transactions key=global allowed=161 rejected=216 (no Redis call: 0) fallback=268 redis=UP check p50<=1us p99<=5000us | last 5s
+14:21:35 | rule=new-transactions key=global allowed=52 rejected=0 (no Redis call: 0) fallback=0 redis=UP check p50<=500us p99<=2000us | last 5s
+14:21:40 | rule=new-transactions key=global allowed=97 rejected=89 (no Redis call: 7) fallback=0 redis=UP check p50<=2000us p99<=10000us | last 5s

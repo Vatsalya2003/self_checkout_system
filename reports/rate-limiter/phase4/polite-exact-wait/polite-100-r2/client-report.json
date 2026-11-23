@@ -1,0 +1,7 @@
+{"client":"polite","wait":"ms","stations":100,"durationSeconds":60,
+ "admitted":38565,"throttled":752570,"completed":38565,"scans":403513,"errors":0,
+ "transactionsPerSecond":642.8,
+ "startAdmittedMs":{"p50":0.660,"p95":2.446,"p99":5.738},
+ "start429Ms":{"p50":0.516,"p95":1.710,"p99":3.489},
+ "scanMs":{"p50":0.269,"p95":0.782,"p99":3.094},
+ "completeMs":{"p50":103.708,"p95":195.844,"p99":298.627}}

@@ -1,0 +1,6 @@
+load before: { 3.94 5.10 5.51 }
+load after:  { 6.70 5.72 5.72 }
+client stderr was 0 bytes
+failed transactions: 0
+nginx errors: 2 lines
+invariant: PASS dead letters 0
