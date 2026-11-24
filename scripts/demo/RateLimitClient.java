@@ -8,6 +8,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
@@ -60,6 +61,9 @@ public class RateLimitClient {
     final LongAdder completed = new LongAdder();
     final LongAdder scans = new LongAdder();
     final LongAdder errors = new LongAdder();
+    // every error by "kind | operation" -> {count, first second, last second}
+    final Map<String, long[]> errorKinds = new ConcurrentHashMap<>();
+    volatile long runStartNanos = System.nanoTime();
     final LongAdder waiting = new LongAdder();
     volatile boolean exactOnly;
     final LongAdder ok = new LongAdder();
@@ -102,6 +106,7 @@ public class RateLimitClient {
                 stations, duration, base, exactOnly ? "exactly X-RateLimit-Retry-After-Ms" : exactWait ? "X-RateLimit-Retry-After-Ms + backoff" : "Retry-After (whole seconds)");
         System.out.println("   t | admitted/s throttled/s waiting | completed/s scans/s errors | 201 p50  429 p50");
         try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
+            runStartNanos = System.nanoTime();
             for (int i = 1; i <= stations; i++) {
                 String id = String.format("polite-%03d", i);
                 pool.submit(() -> station(id, skus, exactWait));
@@ -124,6 +129,16 @@ public class RateLimitClient {
         System.out.printf("  completed transactions       %8d  (%.1f/s)   complete p50 %s  p95 %s  p99 %s%n",
                 completed.sum(), completed.sum() / (double) duration, ms(pct(c, .50)), ms(pct(c, .95)), ms(pct(c, .99)));
         System.out.printf("  errors (anything but 201/200/429, or no answer): %d%n", errors.sum());
+        if (!errorKinds.isEmpty()) {
+            System.out.println("  errors by kind and operation (seconds into the run when they happened):");
+            errorKinds.entrySet().stream()
+                    .sorted((x, y) -> Long.compare(y.getValue()[0], x.getValue()[0]))
+                    .forEach(e -> {
+                        String[] k = e.getKey().split("\\|");
+                        long[] v = e.getValue();
+                        System.out.printf("    %8d  %-44s %-9s s %d-%d%n", v[0], k[0], k[1], v[1], v[2]);
+                    });
+        }
         if (opt.containsKey("report")) {
             String json = String.format(java.util.Locale.ROOT, """
                     {"client":"polite","wait":"%s","stations":%d,"durationSeconds":%d,
@@ -149,6 +164,7 @@ public class RateLimitClient {
         ThreadLocalRandom rnd = ThreadLocalRandom.current();
         int refusedInARow = 0;
         while (!stop.get()) {
+            String op = "start";
             try {
                 long t0 = System.nanoTime();
                 HttpResponse<String> r = send("POST", "/transactions", "{\"stationId\":\"" + id + "\"}");
@@ -183,7 +199,7 @@ public class RateLimitClient {
                     continue;
                 }
                 if (r.statusCode() != 201) {
-                    errors.increment();
+                    error("HTTP " + r.statusCode(), op);
                     continue;
                 }
                 refusedInARow = 0;
@@ -191,12 +207,13 @@ public class RateLimitClient {
                 admittedNanos.add(took);
                 Matcher m = TX_ID.matcher(r.body());
                 if (!m.find()) {
-                    errors.increment();
+                    error("201 without a transaction id", op);
                     continue;
                 }
                 String tx = m.group(1);
                 int n = rnd.nextInt(1, 21);
                 boolean okSoFar = true;
+                op = "scan";
                 for (int i = 0; i < n && okSoFar; i++) {
                     String sku = skus.get(rnd.nextInt(skus.size()));
                     long ts = System.nanoTime();
@@ -205,25 +222,41 @@ public class RateLimitClient {
                         scans.increment();
                         scanNanos.add(System.nanoTime() - ts);
                     } else {
-                        errors.increment();
+                        error("HTTP " + s.statusCode(), op);
                         okSoFar = false;
                     }
                 }
                 if (!okSoFar) {
                     continue;
                 }
+                op = "complete";
                 long tc = System.nanoTime();
                 HttpResponse<String> done = send("POST", "/transactions/" + tx + "/complete", "{}");
                 if (done.statusCode() == 200) {
                     completed.increment();
                     completeNanos.add(System.nanoTime() - tc);
                 } else {
-                    errors.increment();
+                    error("HTTP " + done.statusCode(), op);
                 }
             } catch (Exception e) {
-                errors.increment();
+                error("no answer (" + e.getClass().getSimpleName() + ")", op);
             }
         }
+    }
+
+    /** Counts one error, and remembers its kind, operation and when it happened. */
+    void error(String kind, String op) {
+        errors.increment();
+        long second = (System.nanoTime() - runStartNanos) / 1_000_000_000L + 1;
+        errorKinds.compute(kind + "|" + op, (k, v) -> {
+            if (v == null) {
+                return new long[] {1, second, second};
+            }
+            v[0]++;
+            v[1] = Math.min(v[1], second);
+            v[2] = Math.max(v[2], second);
+            return v;
+        });
     }
 
     List<String> fetchSkus() throws Exception {
